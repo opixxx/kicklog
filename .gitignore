@@ -98,6 +98,13 @@ local.properties
 # ========== Docker ==========
 docker-compose.override.yml
 
+# ========== 하네스 — worktree 내부 작업 아티팩트 (공유 불필요) ==========
+.task/
+/logs/
+EXEC_PLAN.md
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+
 # ========== Misc ==========
 *.swp
 *.swo

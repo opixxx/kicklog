@@ -1,0 +1,26 @@
+{
+  "$comment": "KickLog 하네스 훅 배선. 상세 정책은 .claude/skills/orchestrator/SKILL.md 참조 (단계 4에서 도입). 현재는 단계 1만 활성 — guard-bash + session-context.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/tools/hooks/guard-bash.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/tools/hooks/session-context.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
