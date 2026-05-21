@@ -159,7 +159,7 @@
 ### 후속 결정 (이후 ADR)
 - ADR-0002: 자동 그룹핑 시간/위치 임계값 정확한 수치 (pending)
 - **ADR-0003: 백엔드 데이터 모델 / API 스키마 ✅ 작성 완료 (2026-05-21)**
-- ADR-0004: SwiftData 모델 + HealthKit 매핑 / iCloud Sync 도입 여부 (pending)
+- **ADR-0004: SwiftData 모델 + HealthKit 매핑 ✅ 작성 완료 (2026-05-21)** — 본인/친구 모델 분리, 최소 권한 6개, Observer Query + Background Delivery, UTC + Local TZ, 친구 캐시 1h TTL, 사용자 프로필 안 받음, SwiftData 영속 캐시
 - ADR-0005: 초대 링크 Universal Link 구조 (pending)
 - **ADR-0006: 백엔드 호스팅 선택 ✅ 작성 완료 (2026-05-21)** — AWS EC2 + RDS + Terraform (서울 region)
 

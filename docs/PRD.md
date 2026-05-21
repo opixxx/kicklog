@@ -112,7 +112,7 @@
 4. HealthKit 권한 (이유 명시 — `NSHealthShareUsageDescription`)
 
 - 위치 권한은 첫 라벨링에서 "운동장 등록" 시점에 deferred
-- 사용자 프로필 (키·몸무게·생년월일)은 HealthKit에서 자동 읽기 (별도 입력 X)
+- **사용자 프로필 (키·몸무게·생년월일)은 MVP에서 사용 안 함** — HealthKit이 `ActiveEnergyBurned` 등을 사용자 본인 프로필로 자동 계산. v1.1+ 코칭 기능 도입 시 권한 확장 (ADR-0004 D7)
 
 ### 4.8 운동장 등록 흐름 (ADR-0003 D6.1)
 
