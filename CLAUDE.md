@@ -27,15 +27,16 @@
 **강제 메커니즘 (단계적 도입):**
 - `PreToolUse` (Bash): `guard-bash.sh` — 위험 명령 차단 ✅
 - `SessionStart`: `session-context.sh` — 현재 작업 상태 자동 주입 ✅
-- `PreToolUse` (Edit/Write): `enforce-worktree.sh` — main 브랜치 백엔드 소스 직접 수정 차단 ✅ (단계 2)
-- `.githooks/pre-commit`: 백엔드 Kotlin compile 게이트 ✅ (단계 2)
+- `PreToolUse` (Edit/Write): `enforce-worktree.sh` — main 브랜치 **백엔드 + iOS 소스** 직접 수정 차단 ✅ (단계 2 + 3)
+- `.githooks/pre-commit`: 백엔드 Kotlin compile 게이트 ✅ (단계 2). iOS는 Xcode가 컴파일 오류 즉시 표시 + CI 게이트 (v1.1).
 - `PreToolUse` (Edit/Write): `enforce-plan.sh` — 30줄 이상 변경에 EXEC_PLAN 강제 (단계 4에서 도입)
 - `Stop`: `verify-and-block.sh` — compile + 자가수정 루프 (단계 4에서 도입)
 
-**Agents 및 Skills (단계 2 활성):**
+**Agents 및 Skills (단계 2~3 활성):**
 - `code-reviewer` agent: 백엔드(Kotlin/Spring) 전용 코드 리뷰 — `memory: project` + `skills: [coding-conventions]`
-- `coding-conventions` skill: 백엔드 컨벤션 (한글 주석/로그, DTO, ErrorCode, 메서드 길이 등) — agent 사전 로드 전용
-- iOS 전용 `ios-reviewer` agent와 `ios-conventions` skill은 단계 3에서 도입
+- `coding-conventions` skill: 백엔드 컨벤션 (한글 주석/로그, DTO, ErrorCode, 메서드 길이 등)
+- **`ios-reviewer` agent** (단계 3): iOS(Swift/SwiftUI/SwiftData/HealthKit) 전용 — `memory: project` + `skills: [ios-conventions]`
+- **`ios-conventions` skill** (단계 3): iOS 컨벤션 (한글 주석, Swift API Design Guidelines, SwiftUI 패턴, async/await, Apple HIG)
 
 **Codex 평행 셋업**: `.codex/config.toml`이 **같은 `tools/hooks/*.sh` 스크립트를 재사용**한다. Claude Code든 Codex든 동일한 hook이 자동 발동 — 단일 진실 원천(SoT). 등록 방법은 `.codex/README.md` 참조.
 
@@ -92,3 +93,5 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 2026-05-21 | `.codex/config.toml` 추가 — Codex hook 자동화 | Codex CLI도 같은 hook 스크립트 자동 실행. 단일 진실 원천 유지. |
 | 2026-05-21 | 단계 2 활성: code-reviewer agent + coding-conventions skill + enforce-worktree + pre-commit | 백엔드 코딩 시작 전 인프라 완성. iOS 별도 reviewer는 단계 3. |
 | 2026-05-21 | ADR-0006 — AWS EC2 + RDS + Terraform 호스팅 결정 + Terraform 골격 + Dockerfile | 서울 region (카카오 API 최단) + 12개월 Free Tier + 학습 가치. |
+| 2026-05-21 | ADR-0004 (SwiftData + HealthKit) 작성 + PRD 4.7 정정 | 본인/친구 모델 분리, 최소 권한 6개, Observer Query Background Delivery, UTC+Local TZ, 친구 캐시 1h TTL, SwiftData 영속 캐시. |
+| 2026-05-21 | 단계 3 활성: ios-reviewer agent + ios-conventions skill + enforce-worktree iOS 확장 | iOS 코딩 시작 직전 하네스 완비. 백엔드/iOS 리뷰어 분리. |
