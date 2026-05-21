@@ -29,6 +29,8 @@
 - `PreToolUse` (Edit/Write): `enforce-worktree.sh`, `enforce-plan.sh` — 단계 2~4에서 도입
 - `Stop`: `verify-and-block.sh` — 단계 4에서 도입 (compile만)
 
+**Codex 평행 셋업**: `.codex/config.toml`이 **같은 `tools/hooks/*.sh` 스크립트를 재사용**한다. Claude Code든 Codex든 동일한 hook이 자동 발동 — 단일 진실 원천(SoT). 등록 방법은 `.codex/README.md` 참조.
+
 ## 자주 쓰는 명령
 
 ```bash
@@ -79,3 +81,4 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 날짜 | 변경 내용 | 사유 |
 |---|---|---|
 | 2026-05-21 | 초기 작성 (단계 1 하네스 셋업) | grill-me 인터뷰 + GearShow 하네스 적응 |
+| 2026-05-21 | `.codex/config.toml` 추가 — Codex hook 자동화 | Codex CLI도 같은 hook 스크립트 자동 실행. 단일 진실 원천 유지. |

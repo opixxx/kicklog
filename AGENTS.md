@@ -27,27 +27,26 @@ Claude Code용 원본은 `CLAUDE.md`와 `.claude/**`에 있으며, Codex는 아�
 **진입점:** `bash scripts/start-task.sh <task-name> <type>` — worktree/플랜/포트/로그를 원자적으로 생성.
 
 **Codex 적용 방식:**
-- Codex는 Claude Code의 `.claude/settings.json` 훅을 자동 실행하지 않는다.
-- 대신 이 AGENTS.md를 기준으로 동일한 절차를 수동으로 강제한다.
-- 소스 변경 전에는 worktree와 EXEC_PLAN 상태를 확인한다.
-- 작업 종료 전에 계산적 검증 명령을 직접 실행하고 실패 시 자가수정한다.
-- 훅 스크립트는 정책의 실행 가능한 명세로 취급한다. 필요하면 내용을 읽어 같은 판단을 적용한다.
+- Codex는 `.codex/config.toml`의 hook을 자동 실행한다 (`.codex/README.md` 참조).
+- **Hook 스크립트는 Claude Code와 동일** (`tools/hooks/*.sh`) — 단일 진실 원천. 두 도구의 동작이 일관된다.
+- `.codex/config.toml`이 로드되려면 사용자가 `~/.codex/config.toml`에서 본 프로젝트를 **trusted** 로 등록해야 한다.
 
-**Claude Code 강제 메커니즘 (참고):**
-- `PreToolUse` (Bash): `tools/hooks/guard-bash.sh` — 위험 명령 차단 (현재 활성)
-- `SessionStart`: `tools/hooks/session-context.sh` — 작업 상태 주입 (현재 활성)
-- `PreToolUse` (Edit/Write): `enforce-worktree.sh`, `enforce-plan.sh` — 단계 2~4 도입 예정
-- `Stop`: `verify-and-block.sh` — 단계 4 도입 예정
+**현재 활성 Hook (Claude Code + Codex 양쪽):**
+- `PreToolUse` (Bash): `tools/hooks/guard-bash.sh` — 위험 명령 차단
+- `SessionStart`: `tools/hooks/session-context.sh` — 작업 상태 자동 컨텍스트 주입
 
-**Codex 수동 체크리스트:**
-1. 구현성 요청이면 관련 문서(`docs/PRD.md`, `docs/adr/`)와 `.claude/skills/orchestrator/SKILL.md`를 먼저 읽는다.
-2. 현재 위치가 메인 작업 디렉토리의 `main`이고 코드 변경이 필요하면 `bash scripts/start-task.sh <task-name> <type>`로 linked worktree를 만든 뒤 그 worktree에서 작업한다.
-3. EXEC_PLAN.md가 필요한지 판단 — **30줄 미만의 단순 변경은 면제**, 그 외는 필수.
-4. Bash 실행 전 `tools/hooks/guard-bash.sh`의 차단 패턴에 해당하는 위험 명령은 실행하지 않는다.
-5. 종료 전 최소 검증:
+**향후 도입 예정 (단계 2~4):**
+- `PreToolUse` (Edit/Write): `enforce-worktree.sh`, `enforce-plan.sh`
+- `Stop`: `verify-and-block.sh` (compile만)
+
+**Codex 작업 체크리스트:**
+1. 구현성 요청이면 관련 문서(`docs/PRD.md`, `docs/adr/`)와 `.claude/skills/orchestrator/SKILL.md`(단계 4 도입 후)를 먼저 읽는다.
+2. 메인 디렉토리의 `main`에서 코드 변경이 필요하면 `bash scripts/start-task.sh <task-name> <type>`로 linked worktree 생성 후 그 worktree에서 작업한다.
+3. EXEC_PLAN.md 작성 — **30줄 미만의 단순 변경은 면제**, 그 외는 목표·접근·검증 3섹션 필수.
+4. 종료 전 최소 검증:
    - 백엔드: `cd backend && ./gradlew compileKotlin`
    - iOS: `xcodebuild -scheme KickLog build` (의존성에 영향 있을 때만)
-6. 검증 실패 시 원인을 수정하고 최대 3회까지 재검증한다. 3회 연속 실패하면 `blocked` 상태로 보고한다.
+5. 검증 실패 시 원인 수정 + 최대 3회 재검증. 3회 연속 실패하면 `blocked` 상태로 보고한다.
 
 ## 자주 쓰는 명령
 
@@ -62,6 +61,8 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 
 ## 참조
 
+- Codex 프로젝트 설정: `.codex/config.toml` · 등록 안내: `.codex/README.md`
+- Hook 스크립트 (Claude/Codex 공유): `tools/hooks/*.sh`
 - 파이프라인·규칙: `.claude/skills/orchestrator/SKILL.md` (단계 4에서 도입)
 - 코딩 컨벤션: `.claude/skills/coding-conventions/SKILL.md` (단계 2에서 도입)
 
@@ -80,3 +81,4 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 날짜 | 변경 내용 | 사유 |
 |---|---|---|
 | 2026-05-21 | 초기 작성 (Codex용 AGENTS.md 분리) | Claude Code 전용 훅/스킬 전제를 Codex 작업 규칙으로 변환 |
+| 2026-05-21 | `.codex/config.toml` 도입 → Codex hook 자동화 | 수동 체크리스트만으로는 위험 명령 자동 차단 불가. 양쪽 도구가 동일 스크립트 재사용. |
