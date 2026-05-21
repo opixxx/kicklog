@@ -34,10 +34,13 @@ Claude Code용 원본은 `CLAUDE.md`와 `.claude/**`에 있으며, Codex는 아�
 **현재 활성 Hook (Claude Code + Codex 양쪽):**
 - `PreToolUse` (Bash): `tools/hooks/guard-bash.sh` — 위험 명령 차단
 - `SessionStart`: `tools/hooks/session-context.sh` — 작업 상태 자동 컨텍스트 주입
+- `PreToolUse` (Edit/Write): `tools/hooks/enforce-worktree.sh` — main 브랜치 백엔드 소스 직접 수정 차단 ✅ (단계 2)
+- `.githooks/pre-commit`: 백엔드 Kotlin 컴파일 게이트 ✅ (단계 2)
 
-**향후 도입 예정 (단계 2~4):**
-- `PreToolUse` (Edit/Write): `enforce-worktree.sh`, `enforce-plan.sh`
-- `Stop`: `verify-and-block.sh` (compile만)
+**향후 도입 예정 (단계 3~4):**
+- iOS 코드 변경 시 `enforce-worktree` 확장 (단계 3)
+- `PreToolUse` (Edit/Write): `enforce-plan.sh` — EXEC_PLAN 강제 (단계 4)
+- `Stop`: `verify-and-block.sh` (compile + 자가수정 루프) (단계 4)
 
 **Codex 작업 체크리스트:**
 1. 구현성 요청이면 관련 문서(`docs/PRD.md`, `docs/adr/`)와 `.claude/skills/orchestrator/SKILL.md`(단계 4 도입 후)를 먼저 읽는다.
@@ -82,3 +85,4 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 |---|---|---|
 | 2026-05-21 | 초기 작성 (Codex용 AGENTS.md 분리) | Claude Code 전용 훅/스킬 전제를 Codex 작업 규칙으로 변환 |
 | 2026-05-21 | `.codex/config.toml` 도입 → Codex hook 자동화 | 수동 체크리스트만으로는 위험 명령 자동 차단 불가. 양쪽 도구가 동일 스크립트 재사용. |
+| 2026-05-21 | 단계 2 활성: code-reviewer + coding-conventions + enforce-worktree + pre-commit | 백엔드 코딩 시작 전 인프라. iOS 별도 reviewer/conventions는 단계 3. |

@@ -24,10 +24,17 @@
 **진입점:** `bash scripts/start-task.sh <task-name> <type>` — worktree/플랜/포트/로그를 원자적으로 생성.
 
 **강제 메커니즘 (단계적 도입):**
-- `PreToolUse` (Bash): `guard-bash.sh` — 위험 명령 차단 (현재 활성)
-- `SessionStart`: `session-context.sh` — 현재 작업 상태 자동 주입 (현재 활성)
-- `PreToolUse` (Edit/Write): `enforce-worktree.sh`, `enforce-plan.sh` — 단계 2~4에서 도입
-- `Stop`: `verify-and-block.sh` — 단계 4에서 도입 (compile만)
+- `PreToolUse` (Bash): `guard-bash.sh` — 위험 명령 차단 ✅
+- `SessionStart`: `session-context.sh` — 현재 작업 상태 자동 주입 ✅
+- `PreToolUse` (Edit/Write): `enforce-worktree.sh` — main 브랜치 백엔드 소스 직접 수정 차단 ✅ (단계 2)
+- `.githooks/pre-commit`: 백엔드 Kotlin compile 게이트 ✅ (단계 2)
+- `PreToolUse` (Edit/Write): `enforce-plan.sh` — 30줄 이상 변경에 EXEC_PLAN 강제 (단계 4에서 도입)
+- `Stop`: `verify-and-block.sh` — compile + 자가수정 루프 (단계 4에서 도입)
+
+**Agents 및 Skills (단계 2 활성):**
+- `code-reviewer` agent: 백엔드(Kotlin/Spring) 전용 코드 리뷰 — `memory: project` + `skills: [coding-conventions]`
+- `coding-conventions` skill: 백엔드 컨벤션 (한글 주석/로그, DTO, ErrorCode, 메서드 길이 등) — agent 사전 로드 전용
+- iOS 전용 `ios-reviewer` agent와 `ios-conventions` skill은 단계 3에서 도입
 
 **Codex 평행 셋업**: `.codex/config.toml`이 **같은 `tools/hooks/*.sh` 스크립트를 재사용**한다. Claude Code든 Codex든 동일한 hook이 자동 발동 — 단일 진실 원천(SoT). 등록 방법은 `.codex/README.md` 참조.
 
@@ -82,3 +89,4 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 |---|---|---|
 | 2026-05-21 | 초기 작성 (단계 1 하네스 셋업) | grill-me 인터뷰 + GearShow 하네스 적응 |
 | 2026-05-21 | `.codex/config.toml` 추가 — Codex hook 자동화 | Codex CLI도 같은 hook 스크립트 자동 실행. 단일 진실 원천 유지. |
+| 2026-05-21 | 단계 2 활성: code-reviewer agent + coding-conventions skill + enforce-worktree + pre-commit | 백엔드 코딩 시작 전 인프라 완성. iOS 별도 reviewer는 단계 3. |

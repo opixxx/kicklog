@@ -10,6 +10,15 @@
             "command": "$CLAUDE_PROJECT_DIR/tools/hooks/guard-bash.sh"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/tools/hooks/enforce-worktree.sh"
+          }
+        ]
       }
     ],
     "SessionStart": [

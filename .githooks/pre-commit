@@ -1,0 +1,49 @@
+#!/bin/bash
+# KickLog pre-commit hook
+#
+# 커밋 직전 결정론적 센서 실행하여 명백한 오류가 main에 진입하는 것을 차단한다.
+# - 백엔드 (Kotlin/Gradle) 변경 있을 때만 compileKotlin 실행
+# - iOS 변경은 단계 3에서 추가 예정 (xcodebuild build-for-testing)
+#
+# 비상 탈출:
+#   SKIP_PRECOMMIT=1 git commit ...  으로 한 번만 우회 가능 (책임은 작성자에게)
+
+set -e
+
+# 비상 탈출
+if [ "${SKIP_PRECOMMIT:-0}" = "1" ]; then
+  echo "⚠️  SKIP_PRECOMMIT=1 — pre-commit 훅 건너뜀. (이 커밋의 책임은 작성자)"
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# ─── 백엔드 검증 ──────────────────────────────────────────────────────────────
+CHANGED_BACKEND=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^backend/.*\.(kt|kts|gradle)$' || true)
+
+if [ -n "$CHANGED_BACKEND" ]; then
+  COUNT=$(echo "$CHANGED_BACKEND" | wc -l | tr -d ' ')
+  echo "🔍 pre-commit: 백엔드 변경 ${COUNT}개 감지 — 컴파일 검증 중..."
+
+  if ! (cd "$REPO_ROOT/backend" && ./gradlew compileKotlin --quiet); then
+    echo ""
+    echo "❌ Kotlin 컴파일 실패 — 커밋 차단."
+    echo "   해결: 오류를 수정한 후 다시 커밋하세요."
+    echo "   비상 우회: SKIP_PRECOMMIT=1 git commit ... (권장 X)"
+    exit 1
+  fi
+  echo "✓ 백엔드 컴파일 통과"
+fi
+
+# ─── iOS 검증 (단계 3에서 활성화) ──────────────────────────────────────────────
+# CHANGED_IOS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^ios/.*\.(swift|xcconfig)$' || true)
+# if [ -n "$CHANGED_IOS" ]; then
+#   echo "🔍 pre-commit: iOS 변경 감지 — 빌드 검증 중..."
+#   (cd "$REPO_ROOT/ios" && xcodebuild build-for-testing -scheme KickLog -destination 'generic/platform=iOS Simulator' -quiet)
+# fi
+
+if [ -z "$CHANGED_BACKEND" ]; then
+  echo "✓ pre-commit: 백엔드 변경 없음 — 건너뜀"
+fi
+
+exit 0

@@ -31,6 +31,17 @@ command = "bash"
 args = ["-c", "exec \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/tools/hooks/session-context.sh\""]
 timeout = 30
 
+# main 브랜치 메인 디렉토리에서 백엔드 소스 직접 수정 차단
+[[hooks.PreToolUse]]
+matcher = "^(Edit|Write|NotebookEdit)$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "bash"
+args = ["-c", "exec \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/tools/hooks/enforce-worktree.sh\""]
+timeout = 30
+statusMessage = "worktree 정책 검사 중"
+
 # ─── 향후 추가 예정 (단계 4) ─────────────────────────────────────────────────
 # Claude Code 단계 4에서 도입할 hook들의 Codex 평행:
 # - PreToolUse (Edit/Write) → enforce-worktree.sh, enforce-plan.sh
