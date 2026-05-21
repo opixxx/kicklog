@@ -17,6 +17,20 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/tools/hooks/enforce-worktree.sh"
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/tools/hooks/enforce-plan.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/tools/hooks/verify-and-block.sh"
           }
         ]
       }

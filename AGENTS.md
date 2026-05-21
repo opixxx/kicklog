@@ -33,14 +33,17 @@ Claude Code용 원본은 `CLAUDE.md`와 `.claude/**`에 있으며, Codex는 아�
 - `.codex/config.toml`이 로드되려면 사용자가 `~/.codex/config.toml`에서 본 프로젝트를 **trusted** 로 등록해야 한다.
 
 **현재 활성 Hook (Claude Code + Codex 양쪽):**
-- `PreToolUse` (Bash): `tools/hooks/guard-bash.sh` — 위험 명령 차단
-- `SessionStart`: `tools/hooks/session-context.sh` — 작업 상태 자동 컨텍스트 주입
-- `PreToolUse` (Edit/Write): `tools/hooks/enforce-worktree.sh` — main 브랜치 **백엔드 + iOS** 소스 직접 수정 차단 ✅ (단계 2 + 3)
+- `PreToolUse` (Bash): `tools/hooks/guard-bash.sh` — 위험 명령 차단 ✅ (단계 1)
+- `SessionStart`: `tools/hooks/session-context.sh` — 작업 상태 자동 컨텍스트 주입 ✅ (단계 1)
+- `PreToolUse` (Edit/Write): `tools/hooks/enforce-worktree.sh` — main에서 **백엔드 + iOS** 소스 보호 ✅ (단계 2 + 3)
+- `PreToolUse` (Edit/Write): `tools/hooks/enforce-plan.sh` — 30줄 이상 변경 시 EXEC_PLAN 강제 ✅ (단계 4)
+- `Stop`: `tools/hooks/verify-and-block.sh` — 백엔드 compile + 자가수정 (최대 3회) ✅ (단계 4)
 - `.githooks/pre-commit`: 백엔드 Kotlin 컴파일 게이트 ✅ (단계 2)
 
-**향후 도입 예정 (단계 4):**
-- `PreToolUse` (Edit/Write): `enforce-plan.sh` — EXEC_PLAN 강제 (단계 4)
-- `Stop`: `verify-and-block.sh` (compile + 자가수정 루프) (단계 4)
+**Skills:**
+- `/orchestrator` — 구현 Phase 0~6 파이프라인 강제 (Intake → EXEC_PLAN → Worktree → 검증 → PR)
+- `/pr-guide` — PR 생성
+- `/code-review` — PR 자동 리뷰 (영역별 agent 분기)
 
 **Codex 작업 체크리스트:**
 1. 구현성 요청이면 관련 문서(`docs/PRD.md`, `docs/adr/`)와 `.claude/skills/orchestrator/SKILL.md`(단계 4 도입 후)를 먼저 읽는다.
@@ -87,3 +90,4 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 2026-05-21 | `.codex/config.toml` 도입 → Codex hook 자동화 | 수동 체크리스트만으로는 위험 명령 자동 차단 불가. 양쪽 도구가 동일 스크립트 재사용. |
 | 2026-05-21 | 단계 2 활성: code-reviewer + coding-conventions + enforce-worktree + pre-commit | 백엔드 코딩 시작 전 인프라. iOS 별도 reviewer/conventions는 단계 3. |
 | 2026-05-21 | 단계 3 활성: ios-reviewer + ios-conventions + enforce-worktree iOS 확장 | iOS 코딩 시작 직전 하네스 완비. 백엔드/iOS 리뷰어 분리. |
+| 2026-05-21 | 단계 4 활성: orchestrator/pr-guide/code-review skills + backend/ios-test-writer agents + enforce-plan + verify-and-block hooks | 구현 오케스트레이션 파이프라인 완비. EXEC_PLAN 30줄 임계 + 백엔드 compile 자가수정 루프. |

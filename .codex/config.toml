@@ -31,7 +31,7 @@ command = "bash"
 args = ["-c", "exec \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/tools/hooks/session-context.sh\""]
 timeout = 30
 
-# main 브랜치 메인 디렉토리에서 백엔드 소스 직접 수정 차단
+# main 브랜치 메인 디렉토리에서 백엔드/iOS 소스 직접 수정 차단
 [[hooks.PreToolUse]]
 matcher = "^(Edit|Write|NotebookEdit)$"
 
@@ -41,6 +41,23 @@ command = "bash"
 args = ["-c", "exec \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/tools/hooks/enforce-worktree.sh\""]
 timeout = 30
 statusMessage = "worktree 정책 검사 중"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "bash"
+args = ["-c", "exec \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/tools/hooks/enforce-plan.sh\""]
+timeout = 30
+statusMessage = "EXEC_PLAN 정책 검사 중"
+
+# 작업 종료 시 백엔드 compile + 자가수정 루프 (최대 3회)
+[[hooks.Stop]]
+
+[[hooks.Stop.hooks]]
+type = "command"
+command = "bash"
+args = ["-c", "exec \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/tools/hooks/verify-and-block.sh\""]
+timeout = 300
+statusMessage = "백엔드 컴파일 검증 중"
 
 # ─── 향후 추가 예정 (단계 4) ─────────────────────────────────────────────────
 # Claude Code 단계 4에서 도입할 hook들의 Codex 평행:
