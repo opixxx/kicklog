@@ -66,7 +66,10 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 
 ## 작업 원칙 (요약)
 
-- **작은 변경은 직접**, 큰 변경은 plan 모드 먼저. 30줄 미만은 EXEC_PLAN 면제.
+- **TDD 우선**: 30줄 이상 변경은 EXEC_PLAN의 "테스트 케이스" 섹션부터 채우고 → RED → GREEN → REFACTOR 사이클.
+  - 백엔드: `backend-test-writer` agent가 Phase 2 진입 시 자동 위임으로 RED 단계 테스트 생성
+  - iOS: `ios-test-writer` agent (단위 테스트 우선, UI 테스트는 사후)
+- **작은 변경은 직접**, 큰 변경은 plan 모드 먼저. 30줄 미만은 EXEC_PLAN + TDD 면제.
 - **데이터 정제·분석은 iOS에서** (스프린트 계산·쿼터 통계 등). 백엔드는 저장·공유 책임만.
 - **자가수정 우회 금지**: `--no-verify`, `-DskipTests`, `@Disabled` 우회 금지.
 - 부수 질문은 `/btw` (도구 액세스 없이 빠른 답변).
@@ -103,3 +106,4 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 2026-05-21 | ADR-0004 (SwiftData + HealthKit) 작성 + PRD 4.7 정정 | 본인/친구 모델 분리, 최소 권한 6개, Observer Query Background Delivery, UTC+Local TZ, 친구 캐시 1h TTL, SwiftData 영속 캐시. |
 | 2026-05-21 | 단계 3 활성: ios-reviewer agent + ios-conventions skill + enforce-worktree iOS 확장 | iOS 코딩 시작 직전 하네스 완비. 백엔드/iOS 리뷰어 분리. |
 | 2026-05-21 | 단계 4 활성: orchestrator + pr-guide + code-review skills + test-writer agents (backend/ios) + enforce-plan + verify-and-block hooks | 구현 오케스트레이션 파이프라인 (Phase 0~6) 완비. EXEC_PLAN 30줄 임계 + 백엔드 compile 자가수정 루프. |
+| 2026-05-21 | TDD 도입 — Phase 2 흐름 Red→Green→Refactor, EXEC_PLAN 3섹션 → 4섹션 (테스트 케이스 추가), test-writer agent Phase 2 진입 시 자동 위임 | KickLog 표준 개발 방식 = TDD. 사용자 결정. |

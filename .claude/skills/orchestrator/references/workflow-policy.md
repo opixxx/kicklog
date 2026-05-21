@@ -61,16 +61,22 @@ ADR-0001 기반 Ralph 원칙: "계획은 일회용, 짧게".
 
 `enforce-plan.sh`가 자동 판단 (`git diff --cached --numstat` sum).
 
-### 3섹션 단순화
+### 4섹션 (TDD 도입)
 
-기존 GearShow의 8섹션 → KickLog는 3섹션:
+기존 GearShow의 8섹션 → KickLog는 4섹션:
 1. **목표 (Goal)** — 왜 이 변경
 2. **접근 (Approach)** — 시그니처 수준 (메서드·API·핵심 규칙)
-3. **검증 (Verification)** — Bash 명령으로 완료 조건
+3. **테스트 케이스 (Test Cases)** — TDD 핵심, Happy/Unhappy/Edge 분류
+4. **검증 (Verification)** — Bash 명령으로 완료 조건
 
 Optional 섹션:
 - 위험도 / 롤백 (Risky 이상)
 - 후속 / 관련 이슈
+
+### TDD 강제 (enforce-plan.sh)
+
+- 30줄 이상 변경 + `<TODO:>` 마커 남아있으면 차단
+- 테스트 케이스 섹션도 채워야 함 (구현 전 작성 의무화)
 
 ## 영역별 검증 명령
 

@@ -94,40 +94,104 @@ bash scripts/start-task.sh <task-name> <type>
 EXEC_PLAN 필수 섹션 (3섹션 단순화):
 1. **목표** (Goal) — 왜 이 변경?
 2. **접근** (Approach) — 시그니처 수준 (메서드 시그니처, API endpoint, 핵심 규칙)
-3. **검증** (Verification) — Bash 명령으로 완료 조건
+3. **테스트 케이스** (Test Cases) — TDD: 어떤 테스트를 먼저 작성할지 명시 (Happy/Unhappy/Edge 분류)
+4. **검증** (Verification) — Bash 명령으로 완료 조건
 
 `<TODO:>` 마커가 남아있으면 `enforce-plan.sh` 훅이 코드 편집을 차단한다.
 
-**30줄 미만 작은 변경 면제**: 오타·변수명·작은 리팩토링은 EXEC_PLAN 없이 직접.
+**30줄 미만 작은 변경 면제**: 오타·변수명·작은 리팩토링은 EXEC_PLAN 없이 직접 (TDD도 면제).
 
 ---
 
-## 2. Worktree 구현
+## 2. Worktree 구현 (TDD: Red → Green → Refactor)
 
 상세 정책: `references/workflow-policy.md`
 
 - 모든 코드 편집은 linked worktree 내부에서
 - `main`/`master` 브랜치 메인 디렉토리에서 백엔드/iOS 소스 수정 금지 (`enforce-worktree.sh` 차단)
 - 예외 허용: 문서·하네스·CI·iOS README/Assets
-- 구현과 테스트는 **함께**
 
-### 백엔드 구현 순서 (Spring Boot 4 + Kotlin)
-1. JPA Entity + Repository
-2. Service (Application 로직, `@Transactional`)
-3. Controller + DTO (`@Valid`)
-4. Flyway 마이그레이션 (스키마 변경 시)
-5. 단위/통합 테스트
+### TDD 사이클 (KickLog 표준)
 
-### iOS 구현 순서 (SwiftUI + SwiftData)
-1. SwiftData `@Model` (변경 시)
-2. Service (HealthKitService / APIClient / FriendDataService 등)
-3. ViewModel (`@Observable`)
-4. SwiftUI View
-5. Swift Testing 테스트 케이스
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ 🔴 RED          │ →  │ 🟢 GREEN        │ →  │ 🔵 REFACTOR     │
+│ 실패하는 테스트  │    │ 테스트 통과하는  │    │ 중복 제거 +     │
+│ 먼저 작성        │    │ 최소 구현       │    │ 가독성 개선     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+        ↑                                              │
+        └──────────── 반복 (다음 테스트 케이스) ──────────┘
+```
+
+**원칙**:
+- EXEC_PLAN의 "테스트 케이스" 섹션을 순서대로 한 번에 하나씩
+- 테스트 작성 후 반드시 **실행해서 실패 확인** (의도한 이유로 실패하는지)
+- 최소 구현 = 통과시키는 가장 단순한 코드 (의도적으로 simple)
+- Refactor 단계는 테스트 그대로 두고 구현만 개선
+
+### 백엔드 TDD 흐름 (Spring Boot 4 + Kotlin)
+
+**Phase 2 진입 시 자동 위임**: 변경 영역에 따라 `backend-test-writer` agent를 먼저 호출하여 테스트 케이스 생성.
+
+```
+1. 🔴 RED — 통합 테스트 작성 (Testcontainers + JUnit5 + AssertJ)
+   ├─ Service + Repository 흐름 (예: matchService.upsertMatch)
+   ├─ Controller test (@WebMvcTest 또는 통합)
+   └─ ./gradlew test → 실패 확인 (RED)
+
+2. 🟢 GREEN — 최소 구현
+   ├─ JPA Entity + Repository
+   ├─ Service (Application 로직, @Transactional)
+   ├─ Controller + DTO (@Valid)
+   ├─ Flyway 마이그레이션 (스키마 변경 시)
+   └─ ./gradlew test → 통과 확인 (GREEN)
+
+3. 🔵 REFACTOR — 코드 개선
+   ├─ 중복 제거 (helper 추출)
+   ├─ ErrorCode enum 정리
+   ├─ 메서드 20줄 이내 분리
+   └─ ./gradlew test → 여전히 통과 확인
+```
+
+### iOS TDD 흐름 (Swift Testing + SwiftUI + SwiftData)
+
+**Phase 2 진입 시 자동 위임**: 변경 영역에 따라 `ios-test-writer` agent를 먼저 호출.
+
+```
+1. 🔴 RED — Swift Testing 단위 테스트 작성
+   ├─ ViewModel @Observable 상태 변화
+   ├─ Service (HealthKitService Mock, APIClient Mock 등)
+   ├─ Model 메서드 (Match.recalculateHeadlineMetrics 등)
+   └─ Cmd+U 또는 xcodebuild test → 실패 확인 (RED)
+
+2. 🟢 GREEN — 최소 구현
+   ├─ SwiftData @Model (변경 시)
+   ├─ Service (Protocol 정의 + Mock 친화적)
+   ├─ ViewModel (@Observable)
+   ├─ SwiftUI View
+   └─ 테스트 → 통과 (GREEN)
+
+3. 🔵 REFACTOR
+   ├─ 중복 추출 (View → ViewModifier, Service helper)
+   ├─ Protocol 분리 (Mock 용이성)
+   └─ 테스트 → 여전히 통과
+```
+
+### UI 테스트 (XCTest UI)는 TDD 안 함
+- 빌드 시간 길음 (시뮬레이터 부팅 30초~) — Red→Green 사이클에 부담
+- **단위 테스트로 TDD → UI 테스트는 사후 작성** (orchestrator Phase 4 검증-b 단계에서 점검)
 
 코딩 규칙:
 - 백엔드: `coding-conventions` skill (자동 로드)
 - iOS: `ios-conventions` skill (자동 로드)
+
+### TDD 금지 사항
+
+- ❌ **테스트 없이 구현 코드 작성** — 30줄 이상 변경에 EXEC_PLAN 테스트 케이스 섹션이 비었으면 차단
+- ❌ **테스트를 통과시키려 production 코드 외 다른 곳 수정** (테스트 자체 수정 등 우회)
+- ❌ **테스트 코드를 비스코프 헬퍼 등으로 의미 없게 만들기** (assertion 없는 테스트)
+- ❌ **Refactor 단계에서 새 기능 추가** — Refactor는 동작 유지가 원칙
+- ❌ **Mock에만 의존** — 백엔드는 Testcontainers (실제 DB), iOS는 Protocol Mock 균형
 
 ---
 

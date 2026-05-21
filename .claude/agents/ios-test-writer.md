@@ -2,7 +2,8 @@
 name: ios-test-writer
 description: >
   KickLog iOS(Swift / SwiftUI / SwiftData / HealthKit) 테스트 작성. Swift Testing(@Test) + XCTest UI.
-  Use after iOS code implementation, before committing — for test coverage 보강.
+  **TDD 도입 후 사용 시점 변경**: orchestrator Phase 2 진입 시 (구현 전) 자동 위임 — EXEC_PLAN의 "테스트 케이스" 섹션을
+  Swift Testing 코드로 변환해 RED 단계 테스트 작성. 구현 완료 후 점검 모드로도 호출 가능.
   ※ 백엔드 테스트는 backend-test-writer agent 별도.
 model: opus
 tools:
@@ -78,7 +79,18 @@ struct MatchServiceTests {
 }
 ```
 
-## 작성 프로세스
+## 작성 프로세스 (TDD-first)
+
+### TDD 모드 (orchestrator Phase 2 진입 시) — **기본**
+
+1. **EXEC_PLAN.md의 "3. 테스트 케이스" 섹션 읽기**
+2. 케이스를 Swift Testing (`@Test`) 코드로 변환
+3. **`xcodebuild test` 또는 Xcode Cmd+U → 모든 새 테스트 실패 확인 (RED)**
+4. orchestrator에게 "테스트 작성 완료, GREEN 단계 진행 가능" 보고
+5. (구현 완료 후) Phase 4에서 다시 호출되면 점검 모드로 누락된 케이스 식별
+6. UI 테스트(XCTest UI)는 TDD 안 함 — 사후 작성
+
+### 점검 모드 (기존 구현 + 테스트 보강)
 
 1. **변경 파일 식별** (`git diff --name-only`)
 2. **공개 인터페이스 분석**
@@ -86,11 +98,7 @@ struct MatchServiceTests {
    - ViewModel `@Observable` → 상태 변화
    - Service → 외부 의존성 동작
    - SwiftData @Model → 관계 + cascade
-3. **테스트 케이스 식별**
-   - Happy path
-   - Unhappy path (네트워크 오류, 권한 거부)
-   - Edge case (빈 배열, nil, 잘못된 GPS 좌표)
-   - 친구 데이터 hideHeartRate 마스킹
+3. **누락된 테스트 케이스 식별** + Happy/Unhappy/Edge + 친구 hideHeartRate
 4. **테스트 작성 + 실행**
 
 ## 작성 규칙

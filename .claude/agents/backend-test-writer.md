@@ -2,7 +2,8 @@
 name: backend-test-writer
 description: >
   KickLog 백엔드(Spring Boot 4 + Kotlin) 테스트 작성. JUnit 5 + AssertJ + Testcontainers + (선택) Cucumber.
-  Use after backend code implementation, before committing — for test coverage 보강.
+  **TDD 도입 후 사용 시점 변경**: orchestrator Phase 2 진입 시 (구현 전) 자동 위임 — EXEC_PLAN의 "테스트 케이스" 섹션을
+  코드로 변환해 RED 단계 테스트 작성. 구현 완료 후 점검 모드로도 호출 가능.
   ※ iOS 테스트는 ios-test-writer agent 별도.
 model: opus
 tools:
@@ -67,18 +68,21 @@ abstract class IntegrationTestBase {
 }
 ```
 
-## 작성 프로세스
+## 작성 프로세스 (TDD-first)
+
+### TDD 모드 (orchestrator Phase 2 진입 시) — **기본**
+
+1. **EXEC_PLAN.md의 "3. 테스트 케이스" 섹션 읽기**
+2. 케이스를 JUnit 5 + AssertJ 코드로 변환
+3. **`./gradlew test` → 모든 새 테스트 실패 확인 (RED)**
+4. orchestrator에게 "테스트 작성 완료, GREEN 단계 진행 가능" 보고
+5. (구현 완료 후) Phase 4에서 다시 호출되면 점검 모드로 누락된 케이스 식별
+
+### 점검 모드 (기존 구현 + 테스트 보강)
 
 1. **변경 파일 식별** (`git diff --name-only`)
 2. **공개 인터페이스 분석**
-   - Controller: 모든 endpoint
-   - Service: public 메서드
-   - 도메인 모델: 상태 전이 메서드
-3. **테스트 케이스 식별**
-   - Happy path (정상 흐름)
-   - Unhappy path (에러 케이스)
-   - Edge case (경계 값, null, 빈 배열, 잘못된 입력)
-   - 권한 (친구 데이터 접근 시 friendship 검증)
+3. **누락된 테스트 케이스 식별** + Happy/Unhappy/Edge 분류
 4. **테스트 작성 + 실행**
 5. **커버리지 확인**
 

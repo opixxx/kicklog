@@ -45,14 +45,18 @@ Claude Code용 원본은 `CLAUDE.md`와 `.claude/**`에 있으며, Codex는 아�
 - `/pr-guide` — PR 생성
 - `/code-review` — PR 자동 리뷰 (영역별 agent 분기)
 
-**Codex 작업 체크리스트:**
-1. 구현성 요청이면 관련 문서(`docs/PRD.md`, `docs/adr/`)와 `.claude/skills/orchestrator/SKILL.md`(단계 4 도입 후)를 먼저 읽는다.
+**Codex 작업 체크리스트 (TDD 우선):**
+1. 구현성 요청이면 관련 문서(`docs/PRD.md`, `docs/adr/`)와 `.claude/skills/orchestrator/SKILL.md`를 먼저 읽는다.
 2. 메인 디렉토리의 `main`에서 코드 변경이 필요하면 `bash scripts/start-task.sh <task-name> <type>`로 linked worktree 생성 후 그 worktree에서 작업한다.
-3. EXEC_PLAN.md 작성 — **30줄 미만의 단순 변경은 면제**, 그 외는 목표·접근·검증 3섹션 필수.
-4. 종료 전 최소 검증:
-   - 백엔드: `cd backend && ./gradlew compileKotlin`
-   - iOS: `xcodebuild -scheme KickLog build` (의존성에 영향 있을 때만)
-5. 검증 실패 시 원인 수정 + 최대 3회 재검증. 3회 연속 실패하면 `blocked` 상태로 보고한다.
+3. EXEC_PLAN.md 작성 — **30줄 미만의 단순 변경은 면제**, 그 외는 목표·접근·**테스트 케이스**·검증 **4섹션** 필수.
+4. **TDD: Red → Green → Refactor** 사이클로 구현:
+   - 🔴 RED: EXEC_PLAN의 테스트 케이스를 코드로 변환 → 실패 확인 (`./gradlew test` 또는 Xcode Cmd+U)
+   - 🟢 GREEN: 최소 구현 → 테스트 통과
+   - 🔵 REFACTOR: 중복 제거 + 가독성 → 테스트 여전히 통과
+5. 종료 전 최소 검증:
+   - 백엔드: `cd backend && ./gradlew check`
+   - iOS: `xcodebuild test` (의존성에 영향 있을 때) 또는 Xcode Cmd+U
+6. 검증 실패 시 원인 수정 + 최대 3회 재검증. 3회 연속 실패하면 `blocked` 상태로 보고한다.
 
 ## 자주 쓰는 명령
 
@@ -91,3 +95,4 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 2026-05-21 | 단계 2 활성: code-reviewer + coding-conventions + enforce-worktree + pre-commit | 백엔드 코딩 시작 전 인프라. iOS 별도 reviewer/conventions는 단계 3. |
 | 2026-05-21 | 단계 3 활성: ios-reviewer + ios-conventions + enforce-worktree iOS 확장 | iOS 코딩 시작 직전 하네스 완비. 백엔드/iOS 리뷰어 분리. |
 | 2026-05-21 | 단계 4 활성: orchestrator/pr-guide/code-review skills + backend/ios-test-writer agents + enforce-plan + verify-and-block hooks | 구현 오케스트레이션 파이프라인 완비. EXEC_PLAN 30줄 임계 + 백엔드 compile 자가수정 루프. |
+| 2026-05-21 | TDD 도입 — Phase 2 흐름 Red→Green→Refactor, EXEC_PLAN 3섹션 → 4섹션 | KickLog 표준 개발 방식 = TDD. test-writer agent Phase 2 진입 시 자동 위임. |
