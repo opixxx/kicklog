@@ -1,14 +1,14 @@
 #!/bin/bash
 # tools/hooks/enforce-plan.sh  (PreToolUse: Edit|Write|NotebookEdit)
 #
-# 30줄 이상 변경 + EXEC_PLAN.md 없거나 <TODO:> 남은 상태에서 백엔드/iOS 코드 편집 차단.
+# 30줄 이상 변경 + EXEC_PLAN.md 없거나 <TODO:> 남은 상태에서 백엔드 코드 편집 차단.
 # "30줄 미만 작은 변경은 면제" 정책 (ADR-0001 정신: Ralph "계획은 일회용, 짧게").
+# iOS 는 enforce-plan 대상 아님 (사용자가 Xcode 에서 자유롭게 작업).
 #
 # 코드 파일 판별:
 #   백엔드: .kt, .kts, .gradle, .yml, .yaml, .sql
-#   iOS:    .swift, .xcconfig, Info.plist, .entitlements
 #
-# 그 외 (.md, docs/, .claude/ 등)는 무관.
+# 그 외 (.md, docs/, .claude/, ios/ 등)는 무관.
 
 set -e
 
@@ -21,10 +21,10 @@ fi
 
 # ─── 코드 파일 여부 판별 ─────────────────────────────────────────────────────
 case "$file_path" in
-  */backend/*.kt|*/backend/*.kts|*/backend/*.gradle|*/backend/*.yml|*/backend/*.yaml|*/backend/*.sql|*/ios/*.swift|*/ios/*.xcconfig|*/ios/*/Info.plist|*/ios/*.entitlements)
+  */backend/*.kt|*/backend/*.kts|*/backend/*.gradle|*/backend/*.yml|*/backend/*.yaml|*/backend/*.sql)
     ;;
   *)
-    exit 0  # 비코드 파일 (문서·설정·스크립트) — enforce-plan 대상 아님
+    exit 0  # 비코드 파일 또는 iOS — enforce-plan 대상 아님
     ;;
 esac
 

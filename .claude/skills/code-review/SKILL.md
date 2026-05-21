@@ -1,14 +1,15 @@
 ---
 name: code-review
 description: >
-  KickLog PR 자동 리뷰. 변경 파일에 따라 code-reviewer(backend/) / ios-reviewer(ios/) / 둘 다를 병렬 호출,
+  KickLog PR 자동 리뷰. 백엔드(backend/) 변경에 code-reviewer 호출,
   결과 통합 후 GitHub PR 코멘트로 등록. Use when: "PR 리뷰", "코드리뷰", "/code-review", PR 번호 언급.
+  ※ iOS 영역은 자동 리뷰 대상 아님 (사용자가 Xcode 에서 직접 검토).
 ---
 
-# PR 자동 리뷰 — 영역별 서브에이전트 오케스트레이션
+# PR 자동 리뷰 — 백엔드 서브에이전트 오케스트레이션
 
-이 스킬은 **직접 리뷰하지 않는다**. 변경 영역에 따라 적절한 서브에이전트를 병렬 호출하고
-결과를 통합하여 GitHub PR에 코멘트로 등록.
+이 스킬은 **직접 리뷰하지 않는다**. 백엔드 변경이 있으면 `code-reviewer` 서브에이전트를 호출하고
+결과를 통합하여 GitHub PR에 코멘트로 등록. iOS 변경은 검토에서 제외 (사용자 책임).
 
 ## 실행 방법
 
@@ -31,27 +32,27 @@ gh pr diff "$PR_NUMBER"
 # 변경 파일 영역 분류
 CHANGED_FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path')
 BACKEND_CHANGED=$(echo "$CHANGED_FILES" | grep -c '^backend/' || true)
-IOS_CHANGED=$(echo "$CHANGED_FILES" | grep -c '^ios/' || true)
 TF_CHANGED=$(echo "$CHANGED_FILES" | grep -c '^infra/terraform/' || true)
+# iOS 변경은 무시 (자동 리뷰 대상 아님)
 
 # CI 상태 (v1.1 도입 후)
 gh pr checks "$PR_NUMBER" 2>/dev/null || echo "(CI 미설정)"
 ```
 
-## Step 2: 영역별 서브에이전트 분기 호출
+## Step 2: 서브에이전트 호출
 
 Task 툴로 변경 영역에 따라 호출:
 
 | 영역 변경 | 호출 에이전트 | 호출 조건 |
 |---|---|---|
 | `backend/**` 변경 | `code-reviewer` | BACKEND_CHANGED > 0 |
-| `ios/**` 변경 | `ios-reviewer` | IOS_CHANGED > 0 |
 | `infra/terraform/**` 변경 | (수동 검토 권장) | TF_CHANGED > 0 — 보안 영향 큼 |
-| 테스트 누락 (Plan에 명시되었으나 추가 안 됨) | `backend-test-writer` 또는 `ios-test-writer` | 점검 목적, 작성은 X |
+| 테스트 누락 (Plan에 명시되었으나 추가 안 됨) | `backend-test-writer` | 점검 목적, 작성은 X |
+| `ios/**` 변경만 | (호출 없음 — 사용자 책임) | — |
 
-### 병렬 호출 — Task 툴
+### 에이전트 호출 — Task 툴
 
-각 에이전트에게 동일 PR 범위 전달:
+에이전트에게 PR 범위 전달:
 
 ```
 PR #{번호}를 리뷰하세요.
@@ -88,8 +89,7 @@ PR #{번호}를 리뷰하세요.
 | 에이전트 | Critical | Major | Minor | 상태 |
 |---|---|---|---|---|
 | code-reviewer (backend) | 0 | 2 | 3 | 수정 권장 |
-| ios-reviewer (ios) | 1 | 0 | 0 | 🔴 머지 차단 |
-| **합계** | **1** | **2** | **3** | **🔄 Request Changes** |
+| **합계** | **0** | **2** | **3** | **💬 Comment** |
 ```
 
 ## Step 4: GitHub PR 코멘트 등록
@@ -158,15 +158,13 @@ gh api repos/{owner}/{repo}/pulls/{PR}/comments \
 | 상황 | 대응 |
 |---|---|
 | PR 번호 없음 | `gh pr view`로 현재 브랜치 PR 자동 조회, 없으면 사용자에게 안내 |
-| backend도 ios도 아닌 변경만 | "리뷰 대상 영역 없음 — docs/infra 변경만" 안내 |
-| 에이전트 1개 타임아웃 | "N/A (타임아웃)"으로 표기하고 나머지로 진행 |
+| backend 변경 없음 (ios/docs/infra만) | "백엔드 리뷰 대상 영역 없음 — iOS 는 자동 리뷰 제외" 안내 |
+| 에이전트 타임아웃 | "N/A (타임아웃)"으로 표기 후 사용자 안내 |
 | PR이 이미 머지됨 | "이미 머지된 PR, post-hoc 리뷰" 안내 후 코멘트만 등록 |
 
 ## 참조
 
 - code-reviewer (backend): `.claude/agents/code-reviewer.md`
-- ios-reviewer: `.claude/agents/ios-reviewer.md`
 - backend-test-writer: `.claude/agents/backend-test-writer.md`
-- ios-test-writer: `.claude/agents/ios-test-writer.md`
 - 오케스트레이터 Phase 4: `.claude/skills/orchestrator/SKILL.md`
   (Phase 4는 **구현 중 리뷰**, 본 스킬은 **PR 생성 후 리뷰**. 호출 시점이 다름.)

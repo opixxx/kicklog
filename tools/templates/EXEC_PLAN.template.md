@@ -28,7 +28,7 @@
 - 변경 대상 파일/패키지
 - 핵심 인터페이스·계약 (메서드 시그니처, API 엔드포인트, DB 스키마)
 - 트랜잭션 경계 / 권한 / 멱등성 등 양보 불가 규칙
-- 외부 의존 변경 (백엔드 API 추가 시 iOS 클라이언트 동기 수정 등)
+- 외부 의존 변경 (백엔드 API 추가 시 iOS 클라이언트 동기 수정 필요 — 본 하네스 대상 아니므로 사용자가 별도 작업)
 >
 
 ## 3. 테스트 케이스 (Test Cases) — TDD 핵심
@@ -50,8 +50,8 @@
 - [ ] <테스트 6 — 멱등성, 재시도, race condition>
 
 ### 테스트 작성자 (자동 위임)
-- 백엔드 → `backend-test-writer` agent (Testcontainers + JUnit5 + AssertJ)
-- iOS → `ios-test-writer` agent (Swift Testing + SwiftData in-memory)
+- 백엔드 → `backend-test-writer` agent (Cucumber + Testcontainers + JUnit5 + AssertJ)
+- iOS → 본 하네스 대상 아님 (사용자가 Xcode 에서 직접)
 >
 
 ## 4. 검증 (Verification)
@@ -60,7 +60,7 @@
 
 ### 자동 검증
 - 백엔드: `cd backend && ./gradlew check`
-- iOS: Xcode Cmd+U 또는 `xcodebuild -scheme KickLog test -destination ...`
+- iOS: 자동 검증 없음 (사용자가 Xcode 에서 수동 빌드)
 
 ### 시나리오 검증 (수동)
 - <실제 사용자 시나리오: 사용자가 X 누르면 Y가 보임>

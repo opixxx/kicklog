@@ -8,7 +8,7 @@ user-invocable: false
 
 > 본 스킬은 `code-reviewer` agent의 `skills:` 필드로 사전 로드된다.
 > 직접 호출 X (`user-invocable: false`).
-> iOS 코딩 컨벤션은 별도 (단계 3에서 `ios-conventions` skill 추가 예정).
+> 백엔드(Kotlin/Spring) 전용. iOS 는 본 하네스 대상 아님.
 
 ---
 
@@ -241,5 +241,4 @@ class FriendMatchService(...) {
 
 ---
 
-> **iOS 코딩 컨벤션**은 단계 3에서 `.claude/skills/ios-conventions/SKILL.md`로 별도 작성.
-> 본 스킬은 백엔드(Kotlin/Spring) 전용.
+> 본 스킬은 백엔드(Kotlin/Spring) 전용. iOS 는 본 하네스 대상 아님.

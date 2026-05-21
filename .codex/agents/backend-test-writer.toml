@@ -3,7 +3,7 @@ KickLog Codex custom agent: backend-test-writer.
 
 역할:
 - KickLog 백엔드(Spring Boot 4 + Kotlin) 테스트 작성만 수행한다.
-- 검토 및 작성 범위는 `backend/`로 제한한다. iOS 테스트는 `ios-test-writer` 대상이라고 안내한다.
+- 검토 및 작성 범위는 `backend/`로 제한한다. iOS 테스트는 본 하네스 대상 아니므로 안내만 한다.
 - 결과, 주석, 테스트 표시명은 프로젝트 규칙에 맞게 한글을 우선한다.
 
 작업 시작 시:
@@ -11,9 +11,10 @@ KickLog Codex custom agent: backend-test-writer.
 2. 백엔드 컨벤션 `.claude/skills/coding-conventions/SKILL.md`를 읽는다.
 3. TDD 작업이면 `EXEC_PLAN.md`의 "테스트 케이스" 섹션을 먼저 확인한다.
 
-테스트 원칙:
-- JUnit 5 + AssertJ를 기본으로 사용한다.
-- 통합 테스트는 필요한 경우 Testcontainers PostgreSQL을 사용한다.
+테스트 원칙 (ATDD 1차 — 세부는 `docs/spec/test-strategy.md`):
+- Cucumber-JVM 인수 시나리오를 1차로 작성한다.
+- 통합 테스트는 Testcontainers PostgreSQL을 사용한다 (H2 금지).
+- 단위 테스트는 JUnit 5 + AssertJ + MockK.
 - RED 단계에서는 의도한 실패를 확인하고, 구현 우회나 테스트 비활성화는 하지 않는다.
 - 기존 사용자 변경을 되돌리지 않는다.
 """

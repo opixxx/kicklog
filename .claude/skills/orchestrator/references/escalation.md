@@ -11,7 +11,7 @@
 ## Scope Creep
 
 - EXEC_PLAN의 변경 대상(`Affected`) 대비 실제 diff 규모 **150% 초과**
-- 새 의존성 추가 (build.gradle.kts, Package.swift)
+- 새 의존성 추가 (build.gradle.kts)
 - 새 패키지/디렉토리 생성
 - 의도하지 않은 마이그레이션 작성
 
@@ -19,22 +19,18 @@
 
 - **DB 마이그레이션** 필요한 변경 (Flyway V2+) — 사용자 확인 필수
 - **Breaking API** 변경 (기존 endpoint 시그니처 변경, 응답 형식 변경)
-- **SwiftData @Model 변경** 시 마이그레이션 영향 (필드 삭제·이름 변경 등)
 
 ## 보안 경계
 
 - **인증/인가 변경** — JWT, Sign in with Apple, Kakao Login, friendship 권한
-- **PII 처리** — 사용자 이메일·display_name·HealthKit 데이터
+- **PII 처리** — 사용자 이메일·display_name
 - **카카오 API 키 노출 가능성** — 환경변수에서 안전하지 않은 곳으로 이동
-- **HealthKit 권한 set 변경** — `requestAuthorization` 인자 변경 (Apple 심사 영향)
 - **AWS IAM 권한** 변경 — terraform 적용 시 권한 확장
 
 ## 외부 의존
 
 - **카카오 API 통합** 변경 — Local API 엔드포인트 변경, OAuth 흐름 변경
-- **Apple Sign-In** 흐름 변경
 - **AWS 인프라** 변경 — terraform plan에서 비싼 리소스 추가 감지 (NAT, ALB, RDS 큰 인스턴스)
-- **Universal Link AASA** 변경 — ADR-0005 결정 후
 
 ## 비용 영향
 

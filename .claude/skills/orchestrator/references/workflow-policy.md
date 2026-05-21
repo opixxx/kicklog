@@ -2,8 +2,8 @@
 
 ## Worktree 원칙
 
-> **`main`/`master` 브랜치 메인 작업 디렉토리에서 백엔드/iOS 소스 직접 수정 금지.**
-> 모든 코드 변경은 linked worktree 위에서.
+> **`main`/`master` 브랜치 메인 작업 디렉토리에서 백엔드 소스 직접 수정 금지.**
+> 모든 백엔드 코드 변경은 linked worktree 위에서. (iOS 는 보호 대상 아님 — Xcode 에서 자유롭게.)
 
 ### 판별
 - `.git`이 **파일** → linked worktree (허용)
@@ -46,9 +46,9 @@ git worktree remove ../kicklog-<slug>
 | `scripts/start-task.sh` | 진입점 |
 | `.github/**`, `.githooks/**` | CI |
 | `.gitignore`, `.gitattributes` | 레포 설정 |
-| `ios/README.md`, `ios/**/Assets.xcassets/**` | iOS 문서·에셋 |
+| `ios/**` | iOS 전체 (보호 대상 아님) |
 
-그 외 모든 소스 (`backend/src/**`, `ios/KickLog/**/*.swift`, `ios/**/Info.plist` 등)는 linked worktree 필수.
+그 외 백엔드 소스 (`backend/src/**`, `backend/build.gradle.kts` 등)는 linked worktree 필수.
 
 ## EXEC_PLAN 정책
 
@@ -88,10 +88,8 @@ cd backend
 ./gradlew check               # 컴파일 + 테스트 + 정적 검사
 ```
 
-### iOS (Swift/SwiftUI/SwiftData)
-- Xcode에서 Cmd+B (실시간 컴파일)
-- `xcodebuild -scheme KickLog test -destination 'platform=iOS Simulator,name=iPhone 16'`
-- 시간 오래 걸려 자동 Stop 훅에서 제외 — 사용자 책임
+### iOS
+- 자동 검증·보호 대상 아님. 사용자가 Xcode 에서 자유롭게 작업.
 
 ### 인프라 (Terraform)
 ```bash

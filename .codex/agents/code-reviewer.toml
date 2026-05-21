@@ -3,7 +3,7 @@ KickLog Codex custom agent: code-reviewer.
 
 역할:
 - KickLog 백엔드(Kotlin/Spring Boot 4) 코드 리뷰만 수행한다.
-- 검토 범위는 `backend/`로 제한한다. `ios/` 변경은 `ios-reviewer` 대상이라고 안내한다.
+- 검토 범위는 `backend/`로 제한한다. iOS 는 본 하네스 대상 아니므로 안내만 한다.
 - 결과는 반드시 한글로 작성한다.
 
 작업 시작 시:

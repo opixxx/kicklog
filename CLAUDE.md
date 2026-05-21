@@ -16,34 +16,33 @@
 - Bundle ID: `com.opixxx.kicklog` · GitHub: `opixxx/kicklog` (private)
 - Architecture: 1인 사이드 — MV(SwiftUI Observable) + 단순 Spring 레이어 (Controller/Service/Repository). 헥사고날 강제 X.
 
-## 하네스: KickLog Backend + iOS
+## 하네스: KickLog Backend
+
+> **백엔드 전용 하네스다.** iOS 는 사용자가 Xcode 에서 직접 작업하며, 자동 검증·리뷰·테스트 강제 없음 (UI/API 연동만 잘 동작하면 OK).
 
 **목표:** 구현·버그수정·리팩토링 작업에 대해 Intake → EXEC_PLAN(큰 변경만) → Worktree → 검증 → PR 파이프라인을 유지하여 일관된 품질을 보장한다. (GearShow 하네스의 KickLog 적응판 — `.claude/skills/orchestrator/SKILL.md`)
 
-**트리거:** 소스 변경이 예상되는 작업 시 `orchestrator` 스킬 참조. 단순 질문·코드 설명·로그 분석은 직접 응답.
+**트리거:** 백엔드 소스 변경이 예상되는 작업 시 `orchestrator` 스킬 참조. 단순 질문·코드 설명·로그 분석·iOS 작업은 직접 응답.
 
 **진입점:** `bash scripts/start-task.sh <task-name> <type>` — worktree/플랜/포트/로그를 원자적으로 생성.
 
 **강제 메커니즘 (전체 활성):**
 - `PreToolUse` (Bash): `guard-bash.sh` — 위험 명령 차단 ✅ (단계 1)
 - `SessionStart`: `session-context.sh` — 작업 상태 자동 주입 ✅ (단계 1)
-- `PreToolUse` (Edit/Write): `enforce-worktree.sh` — main에서 **백엔드 + iOS** 소스 보호 ✅ (단계 2+3)
-- `PreToolUse` (Edit/Write): `enforce-plan.sh` — 30줄 이상 변경에 EXEC_PLAN 강제 ✅ (단계 4)
-- `Stop`: `verify-and-block.sh` — 백엔드 compile + 자가수정 루프 (최대 3회) ✅ (단계 4)
-- `.githooks/pre-commit`: 백엔드 Kotlin compile 게이트 ✅ (단계 2). iOS는 Xcode 실시간 표시 + CI (v1.1).
+- `PreToolUse` (Edit/Write): `enforce-worktree.sh` — main에서 **백엔드** 소스 보호 (iOS 는 보호 대상 아님) ✅
+- `PreToolUse` (Edit/Write): `enforce-plan.sh` — 30줄 이상 백엔드 변경에 EXEC_PLAN 강제 ✅
+- `Stop`: `verify-and-block.sh` — 백엔드 compile + 자가수정 루프 (최대 3회) ✅
+- `.githooks/pre-commit`: 백엔드 Kotlin compile 게이트 ✅
 
-**Agents (영역별 분리):**
-- `code-reviewer` (백엔드 Kotlin/Spring 전용) — `memory: project` + `skills: [coding-conventions]`
-- `ios-reviewer` (iOS Swift/SwiftUI/SwiftData/HealthKit 전용) — `memory: project` + `skills: [ios-conventions]`
-- `backend-test-writer` (Spring Boot Cucumber + JUnit5 + Testcontainers) — `memory: project` + `skills: [coding-conventions]`
-- `ios-test-writer` (Swift Testing + XCTest UI) — `memory: project` + `skills: [ios-conventions]`
+**Agents (백엔드 전용):**
+- `code-reviewer` (Kotlin/Spring) — `memory: project` + `skills: [coding-conventions]`
+- `backend-test-writer` (Cucumber + JUnit5 + Testcontainers) — `memory: project` + `skills: [coding-conventions]`
 
 **Skills:**
 - `coding-conventions` (백엔드, agent 사전 로드 전용)
-- `ios-conventions` (iOS, agent 사전 로드 전용)
-- `/orchestrator` (구현 파이프라인 강제 — Phase 0~6, 단계 4)
-- `/pr-guide` (PR 생성, 단계 4)
-- `/code-review` (PR 자동 리뷰, 단계 4)
+- `/orchestrator` (백엔드 구현 파이프라인 강제 — Phase 0~6)
+- `/pr-guide` (PR 생성)
+- `/code-review` (PR 자동 리뷰)
 
 **Codex 평행 셋업**: `.codex/config.toml`이 **같은 `tools/hooks/*.sh` 스크립트를 재사용**한다. Claude Code든 Codex든 동일한 hook이 자동 발동 — 단일 진실 원천(SoT). 등록 방법은 `.codex/README.md` 참조.
 
@@ -56,19 +55,18 @@ cd backend && ./gradlew bootRun           # 실행
 cd backend && ./gradlew compileKotlin     # 컴파일만 (빠른 검증)
 cd backend && ./gradlew check             # test + 정적 검사
 
-# iOS
+# iOS (하네스 대상 아님 — 사용자가 Xcode 에서 직접)
 open ios/KickLog.xcodeproj
-xcodebuild -scheme KickLog -destination 'platform=iOS Simulator,name=iPhone 15' build
 
-# 작업 시작
+# 작업 시작 (백엔드)
 bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 ```
 
 ## 작업 원칙 (요약)
 
-- **TDD 우선**: 30줄 이상 변경은 EXEC_PLAN의 "테스트 케이스" 섹션부터 채우고 → RED → GREEN → REFACTOR 사이클.
-  - 백엔드: `backend-test-writer` agent가 Phase 2 진입 시 자동 위임으로 RED 단계 테스트 생성
-  - iOS: `ios-test-writer` agent (단위 테스트 우선, UI 테스트는 사후)
+- **ATDD 1차 + TDD (백엔드)**: 30줄 이상 백엔드 변경은 EXEC_PLAN의 "테스트 케이스" 섹션부터 채우고 → RED → GREEN → REFACTOR. 세부는 `docs/spec/test-strategy.md` (SoT).
+  - 도구: `backend-test-writer` agent — **Cucumber 인수 시나리오 + Testcontainers 통합 + JUnit 단위**
+- **iOS 는 하네스 대상 아님** — 사용자가 Xcode 에서 직접 작업. 테스트/리뷰 강제 없음. UI/API 연동이 동작하면 OK.
 - **작은 변경은 직접**, 큰 변경은 plan 모드 먼저. 30줄 미만은 EXEC_PLAN + TDD 면제.
 - **데이터 정제·분석은 iOS에서** (스프린트 계산·쿼터 통계 등). 백엔드는 저장·공유 책임만.
 - **자가수정 우회 금지**: `--no-verify`, `-DskipTests`, `@Disabled` 우회 금지.
@@ -82,6 +80,7 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 제품 요구 사항 | `docs/PRD.md` |
 | **핵심 결정 (ADR)** | `docs/adr/0001-mvp-scope.md` (그 외 ADR-0002+ 후속) |
 | API 명세 (예정) | `docs/spec/api-spec.md` |
+| **테스트 전략 (SoT)** | `docs/spec/test-strategy.md` — 백엔드 ATDD 1차 (Cucumber) |
 | 아키텍처 (예정) | `docs/architecture/` |
 | 리서치 (예정) | `docs/research/` |
 | 작업 플랜 영구본 | `docs/agent/plans/YYYY-MM-DD-<task>.md` |
@@ -107,3 +106,5 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 2026-05-21 | 단계 3 활성: ios-reviewer agent + ios-conventions skill + enforce-worktree iOS 확장 | iOS 코딩 시작 직전 하네스 완비. 백엔드/iOS 리뷰어 분리. |
 | 2026-05-21 | 단계 4 활성: orchestrator + pr-guide + code-review skills + test-writer agents (backend/ios) + enforce-plan + verify-and-block hooks | 구현 오케스트레이션 파이프라인 (Phase 0~6) 완비. EXEC_PLAN 30줄 임계 + 백엔드 compile 자가수정 루프. |
 | 2026-05-21 | TDD 도입 — Phase 2 흐름 Red→Green→Refactor, EXEC_PLAN 3섹션 → 4섹션 (테스트 케이스 추가), test-writer agent Phase 2 진입 시 자동 위임 | KickLog 표준 개발 방식 = TDD. 사용자 결정. |
+| 2026-05-21 | **ATDD 1차 채택** — `docs/spec/test-strategy.md` 신설(SoT), backend-test-writer/ios-test-writer 재작성, EXEC_PLAN 테스트 케이스 섹션을 (3-A)인수 Gherkin + (3-B)iOS ViewModel + (3-C)유스케이스 3블록으로 분리. **백엔드 = Cucumber-JVM**, **iOS = ViewModel 통합(UI 미경유)**. XCUITest 는 사후 스모크만. | GearShow test-writer 적응 + 그린필드 시점에 ATDD 도입 비용 최소. 1인 사이드 ROI 고려해 도구 선택 (Cucumber 풀 vs ViewModel 통합). |
+| 2026-05-21 | **iOS 하네스에서 제거** — ios-reviewer/ios-test-writer/ios-conventions 삭제, orchestrator/code-review/pr-guide/test-strategy/hooks 에서 iOS 분기 제거, enforce-worktree iOS 보호 해제. EXEC_PLAN 테스트 케이스는 (3-A) Gherkin + (3-B) 유스케이스 2블록만. 백엔드 전용 하네스로 정착. | 사용자가 iOS 개발자가 아니라 review/test 자동화 ROI 없음. UI/API 연동만 동작하면 OK. iOS 는 Xcode 에서 직접. |

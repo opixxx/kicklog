@@ -34,7 +34,7 @@ trust_level = "trusted"
 |---|---|---|---|
 | `PreToolUse` | `^Bash$` | `tools/hooks/guard-bash.sh` | 위험 명령 차단 (rm -rf /, git push --force, DROP TABLE 등) |
 | `SessionStart` | (모든) | `tools/hooks/session-context.sh` | 현재 worktree·브랜치·EXEC_PLAN·최근 커밋을 컨텍스트로 자동 주입 |
-| `PreToolUse` | `^(Edit\|Write\|NotebookEdit)$` | `tools/hooks/enforce-worktree.sh` | main 메인 디렉토리에서 backend/iOS 소스 직접 수정 차단 |
+| `PreToolUse` | `^(Edit\|Write\|NotebookEdit)$` | `tools/hooks/enforce-worktree.sh` | main 메인 디렉토리에서 백엔드 소스 직접 수정 차단 (iOS 는 보호 대상 아님) |
 | `PreToolUse` | `^(Edit\|Write\|NotebookEdit)$` | `tools/hooks/enforce-plan.sh` | 30줄 이상 코드 변경 시 EXEC_PLAN 강제 |
 | `Stop` | (모든) | `tools/hooks/verify-and-block.sh` | linked worktree의 backend 변경에 대해 compileKotlin 검증 |
 
@@ -51,7 +51,6 @@ Claude Code 원본 skill을 복사하지 않고 `.codex/config.toml`에서 직�
 | `pr-guide` | `.claude/skills/pr-guide/SKILL.md` |
 | `code-review` | `.claude/skills/code-review/SKILL.md` |
 | `coding-conventions` | `.claude/skills/coding-conventions/SKILL.md` |
-| `ios-conventions` | `.claude/skills/ios-conventions/SKILL.md` |
 
 Codex TUI에서 `/skills`로 노출 여부를 확인한다.
 
@@ -64,8 +63,6 @@ Claude Code 원본 agent markdown을 Codex custom agent role로 얇게 매핑한
 |---|---|---|
 | `code-reviewer` | `.codex/agents/code-reviewer.toml` | `.claude/agents/code-reviewer.md` |
 | `backend-test-writer` | `.codex/agents/backend-test-writer.toml` | `.claude/agents/backend-test-writer.md` |
-| `ios-reviewer` | `.codex/agents/ios-reviewer.toml` | `.claude/agents/ios-reviewer.md` |
-| `ios-test-writer` | `.codex/agents/ios-test-writer.toml` | `.claude/agents/ios-test-writer.md` |
 
 Codex TUI에서 subagent 생성 UI 또는 `/agent` 관련 기능으로 role 노출 여부를 확인한다.
 
@@ -133,5 +130,5 @@ Skill/agent 상세 정책도 `.claude/**`를 원본으로 두고, Codex는 얇�
 ### Skills / Agents가 보이지 않음
 1. Codex 버전 확인: `codex --version` (현재 검증 기준: `0.132.0`)
 2. `/skills`에서 `orchestrator`, `pr-guide`, `code-review`가 보이는지 확인
-3. `/agent` 또는 subagent 생성 UI에서 `code-reviewer`, `ios-reviewer` 등이 보이는지 확인
+3. `/agent` 또는 subagent 생성 UI에서 `code-reviewer`, `backend-test-writer` 가 보이는지 확인
 4. 보이지 않으면 `/debug-config`로 project `.codex/config.toml` 레이어가 로드됐는지 확인

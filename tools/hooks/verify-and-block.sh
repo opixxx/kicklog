@@ -5,7 +5,7 @@
 # 카운터 파일로 반복 횟수 제한 (무한 루프 + 비용 폭증 방지).
 #
 # 동작:
-#   1) worktree 내부 + 백엔드 변경 있을 때만 동작 (iOS 빌드는 너무 무거워 제외)
+#   1) worktree 내부 + 백엔드 변경 있을 때만 동작 (iOS 는 보호 대상 아님)
 #   2) 카운터 확인 — MAX_ATTEMPTS 초과 시 에스컬레이션
 #   3) compileKotlin 실행 (test는 PR/CI 단계로 위임)
 #   4) 실패 → decision:"block" + 에러 주입 (에이전트가 reasoning 재개)
@@ -31,7 +31,7 @@ fi
 # ─── 1-1) 백엔드 변경이 있는지 확인 ───────────────────────────────────────────
 CHANGED_BACKEND=$(git -C "$top" diff HEAD --name-only 2>/dev/null | grep -E '^backend/.*\.(kt|kts|gradle)$' || true)
 if [ -z "$CHANGED_BACKEND" ]; then
-  # 백엔드 변경 없음 (iOS만 또는 문서만) → verify-and-block 대상 아님
+  # 백엔드 변경 없음 (문서만 또는 iOS만) → verify-and-block 대상 아님
   exit 0
 fi
 

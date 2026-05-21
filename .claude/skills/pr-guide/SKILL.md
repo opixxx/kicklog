@@ -1,6 +1,6 @@
 ---
 name: pr-guide
-description: KickLog Pull Request 생성. 백엔드/iOS 검증 → push → PR 생성 절차. 백엔드+iOS 동시 변경 시 단일 PR (스코프 작으면) 또는 분할 권장.
+description: KickLog Pull Request 생성. 백엔드 검증 → push → PR 생성 절차. iOS 변경은 검증 없이 통과 (사용자 책임).
 ---
 
 # KickLog PR 생성
@@ -51,13 +51,7 @@ cd backend
 | 3 | **단위 테스트** | 도메인 모델 |
 
 #### iOS 변경이 있는 경우
-```bash
-# Xcode에서 Cmd+B로 빌드 확인 (또는 CLI)
-xcodebuild -scheme KickLog -destination 'platform=iOS Simulator,name=iPhone 16' build -quiet
-
-# 테스트 실행 (Swift Testing)
-xcodebuild -scheme KickLog -destination 'platform=iOS Simulator,name=iPhone 16' test
-```
+- **자동 검증 없음.** 사용자가 Xcode 에서 Cmd+B 로 빌드 확인 (책임 사용자).
 
 #### 인프라 변경이 있는 경우
 ```bash
@@ -136,9 +130,7 @@ gh pr create --title "PR 제목" --body "$(cat <<'EOF'
 - [ ] DB 마이그레이션 (V?) 작성 (해당 시)
 
 iOS:
-- [ ] Xcode build 성공
-- [ ] Swift Testing 통과
-- [ ] HealthKit 권한 변경 없음 (있으면 ADR 참조 필요)
+- [ ] (사용자가 Xcode 에서 수동 확인 — 자동 검증 없음)
 
 인프라:
 - [ ] terraform fmt/validate 통과
@@ -174,12 +166,12 @@ fi
 ### 단일 PR — 권장
 - 백엔드만 변경
 - iOS만 변경
-- 백엔드 + iOS 같은 기능 (예: 친구 추가 API + iOS 친구 목록 화면) — 작은 변경 시 합쳐도 OK
+- 백엔드 + iOS 같은 기능 — 작은 변경 시 합쳐도 OK
 
 ### 분할 PR — 권장
 - 큰 변경 (>500줄)
 - Breaking 변경과 호환성 변경 분리
-- 인프라(terraform) + 백엔드 + iOS 셋 다 — 영역별 분리
+- 인프라(terraform) + 백엔드 — 영역별 분리
 
 ## 에러 대응
 
@@ -190,13 +182,12 @@ fi
 | PR 이미 존재 | `gh pr view` 후 업데이트 여부 결정 |
 | 머지 충돌 | 충돌 해결 후 rebase |
 | 백엔드 test 실패 | 자가수정 또는 사용자 확인 |
-| iOS build 실패 | Xcode 에러 메시지 사용자에게 전달 |
 
 ## 최종 체크리스트
 
 - [ ] `gh` CLI 인증
 - [ ] 백엔드 변경 시 `./gradlew check` 통과
-- [ ] iOS 변경 시 Xcode build + Swift Testing 통과
+- [ ] iOS 변경 시 사용자가 Xcode 에서 수동 빌드 확인 (자동 검증 없음)
 - [ ] terraform 변경 시 plan 검토
 - [ ] 작업 디렉토리 clean
 - [ ] 모든 커밋이 push됨

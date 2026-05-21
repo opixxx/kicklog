@@ -31,7 +31,6 @@
 - `--no-verify`, `-DskipTests`, `--no-tests` 등으로 검증 우회
 - 실패 원인 분석 없이 "다른 것을 시도" brute-force
 - `try { ... } catch (e: Exception) { /* ignore */ }` 에러 삼키기
-- iOS `try? await` 결과 무시
 
 ## 로그 위치
 

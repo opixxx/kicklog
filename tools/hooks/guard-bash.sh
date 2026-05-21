@@ -76,8 +76,5 @@ check_pattern 'wget[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(bash|sh|zsh|fish)([[:s
 check_pattern 'docker[[:space:]]+system[[:space:]]+prune[[:space:]]+--all'      'docker system prune --all (모든 캐시·볼륨 삭제)'
 check_pattern 'docker[[:space:]]+volume[[:space:]]+rm[[:space:]]+kicklog-postgres-data'  'kicklog-postgres-data 볼륨 삭제 (DB 데이터 영구 손실)'
 
-# Xcode 위험 (iOS)
-check_pattern 'xcrun[[:space:]]+simctl[[:space:]]+erase[[:space:]]+all'  'xcrun simctl erase all (모든 시뮬레이터 데이터 삭제)'
-
 # 모든 검사 통과
 exit 0
