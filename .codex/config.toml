@@ -59,11 +59,57 @@ args = ["-c", "exec \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/tools/
 timeout = 300
 statusMessage = "백엔드 컴파일 검증 중"
 
-# ─── 향후 추가 예정 (단계 4) ─────────────────────────────────────────────────
-# Claude Code 단계 4에서 도입할 hook들의 Codex 평행:
-# - PreToolUse (Edit/Write) → enforce-worktree.sh, enforce-plan.sh
-# - Stop → verify-and-block.sh (compile만)
-# 도입 시 위와 동일한 패턴으로 추가한다.
+# ─── Skills ─────────────────────────────────────────────────────────────────
+# Claude Code 원본 skill을 Codex /skills에서도 사용할 수 있게 등록한다.
+# 실제 지식 원천은 .claude/skills/**/SKILL.md 이며, 중복 복사하지 않는다.
+
+[[skills.config]]
+path = "../.claude/skills/orchestrator"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/pr-guide"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/code-review"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/coding-conventions"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/ios-conventions"
+enabled = true
+
+# ─── Agents ─────────────────────────────────────────────────────────────────
+# Claude Code 원본 agent markdown을 Codex custom agent role로 얇게 매핑한다.
+# 각 config_file은 .claude/agents/<name>.md를 원본 지침으로 참조한다.
+
+[agents]
+max_threads = 6
+max_depth = 1
+
+[agents.code-reviewer]
+description = "KickLog 백엔드(Kotlin/Spring Boot 4) 코드 리뷰 전용. backend/만 검토하고 coding-conventions를 따른다."
+config_file = "agents/code-reviewer.toml"
+nickname_candidates = ["Backend Reviewer", "Kotlin Reviewer"]
+
+[agents.backend-test-writer]
+description = "KickLog 백엔드 테스트 작성 전용. JUnit 5, AssertJ, Testcontainers 기반으로 RED 테스트를 작성한다."
+config_file = "agents/backend-test-writer.toml"
+nickname_candidates = ["Backend Test Writer", "Spring Test Writer"]
+
+[agents.ios-reviewer]
+description = "KickLog iOS(SwiftUI/SwiftData/HealthKit) 코드 리뷰 전용. ios/만 검토하고 ios-conventions를 따른다."
+config_file = "agents/ios-reviewer.toml"
+nickname_candidates = ["iOS Reviewer", "Swift Reviewer"]
+
+[agents.ios-test-writer]
+description = "KickLog iOS 테스트 작성 전용. Swift Testing과 XCTest UI 기준으로 RED 테스트를 작성한다."
+config_file = "agents/ios-test-writer.toml"
+nickname_candidates = ["iOS Test Writer", "Swift Test Writer"]
 
 # ─── 모델 / 승인 정책 (선택) ─────────────────────────────────────────────────
 # 글로벌 ~/.codex/config.toml에서 일반적 기본값을 두고, 여기는 프로젝트 특이값만.
