@@ -14,7 +14,14 @@
   - Kotlin / Spring Boot 4 / PostgreSQL 16 / Flyway / Spring Security (JWT)
   - **호스팅: AWS EC2 + RDS (ap-northeast-2 서울) + Terraform** (ADR-0006)
 - Bundle ID: `com.opixxx.kicklog` · GitHub: `opixxx/kicklog` (private)
-- Architecture: 1인 사이드 — MV(SwiftUI Observable) + 단순 Spring 레이어 (Controller/Service/Repository). 헥사고날 강제 X.
+- Architecture: 1인 사이드 — **구조는 3-tier** (Controller/Service/Repository), 도메인별 패키지 (`auth/user/friend/match/place/venue/stat/common`), **모델링은 DDD-lite** (Rich Aggregate + VO + Ubiquitous Language). 헥사고날 Port/Adapter 강제 X. iOS 는 본 하네스 대상 아님.
+  - **세부**: `docs/architecture/{overview,domain-modeling,auth,api-conventions}.md` (코드 레벨 적용 — ADR 의 how)
+  - **결정 근거**: `docs/adr/` (ADR 의 why)
+  - **DTO 흐름**: `Request → Command → (Service) → Result → Response` — Entity 직접 노출 금지
+  - **모델링**: Aggregate Root 만 Repository, Entity 안에 비즈니스 메서드, `@Embeddable` VO 로 Primitive Obsession 회피 — `domain-modeling.md`
+  - **인증**: Apple/Kakao OAuth → 자체 JWT (Access 1h + Refresh 90d, DB 저장) — `auth.md`
+  - **에러 응답**: `{ code, message, field?, traceId? }` — `common/exception/ErrorCode` enum 경유, `GlobalExceptionHandler` 단일 진입점
+  - **iOS 가 1차 SoT** (HealthKit raw + SwiftData), 백엔드는 백업 + 친구 공유 채널
 
 ## 하네스: KickLog Backend
 
@@ -81,7 +88,7 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | **핵심 결정 (ADR)** | `docs/adr/0001-mvp-scope.md` (그 외 ADR-0002+ 후속) |
 | API 명세 (예정) | `docs/spec/api-spec.md` |
 | **테스트 전략 (SoT)** | `docs/spec/test-strategy.md` — 백엔드 ATDD 1차 (Cucumber) |
-| 아키텍처 (예정) | `docs/architecture/` |
+| **아키텍처 (코드 레벨)** | `docs/architecture/overview.md` (패키지·레이어·DTO·외부 통합) / `domain-modeling.md` (3-tier + DDD-lite 정책 — Aggregate·VO·Ubiquitous Language) / `auth.md` (인증) / `api-conventions.md` (REST 규약·ErrorCode) |
 | 리서치 (예정) | `docs/research/` |
 | 작업 플랜 영구본 | `docs/agent/plans/YYYY-MM-DD-<task>.md` |
 | 트레젝토리 | `docs/agent/trajectories/YYYY-MM.log` |
@@ -108,3 +115,5 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 2026-05-21 | TDD 도입 — Phase 2 흐름 Red→Green→Refactor, EXEC_PLAN 3섹션 → 4섹션 (테스트 케이스 추가), test-writer agent Phase 2 진입 시 자동 위임 | KickLog 표준 개발 방식 = TDD. 사용자 결정. |
 | 2026-05-21 | **ATDD 1차 채택** — `docs/spec/test-strategy.md` 신설(SoT), backend-test-writer/ios-test-writer 재작성, EXEC_PLAN 테스트 케이스 섹션을 (3-A)인수 Gherkin + (3-B)iOS ViewModel + (3-C)유스케이스 3블록으로 분리. **백엔드 = Cucumber-JVM**, **iOS = ViewModel 통합(UI 미경유)**. XCUITest 는 사후 스모크만. | GearShow test-writer 적응 + 그린필드 시점에 ATDD 도입 비용 최소. 1인 사이드 ROI 고려해 도구 선택 (Cucumber 풀 vs ViewModel 통합). |
 | 2026-05-21 | **iOS 하네스에서 제거** — ios-reviewer/ios-test-writer/ios-conventions 삭제, orchestrator/code-review/pr-guide/test-strategy/hooks 에서 iOS 분기 제거, enforce-worktree iOS 보호 해제. EXEC_PLAN 테스트 케이스는 (3-A) Gherkin + (3-B) 유스케이스 2블록만. 백엔드 전용 하네스로 정착. | 사용자가 iOS 개발자가 아니라 review/test 자동화 ROI 없음. UI/API 연동만 동작하면 OK. iOS 는 Xcode 에서 직접. |
+| 2026-05-22 | **`docs/architecture/` 신설** — overview.md (패키지·레이어·DTO·외부 통합·schema 위치) + auth.md (Apple/Kakao OAuth → JWT, Spring Security, soft delete cron) + api-conventions.md (URL prefix, HTTP 메서드, ErrorCode 규약, GlobalExceptionHandler, 페이지네이션, CORS). CLAUDE.md Architecture 섹션 1줄 → 7줄로 확장. | ADR-0003 의 결정은 풍부하나 코드/패키지 레벨 적용이 미정 → 에이전트가 새 작업 시 매번 ADR 통독해야 했음. 이걸 한 페이지로 압축해서 backend-test-writer / code-reviewer 가 즉시 참조. V1__init.sql ↔ ADR-0003 불일치는 첫 도메인 작업과 함께 정정 (점진적). |
+| 2026-05-22 | **`domain-modeling.md` 신설 — 3-tier + DDD-lite 정책 명문화** — 구조(3-tier) ≠ 모델링(DDD) 차원 분리, DDD 요소별 도입 정책 표, Anemic vs Rich (Match Aggregate 예시), Ubiquitous Language 어휘표, Aggregate 규칙 + JPA 함정 회피, Value Object 적용 기준, Domain Service · Anti-Corruption Layer · Bounded Context, 점진적 도입 단계(1~4 MVP / 5~6 v1.1), 새 Aggregate 추가 체크리스트, 안티패턴 모음. overview.md / CLAUDE.md 에 link 추가. | "3-tier에서 DDD 가능한가" 질문 — 둘이 독립 차원이라 가능. 헥사고날 Port/Adapter 없이도 Rich Aggregate + VO + Ubiquitous Language 까지는 도입해서 Service 비대화·Primitive Obsession·도메인 어휘 일관성 확보. Domain Event/CQRS 는 v1.1+. |
