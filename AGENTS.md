@@ -13,7 +13,7 @@ Claude Code용 원본은 `CLAUDE.md`와 `.claude/**`에 있으며, Codex는 아�
 
 - **KickLog**: 조기축구 데이터 분석 iOS 앱 + Spring 백엔드.
 - Tech Stack:
-  - iOS 17 / SwiftUI / SwiftData / HealthKit / CoreLocation
+  - iOS 26.4 / SwiftUI / SwiftData / HealthKit / CoreLocation
   - Kotlin / Spring Boot 4 / PostgreSQL 15 / Flyway / Spring Security (JWT)
 - Bundle ID: `com.opixxx.kicklog`
 - Architecture: MV (SwiftUI Observable) + 단순 Spring 레이어. 헥사고날 강제 X.

@@ -37,7 +37,7 @@ iOS 앱. 사용자는 이 폴더에 Xcode 프로젝트를 직접 생성한다.
 - ☑ **Background Modes** → ☑ Background fetch, ☑ Remote notifications (v1.1)
 
 ### Deployment Target
-- **iOS 17.0**
+- **iOS 26.4** (Xcode 기본값 그대로. 본인+팀원 모두 최신 폰 가정)
 
 ### 추가 의존성 (SPM, 필요 시점에)
 - (MVP에선 외부 의존성 거의 없음 — Apple 표준 프레임워크로 충분)

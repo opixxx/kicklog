@@ -10,7 +10,7 @@
 
 - **KickLog**: 조기축구 데이터 분석 iOS 앱 + Spring 백엔드.
 - Tech Stack:
-  - iOS 17 / SwiftUI / SwiftData / Swift Charts / HealthKit / CoreLocation
+  - iOS 26.4 / SwiftUI / SwiftData / Swift Charts / HealthKit / CoreLocation
   - Kotlin / Spring Boot 4 / PostgreSQL 15 / Flyway / Spring Security (JWT)
 - Bundle ID: `com.opixxx.kicklog` · GitHub: `opixxx/kicklog` (private)
 - Architecture: 1인 사이드 — MV(SwiftUI Observable) + 단순 Spring 레이어 (Controller/Service/Repository). 헥사고날 강제 X.

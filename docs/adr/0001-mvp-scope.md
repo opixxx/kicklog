@@ -134,7 +134,7 @@
 
 ### D16. 기술 스택 / 인프라
 
-- iOS: Swift / SwiftUI / SwiftData / Swift Charts / iOS 17+ / SPM / Swift Testing / MV 아키텍처
+- iOS: Swift / SwiftUI / SwiftData / Swift Charts / **iOS 26.4+** / SPM / Swift Testing / MV 아키텍처
 - Backend: Kotlin / Spring Boot 3 / Java 17 / PostgreSQL 15 / Gradle / Flyway / Spring Security (JWT) / REST
 - 호스팅 예정: Railway 또는 Fly.io
 - Repo: GitHub Private (`opixxx/kicklog`), 모노레포 (ios/ + backend/ + docs/ + infra/)
@@ -162,3 +162,11 @@
 - ADR-0004: SwiftData 모델 + HealthKit 매핑 / iCloud Sync 도입 여부
 - ADR-0005: 초대 링크 Universal Link 구조
 - ADR-0006: 백엔드 호스팅 선택 (Railway vs Fly.io)
+
+---
+
+## Revisions
+
+| 날짜 | 변경 | 사유 |
+|---|---|---|
+| 2026-05-21 | D16 iOS 최소 지원 `17` → `26.4` | Xcode 기본값 + 2026-05 시점에 iOS 17은 EOL 근접. 본인+팀원 모두 최신 폰 가정. 원래 ADR 작성 시 시점 가정 오류. |
