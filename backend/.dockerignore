@@ -1,0 +1,36 @@
+# Build 산출물 (멀티스테이지 안에서 새로 빌드)
+build/
+.gradle/
+out/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# 테스트 결과
+**/test-results/
+**/reports/
+
+# 환경 / 비밀
+.env
+*.local.properties
+secrets/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# 문서
+*.md
+HELP.md
+README.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

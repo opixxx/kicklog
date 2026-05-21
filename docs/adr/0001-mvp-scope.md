@@ -161,7 +161,7 @@
 - **ADR-0003: 백엔드 데이터 모델 / API 스키마 ✅ 작성 완료 (2026-05-21)**
 - ADR-0004: SwiftData 모델 + HealthKit 매핑 / iCloud Sync 도입 여부 (pending)
 - ADR-0005: 초대 링크 Universal Link 구조 (pending)
-- ADR-0006: 백엔드 호스팅 선택 (Railway vs Fly.io) (pending)
+- **ADR-0006: 백엔드 호스팅 선택 ✅ 작성 완료 (2026-05-21)** — AWS EC2 + RDS + Terraform (서울 region)
 
 ---
 

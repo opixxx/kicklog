@@ -133,7 +133,7 @@
 | 동기화 | iOS → Server fire-and-forget + 재시도 (PUT 멱등) |
 | 빌드 | Gradle |
 | 마이그레이션 | Flyway |
-| 호스팅 (예정) | Railway / Fly.io |
+| 호스팅 | **AWS EC2 + RDS (ap-northeast-2 서울, Free Tier) + Terraform** (ADR-0006) |
 
 ### 백엔드의 책임
 - 사용자 계정 (Sign in with Apple)

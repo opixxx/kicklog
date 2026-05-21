@@ -11,7 +11,8 @@
 - **KickLog**: 조기축구 데이터 분석 iOS 앱 + Spring 백엔드.
 - Tech Stack:
   - iOS 26.4 / SwiftUI / SwiftData / Swift Charts / HealthKit / CoreLocation
-  - Kotlin / Spring Boot 4 / PostgreSQL 15 / Flyway / Spring Security (JWT)
+  - Kotlin / Spring Boot 4 / PostgreSQL 16 / Flyway / Spring Security (JWT)
+  - **호스팅: AWS EC2 + RDS (ap-northeast-2 서울) + Terraform** (ADR-0006)
 - Bundle ID: `com.opixxx.kicklog` · GitHub: `opixxx/kicklog` (private)
 - Architecture: 1인 사이드 — MV(SwiftUI Observable) + 단순 Spring 레이어 (Controller/Service/Repository). 헥사고날 강제 X.
 
@@ -90,3 +91,4 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 2026-05-21 | 초기 작성 (단계 1 하네스 셋업) | grill-me 인터뷰 + GearShow 하네스 적응 |
 | 2026-05-21 | `.codex/config.toml` 추가 — Codex hook 자동화 | Codex CLI도 같은 hook 스크립트 자동 실행. 단일 진실 원천 유지. |
 | 2026-05-21 | 단계 2 활성: code-reviewer agent + coding-conventions skill + enforce-worktree + pre-commit | 백엔드 코딩 시작 전 인프라 완성. iOS 별도 reviewer는 단계 3. |
+| 2026-05-21 | ADR-0006 — AWS EC2 + RDS + Terraform 호스팅 결정 + Terraform 골격 + Dockerfile | 서울 region (카카오 API 최단) + 12개월 Free Tier + 학습 가치. |

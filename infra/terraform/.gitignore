@@ -1,0 +1,25 @@
+# 실제 변수 값 (민감 정보)
+terraform.tfvars
+*.tfvars.json
+
+# Terraform 작업 디렉토리
+.terraform/
+.terraform.lock.hcl
+
+# State 파일 (MVP는 로컬 — v1.1에서 S3 backend로 이전 후 이 파일은 사라짐)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Plan 출력
+*.tfplan
+
+# Override 파일 (개인용)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# crash logs
+crash.log
+crash.*.log
