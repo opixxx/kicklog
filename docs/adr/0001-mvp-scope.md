@@ -157,7 +157,7 @@
 - Apple HealthKit 데이터 서버 전송 정책 준수 필요 (사용자 동의 + 명분 명시)
 
 ### 후속 결정 (이후 ADR)
-- ADR-0002: 자동 그룹핑 시간/위치 임계값 정확한 수치 (pending)
+- **ADR-0002: 자동 그룹핑 시간/위치 임계값 ✅ 작성 완료 (2026-05-21)** — 시간 90분 + 위치 100m (Haversine)
 - **ADR-0003: 백엔드 데이터 모델 / API 스키마 ✅ 작성 완료 (2026-05-21)**
 - **ADR-0004: SwiftData 모델 + HealthKit 매핑 ✅ 작성 완료 (2026-05-21)** — 본인/친구 모델 분리, 최소 권한 6개, Observer Query + Background Delivery, UTC + Local TZ, 친구 캐시 1h TTL, 사용자 프로필 안 받음, SwiftData 영속 캐시
 - ADR-0005: 초대 링크 Universal Link 구조 (pending)
