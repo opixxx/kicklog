@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: kicklog
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/kicklog}
+    username: ${DB_USERNAME:kicklog}
+    password: ${DB_PASSWORD:kicklog}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    root: INFO
+    com.opixxx.kicklog: DEBUG
+
+kicklog:
+  jwt:
+    secret: ${JWT_SECRET:dev-secret-change-me-in-production-min-32-chars}
+    expiration-hours: ${JWT_EXPIRATION_HOURS:168}  # 7일
+  apple:
+    sign-in:
+      team-id: ${APPLE_TEAM_ID:}
+      bundle-id: com.opixxx.kicklog
+      key-id: ${APPLE_KEY_ID:}
+      private-key: ${APPLE_PRIVATE_KEY:}

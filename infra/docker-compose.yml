@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: kicklog-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kicklog
+      POSTGRES_USER: kicklog
+      POSTGRES_PASSWORD: kicklog
+    ports:
+      - "5432:5432"
+    volumes:
+      - kicklog-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kicklog -d kicklog"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  kicklog-postgres-data:
