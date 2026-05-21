@@ -108,20 +108,29 @@
 
 1. 앱 소개 (한 줄 카피)
 2. 워치 가이드 — Apple Watch에서 Soccer 워크아웃 시작/종료 방법 (사용자 직접 캡처 스크린샷)
-3. Sign in with Apple
+3. **로그인 — Sign in with Apple + 카카오로 시작하기 두 버튼 (ADR-0003 D7)**
 4. HealthKit 권한 (이유 명시 — `NSHealthShareUsageDescription`)
 
 - 위치 권한은 첫 라벨링에서 "운동장 등록" 시점에 deferred
 - 사용자 프로필 (키·몸무게·생년월일)은 HealthKit에서 자동 읽기 (별도 입력 X)
 
+### 4.8 운동장 등록 흐름 (ADR-0003 D6.1)
+
+- 라벨링 화면에서 자동 GPS 매칭 (반경 100m, iOS Haversine)
+- 매칭 안 되면 "운동장 처음? 이름 입력" 카드 → 자동 GPS 좌표로 등록
+- 사용자가 정확한 위치 원하면 **카카오 검색** 옵션 (백엔드 프록시 경유)
+
 ## 5. 백엔드
 
 | 영역 | 결정 |
 |---|---|
-| 언어/프레임워크 | Kotlin + Spring Boot 3 |
+| 언어/프레임워크 | Kotlin + Spring Boot 4 |
 | DB | PostgreSQL 15 |
-| 인증 | Sign in with Apple + JWT |
+| 인증 | Sign in with Apple + **Kakao Login** + JWT (Access 1h + Refresh 90d) |
 | API | REST |
+| 운동장 검색 | **카카오 로컬 API (백엔드 프록시)** |
+| 사용자 삭제 | Soft delete + 30일 grace + cron hard delete |
+| 동기화 | iOS → Server fire-and-forget + 재시도 (PUT 멱등) |
 | 빌드 | Gradle |
 | 마이그레이션 | Flyway |
 | 호스팅 (예정) | Railway / Fly.io |

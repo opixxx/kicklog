@@ -156,12 +156,12 @@
 - 1인 개발 burnout 위험 → 마일스톤 분리·주간 진척 체크 필수
 - Apple HealthKit 데이터 서버 전송 정책 준수 필요 (사용자 동의 + 명분 명시)
 
-### 후속 결정 필요 (이후 ADR)
-- ADR-0002: 자동 그룹핑 시간/위치 임계값 정확한 수치
-- ADR-0003: 백엔드 데이터 모델 / API 스키마
-- ADR-0004: SwiftData 모델 + HealthKit 매핑 / iCloud Sync 도입 여부
-- ADR-0005: 초대 링크 Universal Link 구조
-- ADR-0006: 백엔드 호스팅 선택 (Railway vs Fly.io)
+### 후속 결정 (이후 ADR)
+- ADR-0002: 자동 그룹핑 시간/위치 임계값 정확한 수치 (pending)
+- **ADR-0003: 백엔드 데이터 모델 / API 스키마 ✅ 작성 완료 (2026-05-21)**
+- ADR-0004: SwiftData 모델 + HealthKit 매핑 / iCloud Sync 도입 여부 (pending)
+- ADR-0005: 초대 링크 Universal Link 구조 (pending)
+- ADR-0006: 백엔드 호스팅 선택 (Railway vs Fly.io) (pending)
 
 ---
 
@@ -170,3 +170,4 @@
 | 날짜 | 변경 | 사유 |
 |---|---|---|
 | 2026-05-21 | D16 iOS 최소 지원 `17` → `26.4` | Xcode 기본값 + 2026-05 시점에 iOS 17은 EOL 근접. 본인+팀원 모두 최신 폰 가정. 원래 ADR 작성 시 시점 가정 오류. |
+| 2026-05-21 | D2 데이터 공유 모델 — Kakao Login 추가 (Apple + Kakao 둘 다) | 한국 사용자에게 카카오 로그인이 압도적. ADR-0003 D7에서 정식 결정. |
