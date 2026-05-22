@@ -7,8 +7,8 @@ KickLog Codex custom agent: backend-test-writer.
 - 결과, 주석, 테스트 표시명은 프로젝트 규칙에 맞게 한글을 우선한다.
 
 작업 시작 시:
-1. Claude Code 원본 지침 `.claude/agents/backend-test-writer.md`를 읽고 테스트 계층, 작성 규칙, 출력 형식을 따른다.
-2. 백엔드 컨벤션 `.claude/skills/coding-conventions/SKILL.md`를 읽는다.
+1. Codex용 복제 지침 `.codex/agents/backend-test-writer.md`를 읽고 테스트 계층, 작성 규칙, 출력 형식을 따른다.
+2. 백엔드 컨벤션 `.codex/skills/coding-conventions/SKILL.md`를 읽는다.
 3. TDD 작업이면 `EXEC_PLAN.md`의 "테스트 케이스" 섹션을 먼저 확인한다.
 
 테스트 원칙 (ATDD 1차 — 세부는 `docs/spec/test-strategy.md`):
@@ -20,5 +20,5 @@ KickLog Codex custom agent: backend-test-writer.
 """
 
 [[skills.config]]
-path = "../../.claude/skills/coding-conventions"
+path = "../skills/coding-conventions"
 enabled = true

@@ -43,26 +43,27 @@ trust_level = "trusted"
 
 ## 등록된 Skills
 
-Claude Code 원본 skill을 복사하지 않고 `.codex/config.toml`에서 직접 참조한다.
+Claude Code의 `.claude/skills/**` 내용을 `.codex/skills/**`에 복제해 Codex가 직접 로드한다.
+원본 `.claude`가 바뀌면 `.codex/skills`도 함께 동기화해야 한다.
 
-| Codex skill | 원본 |
+| Codex skill | 경로 |
 |---|---|
-| `orchestrator` | `.claude/skills/orchestrator/SKILL.md` |
-| `pr-guide` | `.claude/skills/pr-guide/SKILL.md` |
-| `code-review` | `.claude/skills/code-review/SKILL.md` |
-| `coding-conventions` | `.claude/skills/coding-conventions/SKILL.md` |
+| `orchestrator` | `.codex/skills/orchestrator/SKILL.md` |
+| `pr-guide` | `.codex/skills/pr-guide/SKILL.md` |
+| `code-review` | `.codex/skills/code-review/SKILL.md` |
+| `coding-conventions` | `.codex/skills/coding-conventions/SKILL.md` |
 
 Codex TUI에서 `/skills`로 노출 여부를 확인한다.
 
 ## 등록된 Agents
 
-Claude Code 원본 agent markdown을 Codex custom agent role로 얇게 매핑한다.
-원본 체크리스트와 상세 출력 형식은 `.claude/agents/*.md`가 계속 단일 진실 원천이다.
+Claude Code의 `.claude/agents/*.md` 내용을 `.codex/agents/*.md`에 복제하고,
+Codex custom agent role은 `.codex/agents/*.toml`을 통해 해당 지침을 읽는다.
 
-| Codex agent role | Config layer | 원본 |
+| Codex agent role | Config layer | 지침 |
 |---|---|---|
-| `code-reviewer` | `.codex/agents/code-reviewer.toml` | `.claude/agents/code-reviewer.md` |
-| `backend-test-writer` | `.codex/agents/backend-test-writer.toml` | `.claude/agents/backend-test-writer.md` |
+| `code-reviewer` | `.codex/agents/code-reviewer.toml` | `.codex/agents/code-reviewer.md` |
+| `backend-test-writer` | `.codex/agents/backend-test-writer.toml` | `.codex/agents/backend-test-writer.md` |
 
 Codex TUI에서 subagent 생성 UI 또는 `/agent` 관련 기능으로 role 노출 여부를 확인한다.
 
@@ -110,11 +111,11 @@ codex --strict-config exec --help
 | 프로젝트 지침 | `CLAUDE.md` (루트) | `AGENTS.md` (루트) |
 | 프로젝트 설정 | `.claude/settings.json` | `.codex/config.toml` (본 파일) |
 | Hook 스크립트 | `tools/hooks/*.sh` ← 같은 파일 재사용 | `tools/hooks/*.sh` |
-| Skills | `.claude/skills/**/SKILL.md` | `.codex/config.toml`의 `skills.config`로 원본 참조 |
-| Agents | `.claude/agents/*.md` | `.codex/agents/*.toml` + `.codex/config.toml`의 `agents.<name>` |
+| Skills | `.claude/skills/**/SKILL.md` | `.codex/skills/**/SKILL.md` + `.codex/config.toml` |
+| Agents | `.claude/agents/*.md` | `.codex/agents/*.md` + `.codex/agents/*.toml` |
 
 **단일 진실 원천(SoT)**: hook 스크립트는 `tools/hooks/`에만 있고, Claude/Codex 양쪽이 동일한 스크립트를 호출한다. 동작 차이는 발생하지 않는다.
-Skill/agent 상세 정책도 `.claude/**`를 원본으로 두고, Codex는 얇은 매핑 계층만 둔다.
+Skill/agent 상세 정책은 `.codex/**`에도 실제 파일로 존재한다. Claude 쪽 정책을 바꾸면 같은 변경을 Codex 쪽에도 반영한다.
 
 ## 트러블슈팅
 

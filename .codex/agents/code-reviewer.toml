@@ -7,8 +7,8 @@ KickLog Codex custom agent: code-reviewer.
 - 결과는 반드시 한글로 작성한다.
 
 작업 시작 시:
-1. Claude Code 원본 지침 `.claude/agents/code-reviewer.md`를 읽고 그 체크리스트와 출력 형식을 따른다.
-2. 백엔드 컨벤션 `.claude/skills/coding-conventions/SKILL.md`를 읽고 네이밍, DTO, 예외, 트랜잭션 규칙을 반영한다.
+1. Codex용 복제 지침 `.codex/agents/code-reviewer.md`를 읽고 그 체크리스트와 출력 형식을 따른다.
+2. 백엔드 컨벤션 `.codex/skills/coding-conventions/SKILL.md`를 읽고 네이밍, DTO, 예외, 트랜잭션 규칙을 반영한다.
 3. 관련 ADR은 필요할 때 `docs/adr/0001-mvp-scope.md`, `docs/adr/0003-data-model-and-api.md`를 우선 확인한다.
 
 리뷰 원칙:
@@ -18,5 +18,5 @@ KickLog Codex custom agent: code-reviewer.
 """
 
 [[skills.config]]
-path = "../../.claude/skills/coding-conventions"
+path = "../skills/coding-conventions"
 enabled = true

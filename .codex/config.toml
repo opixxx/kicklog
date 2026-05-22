@@ -60,28 +60,28 @@ timeout = 300
 statusMessage = "백엔드 컴파일 검증 중"
 
 # ─── Skills ─────────────────────────────────────────────────────────────────
-# Claude Code 원본 skill을 Codex /skills에서도 사용할 수 있게 등록한다.
-# 실제 지식 원천은 .claude/skills/**/SKILL.md 이며, 중복 복사하지 않는다.
+# Claude Code 원본 skill을 .codex/skills/**/SKILL.md 로 복제해 Codex가 직접 로드할 수 있게 등록한다.
+# 원본 갱신 시 .claude/skills/** 와 .codex/skills/** 를 함께 동기화한다.
 
 [[skills.config]]
-path = "../.claude/skills/orchestrator"
+path = "skills/orchestrator"
 enabled = true
 
 [[skills.config]]
-path = "../.claude/skills/pr-guide"
+path = "skills/pr-guide"
 enabled = true
 
 [[skills.config]]
-path = "../.claude/skills/code-review"
+path = "skills/code-review"
 enabled = true
 
 [[skills.config]]
-path = "../.claude/skills/coding-conventions"
+path = "skills/coding-conventions"
 enabled = true
 
 # ─── Agents ─────────────────────────────────────────────────────────────────
-# Claude Code 원본 agent markdown을 Codex custom agent role로 얇게 매핑한다.
-# 각 config_file은 .claude/agents/<name>.md를 원본 지침으로 참조한다.
+# Claude Code 원본 agent markdown을 .codex/agents/*.md 로 복제하고,
+# Codex custom agent role은 .codex/agents/*.toml 을 통해 해당 지침을 읽는다.
 
 [agents]
 max_threads = 6
