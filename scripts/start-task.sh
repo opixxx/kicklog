@@ -1,11 +1,12 @@
 #!/bin/bash
-# scripts/start-task.sh <task-name> <type> [--with-context [N]]
+# scripts/start-task.sh <task-name> <type> [--with-context [N]] [--worktree-root PATH]
 #
 # 새 작업 시작 시 worktree · EXEC_PLAN · 포트 · 로그를 원자적으로 셋업한다.
 # 이 스크립트가 에이전트 작업의 단일 진입점이며, 하나라도 실패하면 전체 롤백된다.
 #
 # 옵션:
 #   --with-context [N]  최근 N개 트레젝토리 항목을 EXEC_PLAN 부록으로 첨부 (기본 5)
+#   --worktree-root PATH  worktree 생성 루트 지정 (기본값: .worktrees)
 #
 # 사용 예:
 #   bash scripts/start-task.sh friend-invite-api feature
@@ -18,6 +19,7 @@ TASK_NAME="${1:-}"
 TYPE="${2:-}"
 WITH_CONTEXT=false
 CONTEXT_N=5
+WT_ROOT_OPTION=""
 
 shift 2 2>/dev/null || true
 while [ $# -gt 0 ]; do
@@ -30,6 +32,13 @@ while [ $# -gt 0 ]; do
       fi
       shift
       ;;
+    --worktree-root)
+      WT_ROOT_OPTION="${2:-}"
+      if [ -z "$WT_ROOT_OPTION" ]; then
+        echo "❌ --worktree-root 값이 필요합니다"; exit 1
+      fi
+      shift 2
+      ;;
     *)
       echo "❌ 알 수 없는 옵션: $1"; exit 1
       ;;
@@ -38,16 +47,18 @@ done
 
 if [ -z "$TASK_NAME" ] || [ -z "$TYPE" ]; then
   cat <<EOF
-사용법: bash scripts/start-task.sh <task-name> <type> [--with-context [N]]
+사용법: bash scripts/start-task.sh <task-name> <type> [--with-context [N]] [--worktree-root PATH]
 
   task-name : 작업 식별자 (한글·공백 허용, 자동 슬러그화됨)
   type      : feature | fix | refactor | chore | docs
   --with-context [N] : 최근 N개 트레젝토리를 EXEC_PLAN 부록에 첨부 (기본 5)
+  --worktree-root PATH : worktree 생성 루트 지정
 
 예시:
   bash scripts/start-task.sh friend-invite-api feature
   bash scripts/start-task.sh sprint-calc-noise fix
   bash scripts/start-task.sh quarter-grouping-tune refactor --with-context 10
+  bash scripts/start-task.sh kakao-login feature --worktree-root .worktrees
 EOF
   exit 1
 fi
@@ -65,9 +76,41 @@ fi
 
 BRANCH="${TYPE}/${SLUG}"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-WT_PATH="${REPO_ROOT}/../kicklog-${SLUG}"
 PLAN_DATE="$(date +%Y-%m-%d)"
-PLAN_PATH="${REPO_ROOT}/docs/agent/plans/${PLAN_DATE}-${SLUG}.md"
+
+if [ -n "$WT_ROOT_OPTION" ]; then
+  WT_ROOT="$WT_ROOT_OPTION"
+  WT_NAME="$SLUG"
+elif [ -n "${KICKLOG_WORKTREE_ROOT:-}" ]; then
+  WT_ROOT="$KICKLOG_WORKTREE_ROOT"
+  WT_NAME="$SLUG"
+else
+  WT_ROOT="${REPO_ROOT}/.worktrees"
+  WT_NAME="$SLUG"
+fi
+
+case "$WT_ROOT" in
+  /*) ;;
+  *) WT_ROOT="${REPO_ROOT}/${WT_ROOT}" ;;
+esac
+
+WT_PATH="${WT_ROOT}/${WT_NAME}"
+PLAN_REL_PATH="docs/agent/plans/${PLAN_DATE}-${SLUG}.md"
+PLAN_PATH="${WT_PATH}/${PLAN_REL_PATH}"
+SETUP_COMPLETE=false
+
+cleanup_on_error() {
+  status=$?
+  if [ "$SETUP_COMPLETE" != "true" ]; then
+    if [ -e "$WT_PATH" ]; then
+      git -C "$REPO_ROOT" worktree remove --force "$WT_PATH" >/dev/null 2>&1 || true
+    fi
+    git -C "$REPO_ROOT" branch -D "$BRANCH" >/dev/null 2>&1 || true
+  fi
+  exit "$status"
+}
+
+trap cleanup_on_error ERR
 
 # ─── 중복 검사 ────────────────────────────────────────────────────────────────
 if [ -e "$WT_PATH" ]; then
@@ -78,11 +121,6 @@ fi
 
 if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$BRANCH"; then
   echo "❌ 브랜치가 이미 존재합니다: $BRANCH"
-  exit 1
-fi
-
-if [ -e "$PLAN_PATH" ]; then
-  echo "❌ 동일 이름의 플랜 파일이 이미 존재합니다: $PLAN_PATH"
   exit 1
 fi
 
@@ -119,10 +157,17 @@ if [ -z "$BASE_REF" ]; then
   exit 1
 fi
 
+mkdir -p "$WT_ROOT"
 git -C "$REPO_ROOT" worktree add "$WT_PATH" -b "$BRANCH" "$BASE_REF"
 
 # ─── 2) EXEC_PLAN 영구본 생성 + worktree에 symlink ────────────────────────────
-mkdir -p "${REPO_ROOT}/docs/agent/plans"
+if [ -e "$PLAN_PATH" ]; then
+  echo "❌ 동일 이름의 플랜 파일이 이미 존재합니다: $PLAN_PATH"
+  echo "   생성된 worktree를 정리하려면: git worktree remove $WT_PATH"
+  exit 1
+fi
+
+mkdir -p "${WT_PATH}/docs/agent/plans"
 sed \
   -e "s|{{TASK}}|${TASK_NAME}|g" \
   -e "s|{{TYPE}}|${TYPE}|g" \
@@ -132,7 +177,7 @@ sed \
   -e "s|{{DATE}}|$(date '+%Y-%m-%d %H:%M')|g" \
   "$TEMPLATE" > "$PLAN_PATH"
 
-ln -s "$PLAN_PATH" "${WT_PATH}/EXEC_PLAN.md"
+ln -s "$PLAN_REL_PATH" "${WT_PATH}/EXEC_PLAN.md"
 
 # ─── 2-1) --with-context 옵션 처리 ────────────────────────────────────────────
 if [ "$WITH_CONTEXT" = "true" ]; then
@@ -208,11 +253,13 @@ echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${WT_PATH}/.task/started-at"
 mkdir -p "${WT_PATH}/logs"
 
 # ─── 5) 트레젝토리 기록 시작 ──────────────────────────────────────────────────
-TRAJ_DIR="${REPO_ROOT}/docs/agent/trajectories"
+TRAJ_DIR="${WT_PATH}/docs/agent/trajectories"
 mkdir -p "$TRAJ_DIR"
 TRAJ_FILE="${TRAJ_DIR}/$(date +%Y-%m).log"
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] STARTED task=${SLUG} type=${TYPE} branch=${BRANCH} port=${PORT} plan=${PLAN_PATH}" \
   >> "$TRAJ_FILE"
+
+SETUP_COMPLETE=true
 
 # ─── 6) 안내 ──────────────────────────────────────────────────────────────────
 cat <<EOF

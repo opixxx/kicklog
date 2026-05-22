@@ -32,6 +32,8 @@
 **트리거:** 백엔드 소스 변경이 예상되는 작업 시 `orchestrator` 스킬 참조. 단순 질문·코드 설명·로그 분석·iOS 작업은 직접 응답.
 
 **진입점:** `bash scripts/start-task.sh <task-name> <type>` — worktree/플랜/포트/로그를 원자적으로 생성.
+- Claude/Codex 모두 기본 worktree 위치는 `.worktrees/<slug>`이다.
+- worktree 루트의 `EXEC_PLAN.md`는 `docs/agent/plans/YYYY-MM-DD-<slug>.md` 상대 symlink다.
 
 **강제 메커니즘 (전체 활성):**
 - `PreToolUse` (Bash): `guard-bash.sh` — 위험 명령 차단 ✅ (단계 1)

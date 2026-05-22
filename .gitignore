@@ -99,6 +99,7 @@ local.properties
 docker-compose.override.yml
 
 # ========== 하네스 — worktree 내부 작업 아티팩트 (공유 불필요) ==========
+.worktrees/
 .task/
 /logs/
 EXEC_PLAN.md

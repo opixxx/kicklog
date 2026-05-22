@@ -59,6 +59,8 @@ Claude Code용 원본은 `CLAUDE.md`와 `.claude/**`에 있으며, Codex는 아�
 **Codex 작업 체크리스트 (ATDD 1차 + TDD):**
 1. 구현성 요청이면 관련 문서(`docs/PRD.md`, `docs/adr/`, `docs/architecture/`, `docs/spec/test-strategy.md`)와 `.codex/skills/orchestrator/SKILL.md`를 먼저 읽는다.
 2. 메인 디렉토리의 `main`에서 백엔드 코드 변경이 필요하면 `bash scripts/start-task.sh <task-name> <type>`로 linked worktree 생성 후 그 worktree에서 작업한다. (iOS 작업은 worktree 불필요)
+   - Claude/Codex 모두 스크립트가 기본으로 `.worktrees/<slug>` 내부 worktree를 만든다.
+   - worktree 루트의 `EXEC_PLAN.md`는 실파일이 아니라 `docs/agent/plans/YYYY-MM-DD-<slug>.md`를 가리키는 symlink여야 한다.
 3. EXEC_PLAN.md 작성 — **30줄 미만의 단순 변경은 면제**, 그 외는 목표·접근·**테스트 케이스**·검증 **4섹션** 필수.
    - 테스트 케이스 섹션은 **(3-A) Gherkin 인수 시나리오 + (3-B) 유스케이스/단위** 2블록.
    - 단, 새 API endpoint / DB 마이그레이션 / 친구 권한 경로는 줄 수와 무관하게 인수 시나리오 1개 이상 필수.

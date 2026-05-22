@@ -119,6 +119,16 @@ Skill/agent 상세 정책은 `.codex/**`에도 실제 파일로 존재한다. Cl
 
 ## 트러블슈팅
 
+### `start-task.sh` worktree 위치
+Claude/Codex 모두 `scripts/start-task.sh`는 기본으로 `.worktrees/<slug>`에 linked worktree를 만든다.
+다른 위치가 필요하면 명시적으로 지정한다:
+
+```bash
+bash scripts/start-task.sh kakao-login feature --worktree-root .worktrees
+```
+
+생성된 worktree의 `EXEC_PLAN.md`는 실파일이 아니라 `docs/agent/plans/YYYY-MM-DD-<slug>.md` 상대 symlink여야 한다.
+
 ### Hook이 실행되지 않음
 1. **신뢰 등록 여부 확인**: `~/.codex/config.toml`의 `[projects."..."]` 항목
 2. **스크립트 권한**: `ls -la tools/hooks/*.sh` — `x` 권한 확인

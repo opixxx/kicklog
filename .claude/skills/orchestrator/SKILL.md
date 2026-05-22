@@ -83,7 +83,7 @@ bash scripts/start-task.sh <task-name> <type>
 ```
 
 원자적 생성:
-- linked worktree (`../kicklog-<slug>`)
+- linked worktree (`.worktrees/<slug>`, 저장소 내부, `.gitignore` 대상)
 - 브랜치 (`<type>/<slug>`)
 - 영구 플랜 파일 (`docs/agent/plans/YYYY-MM-DD-<slug>.md`)
 - worktree 루트의 `EXEC_PLAN.md` symlink

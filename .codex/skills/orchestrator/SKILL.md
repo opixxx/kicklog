@@ -83,10 +83,11 @@ bash scripts/start-task.sh <task-name> <type>
 ```
 
 원자적 생성:
-- linked worktree (`../kicklog-<slug>`)
+- linked worktree
+  - Claude/Codex 공통: `.worktrees/<slug>` (저장소 내부, `.gitignore` 대상)
 - 브랜치 (`<type>/<slug>`)
-- 영구 플랜 파일 (`docs/agent/plans/YYYY-MM-DD-<slug>.md`)
-- worktree 루트의 `EXEC_PLAN.md` symlink
+- 영구 플랜 파일 (`<worktree>/docs/agent/plans/YYYY-MM-DD-<slug>.md`)
+- worktree 루트의 `EXEC_PLAN.md` symlink (`docs/agent/plans/...` 상대 링크)
 - 빈 포트 (9000~9099)
 - `.task/` 메타 + `logs/` + 트레젝토리 기록
 
