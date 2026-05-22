@@ -307,8 +307,11 @@ iOS 앱은 webview 가 아니라 native HTTP → 사실상 CORS 불필요.
 ## API 명세 문서
 
 본 문서는 **규약**. 실제 endpoint 명세는 별도:
-- `docs/spec/api-spec.md` — endpoint·request·response·예시 표 (현재 미작성, 첫 도메인 작업 시 점진적으로)
-- ADR-0003 의 "API Endpoints" 섹션이 임시 SoT
+- [`docs/spec/api-spec.md`](../spec/api-spec.md) — 9개 도메인 27 endpoint 의 request·response·상태코드·에러·예시 (구현 시 직참조 계약)
+- [`docs/spec/diagram.md`](../spec/diagram.md) — ERD + 인증 시퀀스 (Mermaid)
+- ADR-0003 의 "API Endpoints" 섹션이 결정 근거(why)
+
+우선순위: **ADR-0003 > 본 문서(규약) > api-spec.md(계약)**. 계약이 어긋나면 갱신 PR 먼저.
 
 v1.1+ 후보: OpenAPI 스펙 자동 생성 (`springdoc-openapi`) → `/v3/api-docs` 로 export.
 

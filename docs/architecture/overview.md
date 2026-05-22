@@ -222,6 +222,8 @@ data class MatchDetailResponse(
 |---|---|
 | **도메인 모델링 정책 (3-tier + DDD-lite)** | [`domain-modeling.md`](./domain-modeling.md) |
 | API 규약 (URL prefix·인증 헤더·에러 응답) | [`api-conventions.md`](./api-conventions.md) |
+| API 명세 (endpoint별 req/res·에러·예시) | [`../spec/api-spec.md`](../spec/api-spec.md) |
+| 다이어그램 (ERD·인증 시퀀스) | [`../spec/diagram.md`](../spec/diagram.md) |
 | 인증 흐름 | [`auth.md`](./auth.md) |
 | 코딩 컨벤션 (네이밍·DTO·예외·트랜잭션) | `.claude/skills/coding-conventions/SKILL.md` |
 | 테스트 전략 | `docs/spec/test-strategy.md` |
