@@ -86,7 +86,8 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 |---|---|
 | 제품 요구 사항 | `docs/PRD.md` |
 | **핵심 결정 (ADR)** | `docs/adr/0001-mvp-scope.md` (그 외 ADR-0002+ 후속) |
-| API 명세 (예정) | `docs/spec/api-spec.md` |
+| **API 명세 (계약)** | `docs/spec/api-spec.md` — 9개 도메인 27 endpoint request/response/에러/예시 |
+| **다이어그램** | `docs/spec/diagram.md` — ERD + 인증 시퀀스 (Mermaid) |
 | **테스트 전략 (SoT)** | `docs/spec/test-strategy.md` — 백엔드 ATDD 1차 (Cucumber) |
 | **아키텍처 (코드 레벨)** | `docs/architecture/overview.md` (패키지·레이어·DTO·외부 통합) / `domain-modeling.md` (3-tier + DDD-lite 정책 — Aggregate·VO·Ubiquitous Language) / `auth.md` (인증) / `api-conventions.md` (REST 규약·ErrorCode) |
 | 리서치 (예정) | `docs/research/` |
@@ -103,17 +104,4 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 
 ## 변경 이력
 
-| 날짜 | 변경 내용 | 사유 |
-|---|---|---|
-| 2026-05-21 | 초기 작성 (단계 1 하네스 셋업) | grill-me 인터뷰 + GearShow 하네스 적응 |
-| 2026-05-21 | `.codex/config.toml` 추가 — Codex hook 자동화 | Codex CLI도 같은 hook 스크립트 자동 실행. 단일 진실 원천 유지. |
-| 2026-05-21 | 단계 2 활성: code-reviewer agent + coding-conventions skill + enforce-worktree + pre-commit | 백엔드 코딩 시작 전 인프라 완성. iOS 별도 reviewer는 단계 3. |
-| 2026-05-21 | ADR-0006 — AWS EC2 + RDS + Terraform 호스팅 결정 + Terraform 골격 + Dockerfile | 서울 region (카카오 API 최단) + 12개월 Free Tier + 학습 가치. |
-| 2026-05-21 | ADR-0004 (SwiftData + HealthKit) 작성 + PRD 4.7 정정 | 본인/친구 모델 분리, 최소 권한 6개, Observer Query Background Delivery, UTC+Local TZ, 친구 캐시 1h TTL, SwiftData 영속 캐시. |
-| 2026-05-21 | 단계 3 활성: ios-reviewer agent + ios-conventions skill + enforce-worktree iOS 확장 | iOS 코딩 시작 직전 하네스 완비. 백엔드/iOS 리뷰어 분리. |
-| 2026-05-21 | 단계 4 활성: orchestrator + pr-guide + code-review skills + test-writer agents (backend/ios) + enforce-plan + verify-and-block hooks | 구현 오케스트레이션 파이프라인 (Phase 0~6) 완비. EXEC_PLAN 30줄 임계 + 백엔드 compile 자가수정 루프. |
-| 2026-05-21 | TDD 도입 — Phase 2 흐름 Red→Green→Refactor, EXEC_PLAN 3섹션 → 4섹션 (테스트 케이스 추가), test-writer agent Phase 2 진입 시 자동 위임 | KickLog 표준 개발 방식 = TDD. 사용자 결정. |
-| 2026-05-21 | **ATDD 1차 채택** — `docs/spec/test-strategy.md` 신설(SoT), backend-test-writer/ios-test-writer 재작성, EXEC_PLAN 테스트 케이스 섹션을 (3-A)인수 Gherkin + (3-B)iOS ViewModel + (3-C)유스케이스 3블록으로 분리. **백엔드 = Cucumber-JVM**, **iOS = ViewModel 통합(UI 미경유)**. XCUITest 는 사후 스모크만. | GearShow test-writer 적응 + 그린필드 시점에 ATDD 도입 비용 최소. 1인 사이드 ROI 고려해 도구 선택 (Cucumber 풀 vs ViewModel 통합). |
-| 2026-05-21 | **iOS 하네스에서 제거** — ios-reviewer/ios-test-writer/ios-conventions 삭제, orchestrator/code-review/pr-guide/test-strategy/hooks 에서 iOS 분기 제거, enforce-worktree iOS 보호 해제. EXEC_PLAN 테스트 케이스는 (3-A) Gherkin + (3-B) 유스케이스 2블록만. 백엔드 전용 하네스로 정착. | 사용자가 iOS 개발자가 아니라 review/test 자동화 ROI 없음. UI/API 연동만 동작하면 OK. iOS 는 Xcode 에서 직접. |
-| 2026-05-22 | **`docs/architecture/` 신설** — overview.md (패키지·레이어·DTO·외부 통합·schema 위치) + auth.md (Apple/Kakao OAuth → JWT, Spring Security, soft delete cron) + api-conventions.md (URL prefix, HTTP 메서드, ErrorCode 규약, GlobalExceptionHandler, 페이지네이션, CORS). CLAUDE.md Architecture 섹션 1줄 → 7줄로 확장. | ADR-0003 의 결정은 풍부하나 코드/패키지 레벨 적용이 미정 → 에이전트가 새 작업 시 매번 ADR 통독해야 했음. 이걸 한 페이지로 압축해서 backend-test-writer / code-reviewer 가 즉시 참조. V1__init.sql ↔ ADR-0003 불일치는 첫 도메인 작업과 함께 정정 (점진적). |
-| 2026-05-22 | **`domain-modeling.md` 신설 — 3-tier + DDD-lite 정책 명문화** — 구조(3-tier) ≠ 모델링(DDD) 차원 분리, DDD 요소별 도입 정책 표, Anemic vs Rich (Match Aggregate 예시), Ubiquitous Language 어휘표, Aggregate 규칙 + JPA 함정 회피, Value Object 적용 기준, Domain Service · Anti-Corruption Layer · Bounded Context, 점진적 도입 단계(1~4 MVP / 5~6 v1.1), 새 Aggregate 추가 체크리스트, 안티패턴 모음. overview.md / CLAUDE.md 에 link 추가. | "3-tier에서 DDD 가능한가" 질문 — 둘이 독립 차원이라 가능. 헥사고날 Port/Adapter 없이도 Rich Aggregate + VO + Ubiquitous Language 까지는 도입해서 Service 비대화·Primitive Obsession·도메인 어휘 일관성 확보. Domain Event/CQRS 는 v1.1+. |
+> 이 파일에 변경 이력을 누적하지 않는다 — `git log` 와 `docs/adr/` 로 추적. (컨텍스트 토큰 절약)
