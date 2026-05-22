@@ -237,6 +237,37 @@ class MatchService(private val repo: MatchRepository) {
 | `@OneToMany` mutable list 외부 노출 | private `_quarters` + public `quarters.get() = _quarters.toList()` |
 | Cascade 누락 | Aggregate Root 에 `@OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)` |
 
+### DB 제약 / FK 정책
+
+> **요약: 기본값은 FK 전부 켬. 라이프사이클이 달라도 끄지 않는다. 끄는 건 "구체적 제약이 실제로 무는 게 확인됐을 때" 그 FK만.**
+
+DDD 의 "다른 Aggregate 는 ID 로 참조"(JPA 객체 탐색 차원 — 항상 `val userId: Long`, `@ManyToOne` 금지)와 **DB 레벨 FK 제약을 두느냐(DB 차원)** 는 **별개 결정**이다. 위 표(아래 §2 Aggregate 후보)에서 `User`/`OAuthIdentity`/`RefreshToken` 을 "다른 라이프사이클의 별개 Aggregate" 로 나눈 건 **객체 참조 차원** 의 분리이지, **DB FK 를 빼라는 뜻이 아니다.**
+
+#### 왜 라이프사이클이 달라도 FK 를 유지하나
+
+1. **비대칭** — `DROP CONSTRAINT` 은 데이터 검사 없이 항상 안전. `ADD CONSTRAINT` 은 전 row 를 스캔해 고아가 하나라도 있으면 **실패**. 즉 안전한 방향은 *strict 시작 → 필요 시 loosen*. "지금 빼고 문제 생기면 추가" 는 **고아가 이미 쌓인 가장 어려운 순간에 FK 를 거는** 자충수.
+2. **그린필드** — 데이터 0건인 지금이 FK 비용 최저점. 하루 지날수록 단조 증가.
+3. **soft delete 모델** — hard delete 가 `UserPurgeJob` cron 한 곳뿐(ADR-0003 D8)이라 `CASCADE` 가 "위험"하게 작동할 표면이 없다. 오히려 `CASCADE` 덕에 cron 은 `users` 한 줄 DELETE 로 전부 정리 → GDPR/Apple 삭제 누락 버그 방지.
+4. **단일 PostgreSQL** — 샤딩·분산 트랜잭션 같은 FK 비용이 애초에 없다.
+
+#### 끄기/유지 판별 기준 (미래에 드롭 검토 시)
+
+라이프사이클 동일 여부가 아니라 **"고아 row 발생 시 (a) 사용자에게 보이는 버그가 나는가, (b) GDPR/Apple 삭제 위반인가"**.
+
+| 고아 경로 | 막는 수단 | 비고 |
+|---|---|---|
+| **쓰기 시점** (클라가 없는 ID 를 INSERT) | **FK 제약만 확실** (앱 검증은 깜빡하면 뚫림) | KickLog 에선 `friendships.{상대 userId}`, `matches.venue_id` 두 곳만 실재 (나머지 `user_id` 는 서버가 JWT principal 로 박음) |
+| **삭제 시점** (부모 hard delete 후 자식 잔존) | `CASCADE` 또는 cron 명시 삭제 | cron 한 곳에서만 발생 |
+
+#### 현행 ON DELETE
+
+- **같은 Aggregate**: `CASCADE` — `quarter_workouts → matches`
+- **Cross-aggregate (유지 + cron 정리)**: `CASCADE` — `oauth_identities/refresh_tokens/venues/matches/friend_invitations/friendships → users`
+- **느슨한 참조**: `SET NULL` — `matches.venue_id → venues` (venue 삭제해도 경기 보존)
+- **드롭 1순위 후보**: `refresh_tokens → users` (라이프사이클 가장 다르고 고아 시 401 로 깔끔히 실패). 단 막상 개발하며 거슬리는 게 확인될 때만 빼고, 그때 cron 에 명시 삭제 1줄 추가.
+
+→ 결과적으로 ADR-0003 스키마 = 본 정책. 신규 Aggregate 추가 시에도 **일단 FK 켜고 시작**.
+
 ---
 
 ## 3. Value Object
