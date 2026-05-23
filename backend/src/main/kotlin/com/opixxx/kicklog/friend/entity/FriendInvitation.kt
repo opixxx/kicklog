@@ -40,4 +40,8 @@ class FriendInvitation(
     fun use() {
         useCount += 1
     }
+
+    fun revoke(now: Instant) {
+        revokedAt = now
+    }
 }
