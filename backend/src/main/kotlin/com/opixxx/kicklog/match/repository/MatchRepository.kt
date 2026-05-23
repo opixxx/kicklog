@@ -1,0 +1,33 @@
+package com.opixxx.kicklog.match.repository
+
+import com.opixxx.kicklog.match.entity.Match
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+import java.time.Instant
+import java.util.UUID
+
+interface MatchRepository : JpaRepository<Match, Long> {
+    fun findByUserIdAndClientMatchId(userId: Long, clientMatchId: UUID): Match?
+
+    @Query(
+        """
+        SELECT m
+        FROM Match m
+        WHERE m.userId = :userId
+          AND (
+              :cursorPlayedAt IS NULL
+              OR m.playedAt < :cursorPlayedAt
+              OR (m.playedAt = :cursorPlayedAt AND m.id < :cursorId)
+          )
+        ORDER BY m.playedAt DESC, m.id DESC
+        """,
+    )
+    fun findAllByUserIdAfterCursor(
+        @Param("userId") userId: Long,
+        @Param("cursorPlayedAt") cursorPlayedAt: Instant?,
+        @Param("cursorId") cursorId: Long?,
+        pageable: Pageable,
+    ): List<Match>
+}
