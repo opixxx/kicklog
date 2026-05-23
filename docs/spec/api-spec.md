@@ -22,7 +22,7 @@
 | 3 | [Friends](#3-friends) | 5 | 🔒 |
 | 4 | [Invitations](#4-invitations) | 4 | 🔒 (token 조회만 🌐) |
 | 5 | [Matches](#5-matches) | 6 | 🔒 |
-| 6 | [Venues](#6-venues) | 4 | 🔒 |
+| 6 | [Venues](#6-venues) | 5 | 🔒 |
 | 7 | [Places](#7-places) | 1 | 🔒 |
 | 8 | [Statistics](#8-statistics) | 2 | 🔒 |
 
@@ -524,34 +524,83 @@ Soft delete 취소. `deleted_at = NULL`.
 
 **Response** `200`
 ```json
-{ "venues": [ { "id": 5, "name": "마포 풋살장", "geoLat": 37.556000, "geoLng": 126.923000 } ] }
+{
+  "venues": [
+    {
+      "id": 5,
+      "name": "마포 풋살장",
+      "geoLat": 37.556000,
+      "geoLng": 126.923000,
+      "address": "서울 마포구 ...",
+      "roadAddress": "서울 마포구 ...",
+      "provider": "kakao",
+      "providerPlaceId": "123456789",
+      "createdAt": "2026-05-23T03:00:00Z"
+    }
+  ]
+}
 ```
 
 ---
 
 ### 6.2 `POST /venues` 🔒
 
-운동장 등록.
+운동장 등록. 카카오 검색 결과를 저장하는 경우 `provider/providerPlaceId` 를 함께 보낸다.
 
 **Request**
 ```json
-{ "name": "마포 풋살장", "geoLat": 37.556000, "geoLng": 126.923000 }
+{
+  "name": "마포 풋살장",
+  "geoLat": 37.556000,
+  "geoLng": 126.923000,
+  "address": "서울 마포구 ...",
+  "roadAddress": "서울 마포구 ...",
+  "provider": "kakao",
+  "providerPlaceId": "123456789"
+}
 ```
 | 필드 | 타입 | 검증 |
 |---|---|---|
 | `name` | string | `@NotBlank @Size(max=100)` |
 | `geoLat` | BigDecimal | `@NotNull` `NUMERIC(9,6)` |
 | `geoLng` | BigDecimal | `@NotNull` `NUMERIC(9,6)` |
+| `address` | string | optional |
+| `roadAddress` | string | optional |
+| `provider` | string | optional. 현재 `"kakao"` |
+| `providerPlaceId` | string | optional. 카카오 장소 id |
 
-**Response** `201`
+**Response** `201` — 신규 생성
 ```json
-{ "id": 5, "name": "마포 풋살장", "geoLat": 37.556000, "geoLng": 126.923000 }
+{
+  "id": 5,
+  "name": "마포 풋살장",
+  "geoLat": 37.556000,
+  "geoLng": 126.923000,
+  "address": "서울 마포구 ...",
+  "roadAddress": "서울 마포구 ...",
+  "provider": "kakao",
+  "providerPlaceId": "123456789",
+  "createdAt": "2026-05-23T03:00:00Z"
+}
 ```
+
+**Response** `200` — 같은 사용자 + 같은 `provider/providerPlaceId` 가 이미 있으면 기존 venue 재사용.
+
 **에러**: `409 VENUE_NAME_DUPLICATE` (같은 사용자 내 이름 중복)
 
 ---
 
-### 6.3 `PATCH /venues/{id}` 🔒
+### 6.3 `GET /venues/{id}` 🔒
+
+내 운동장 상세 조회.
+
+**Response** `200` — [`VenueResponse`](#62-post-venues-)
+
+**에러**: `403 VENUE_NOT_OWNED`, `404 VENUE_NOT_FOUND`
+
+---
+
+### 6.4 `PATCH /venues/{id}` 🔒
 
 이름 수정 (좌표는 불변 — 새 위치면 새 venue).
 
@@ -563,7 +612,7 @@ Soft delete 취소. `deleted_at = NULL`.
 
 ---
 
-### 6.4 `DELETE /venues/{id}` 🔒
+### 6.5 `DELETE /venues/{id}` 🔒
 
 삭제. 관련 `matches.venue_id → NULL` (ON DELETE SET NULL).
 

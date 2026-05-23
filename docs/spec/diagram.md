@@ -81,6 +81,10 @@ erDiagram
         varchar100  name "UK(user_id, name)"
         numeric     geo_lat "NUMERIC(9,6)"
         numeric     geo_lng "NUMERIC(9,6)"
+        varchar255  address "nullable"
+        varchar255  road_address "nullable"
+        varchar20   provider "nullable"
+        varchar255  provider_place_id "nullable"
         timestamptz created_at
     }
 
