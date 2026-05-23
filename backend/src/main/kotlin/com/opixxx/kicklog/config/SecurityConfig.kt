@@ -1,5 +1,6 @@
 package com.opixxx.kicklog.config
 
+import com.opixxx.kicklog.common.security.DeletedUserGuardFilter
 import com.opixxx.kicklog.common.security.JwtAuthenticationFilter
 import com.opixxx.kicklog.common.security.JwtProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -16,6 +17,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableConfigurationProperties(JwtProperties::class)
 class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
+    private val deletedUserGuardFilter: DeletedUserGuardFilter,
 ) {
 
     @Bean
@@ -33,6 +35,7 @@ class SecurityConfig(
             .formLogin { it.disable() }
             .exceptionHandling { it.authenticationEntryPoint(HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)) }
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterAfter(deletedUserGuardFilter, JwtAuthenticationFilter::class.java)
 
         return http.build()
     }

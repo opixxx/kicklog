@@ -15,6 +15,8 @@ enum class ErrorCode(
     AUTH_REFRESH_REUSED(HttpStatus.UNAUTHORIZED, "이미 사용된 Refresh token입니다"),
     AUTH_REFRESH_NOT_OWNED(HttpStatus.FORBIDDEN, "본인 세션만 로그아웃할 수 있습니다"),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다"),
+    USER_DELETED(HttpStatus.GONE, "탈퇴한 사용자입니다"),
+    USER_NOT_DELETING(HttpStatus.CONFLICT, "삭제 대기 상태가 아닙니다"),
     MATCH_NOT_FOUND(HttpStatus.NOT_FOUND, "경기를 찾을 수 없습니다"),
     MATCH_NOT_OWNED(HttpStatus.FORBIDDEN, "본인의 경기가 아닙니다"),
     MATCH_QUARTER_OVERFLOW(HttpStatus.BAD_REQUEST, "쿼터는 최대 4개까지 저장할 수 있습니다"),
