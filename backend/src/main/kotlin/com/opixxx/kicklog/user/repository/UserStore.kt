@@ -5,4 +5,5 @@ import com.opixxx.kicklog.user.entity.User
 interface UserStore {
     fun save(user: User): User
     fun findById(id: Long): User?
+    fun findAllActiveByIds(ids: Collection<Long>): List<User>
 }
