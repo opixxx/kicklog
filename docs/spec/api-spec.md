@@ -587,11 +587,20 @@ Soft delete 취소. `deleted_at = NULL`.
 ```json
 {
   "places": [
-    { "name": "마포 풋살장", "address": "서울 마포구 ...", "lat": 37.556, "lng": 126.923, "distanceM": 320 }
+    {
+      "provider": "kakao",
+      "providerPlaceId": "123456789",
+      "name": "마포 풋살장",
+      "address": "서울 마포구 ...",
+      "roadAddress": "서울 마포구 ...",
+      "lat": 37.556,
+      "lng": 126.923,
+      "distanceM": 320
+    }
   ]
 }
 ```
-> 카카오 응답 키(`place_name` 등)를 그대로 전달하지 않고 우리 DTO 로 변환 (api-conventions.md). `distanceM` 은 `lat/lng` 미제공 시 `null`.
+> 카카오 응답 키(`place_name`, `road_address_name`, `x`, `y` 등)를 그대로 전달하지 않고 우리 DTO 로 변환 (api-conventions.md). `providerPlaceId` 는 카카오 장소 id이며, `distanceM` 은 `lat/lng` 미제공 시 `null`.
 
 **에러**
 

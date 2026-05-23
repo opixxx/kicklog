@@ -7,13 +7,25 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: create-drop
     properties:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
 
+  flyway:
+    enabled: false
+
 kicklog:
   jwt:
     secret: test-secret-change-me-minimum-32-chars
-    access-expiration-hours: 1
-    refresh-expiration-days: 90
+    issuer: kicklog
+    audience: kicklog-ios
+    access-token-minutes: 15
+    refresh-token-days: 30
+  apple:
+    client-id: com.opixxx.kicklog
+    jwks-url: http://localhost/apple/keys
+  kakao:
+    user-info-url: http://localhost/kakao/user
+    rest-api-key: test-rest-key
+    local-search-url: https://dapi.kakao.com/v2/local/search/keyword.json

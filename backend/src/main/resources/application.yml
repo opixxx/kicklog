@@ -51,3 +51,5 @@ kicklog:
     jwks-url: ${APPLE_JWKS_URL:https://appleid.apple.com/auth/keys}
   kakao:
     user-info-url: ${KAKAO_USER_INFO_URL:https://kapi.kakao.com/v2/user/me}
+    rest-api-key: ${KAKAO_REST_API_KEY:}
+    local-search-url: ${KAKAO_LOCAL_SEARCH_URL:https://dapi.kakao.com/v2/local/search/keyword.json}

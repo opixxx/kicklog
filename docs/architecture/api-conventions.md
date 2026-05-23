@@ -282,8 +282,11 @@ GET /matches?page=0&size=20&sort=playedAt,desc
       val places: List<Place>,
   ) {
       data class Place(
+          val provider: String,          // "kakao"
+          val providerPlaceId: String,
           val name: String,
           val address: String,
+          val roadAddress: String?,
           val lat: BigDecimal,
           val lng: BigDecimal,
           val distanceM: Int?,

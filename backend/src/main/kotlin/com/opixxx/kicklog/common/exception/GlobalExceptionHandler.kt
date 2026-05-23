@@ -3,6 +3,7 @@ package com.opixxx.kicklog.common.exception
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
@@ -35,5 +36,15 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(ErrorCode.VALIDATION_FAILED.status)
             .body(ErrorResponse(ErrorCode.VALIDATION_FAILED.name, message, request.requestURI))
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException::class)
+    fun handleMissingRequestParameter(
+        exception: MissingServletRequestParameterException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorResponse> {
+        return ResponseEntity
+            .status(ErrorCode.VALIDATION_FAILED.status)
+            .body(ErrorResponse(ErrorCode.VALIDATION_FAILED.name, "${exception.parameterName} 파라미터는 필수입니다", request.requestURI))
     }
 }
