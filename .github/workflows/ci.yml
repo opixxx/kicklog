@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  backend-check:
+    name: Backend Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: kicklog
+          POSTGRES_USER: kicklog
+          POSTGRES_PASSWORD: kicklog
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kicklog -d kicklog"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/kicklog
+      DB_USERNAME: kicklog
+      DB_PASSWORD: kicklog
+      JWT_SECRET: ci-secret-change-me-minimum-32-chars
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Run backend check
+        run: ./gradlew check
