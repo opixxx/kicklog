@@ -1,5 +1,6 @@
 package com.opixxx.kicklog.common.security
 
+import com.opixxx.kicklog.common.exception.KickLogException
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -12,33 +13,35 @@ import org.springframework.web.filter.OncePerRequestFilter
 class JwtAuthenticationFilter(
     private val jwtTokenProvider: JwtTokenProvider,
 ) : OncePerRequestFilter() {
+
+    override fun shouldNotFilter(request: HttpServletRequest): Boolean {
+        val path = request.requestURI
+        return path == "/auth/apple/signin" ||
+            path == "/auth/kakao/signin" ||
+            path == "/auth/refresh" ||
+            path.startsWith("/actuator/")
+    }
+
     override fun doFilterInternal(
         request: HttpServletRequest,
         response: HttpServletResponse,
         filterChain: FilterChain,
     ) {
-        val token = request.extractBearerToken()
-        if (token != null) authenticate(token)
-        filterChain.doFilter(request, response)
-    }
+        val token = request.getHeader("Authorization")
+            ?.takeIf { it.startsWith("Bearer ") }
+            ?.removePrefix("Bearer ")
 
-    private fun authenticate(token: String) {
-        runCatching {
-            val parsed = jwtTokenProvider.verify(token)
-            if (parsed.type == JwtTokenProvider.ACCESS_TYPE) {
-                val principal = KickLogPrincipal(parsed.subject.toLong())
-                val authentication = UsernamePasswordAuthenticationToken(principal, null, emptyList())
-                SecurityContextHolder.getContext().authentication = authentication
+        if (token != null) {
+            try {
+                val claims = jwtTokenProvider.verifyAccessToken(token)
+                val principal = KickLogPrincipal(claims.userId)
+                SecurityContextHolder.getContext().authentication =
+                    UsernamePasswordAuthenticationToken(principal, token, emptyList())
+            } catch (exception: KickLogException) {
+                SecurityContextHolder.clearContext()
             }
         }
-    }
 
-    private fun HttpServletRequest.extractBearerToken(): String? {
-        val header = getHeader("Authorization") ?: return null
-        return header.takeIf { it.startsWith(BEARER_PREFIX) }?.removePrefix(BEARER_PREFIX)
-    }
-
-    companion object {
-        private const val BEARER_PREFIX = "Bearer "
+        filterChain.doFilter(request, response)
     }
 }

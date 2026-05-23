@@ -11,8 +11,8 @@ CREATE TABLE users (
     username        VARCHAR(50)  UNIQUE NOT NULL,
     display_name    VARCHAR(100) NOT NULL,
     hide_heart_rate BOOLEAN      NOT NULL DEFAULT FALSE,
-    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    created_at      TIMESTAMP WITH TIME ZONE  NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP WITH TIME ZONE  NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_users_username ON users(username);

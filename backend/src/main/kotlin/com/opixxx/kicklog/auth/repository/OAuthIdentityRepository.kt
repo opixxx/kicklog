@@ -4,6 +4,6 @@ import com.opixxx.kicklog.auth.entity.OAuthIdentity
 import com.opixxx.kicklog.auth.entity.OAuthProvider
 import org.springframework.data.jpa.repository.JpaRepository
 
-interface OAuthIdentityRepository : JpaRepository<OAuthIdentity, Long> {
-    fun findByProviderAndProviderUserId(provider: OAuthProvider, providerUserId: String): OAuthIdentity?
+interface OAuthIdentityRepository : JpaRepository<OAuthIdentity, Long>, OAuthIdentityStore {
+    override fun findByProviderAndProviderUserId(provider: OAuthProvider, providerUserId: String): OAuthIdentity?
 }

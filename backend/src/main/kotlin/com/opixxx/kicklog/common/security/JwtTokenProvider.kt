@@ -2,127 +2,137 @@ package com.opixxx.kicklog.common.security
 
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.opixxx.kicklog.auth.service.InvalidAccessTokenException
-import com.opixxx.kicklog.auth.service.InvalidRefreshTokenException
-import org.springframework.beans.factory.annotation.Value
+import com.opixxx.kicklog.common.exception.ErrorCode
+import com.opixxx.kicklog.common.exception.KickLogException
 import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-data class ParsedJwt(
-    val subject: String,
-    val type: String,
+enum class TokenType {
+    ACCESS,
+    REFRESH,
+}
+
+data class JwtClaims(
+    val userId: Long,
+    val type: TokenType,
+    val issuedAt: Instant,
     val expiresAt: Instant,
-    val jti: String?,
+    val jti: UUID?,
 )
 
 @Component
 class JwtTokenProvider(
-    @Value("\${kicklog.jwt.secret}") private val secret: String,
-    private val clock: Clock,
+    private val properties: JwtProperties,
+    private val objectMapper: ObjectMapper = ObjectMapper(),
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     private val encoder = Base64.getUrlEncoder().withoutPadding()
     private val decoder = Base64.getUrlDecoder()
-    private val objectMapper = ObjectMapper()
 
-    fun createAccessToken(userId: Long, expiresAt: Instant): String =
-        createToken(
-            claims = baseClaims(userId, expiresAt) + ("type" to ACCESS_TYPE),
-        )
-
-    fun createRefreshToken(userId: Long, jti: UUID, expiresAt: Instant): String =
-        createToken(
-            claims = baseClaims(userId, expiresAt) + mapOf(
-                "jti" to jti.toString(),
-                "type" to REFRESH_TYPE,
-            ),
-        )
-
-    fun verify(token: String): ParsedJwt =
-        try {
-            parseAndVerify(token)
-        } catch (exception: InvalidAccessTokenException) {
-            throw exception
-        } catch (exception: InvalidRefreshTokenException) {
-            throw exception
-        } catch (exception: RuntimeException) {
-            throw InvalidAccessTokenException()
-        }
-
-    private fun parseAndVerify(token: String): ParsedJwt {
-        val parts = token.split(".")
-        if (parts.size != 3) throw InvalidRefreshTokenException()
-
-        verifySignature(parts)
-        val claims = parseClaims(parts[1])
-        validateIssuerAndAudience(claims)
-
-        val expiresAt = Instant.ofEpochSecond((claims["exp"] as Number).toLong())
-        if (!expiresAt.isAfter(clock.instant())) throw InvalidRefreshTokenException()
-
-        return ParsedJwt(
-            subject = claims["sub"] as? String ?: throw InvalidRefreshTokenException(),
-            type = claims["type"] as? String ?: throw InvalidRefreshTokenException(),
-            expiresAt = expiresAt,
-            jti = claims["jti"] as? String,
-        )
+    fun createAccessToken(userId: Long): String {
+        return createToken(userId, TokenType.ACCESS, Duration.ofMinutes(properties.accessTokenMinutes), null)
     }
 
-    private fun baseClaims(userId: Long, expiresAt: Instant): Map<String, Any> =
-        mapOf(
-            "sub" to userId.toString(),
-            "iss" to ISSUER,
-            "aud" to AUDIENCE,
-            "iat" to clock.instant().epochSecond,
-            "exp" to expiresAt.epochSecond,
-        )
+    fun createRefreshToken(userId: Long, jti: UUID = UUID.randomUUID()): String {
+        return createToken(userId, TokenType.REFRESH, Duration.ofDays(properties.refreshTokenDays), jti)
+    }
 
-    private fun createToken(claims: Map<String, Any>): String {
+    fun verifyAccessToken(token: String): JwtClaims {
+        val claims = verify(token)
+        if (claims.type != TokenType.ACCESS) {
+            throw KickLogException(ErrorCode.AUTH_INVALID_TOKEN)
+        }
+        return claims
+    }
+
+    fun verifyRefreshToken(token: String): JwtClaims {
+        val claims = verify(token)
+        if (claims.type != TokenType.REFRESH || claims.jti == null) {
+            throw KickLogException(ErrorCode.AUTH_INVALID_REFRESH)
+        }
+        return claims
+    }
+
+    private fun createToken(userId: Long, type: TokenType, ttl: Duration, jti: UUID?): String {
+        val now = Instant.now(clock)
+        val expiresAt = now.plus(ttl)
         val header = mapOf("alg" to "HS256", "typ" to "JWT")
-        val encodedHeader = encoder.encodeToString(objectMapper.writeValueAsBytes(header))
-        val encodedPayload = encoder.encodeToString(objectMapper.writeValueAsBytes(claims))
-        val signingInput = "$encodedHeader.$encodedPayload"
-        return "$signingInput.${hmacSha256(signingInput)}"
-    }
-
-    private fun verifySignature(parts: List<String>) {
-        val signingInput = "${parts[0]}.${parts[1]}"
-        val expectedSignature = hmacSha256(signingInput)
-        if (!constantTimeEquals(expectedSignature, parts[2])) throw InvalidAccessTokenException()
-    }
-
-    private fun validateIssuerAndAudience(claims: Map<String, Any>) {
-        if (claims["iss"] != ISSUER || claims["aud"] != AUDIENCE) {
-            throw InvalidAccessTokenException()
+        val payload = buildMap<String, Any> {
+            put("sub", userId.toString())
+            put("iss", properties.issuer)
+            put("aud", properties.audience)
+            put("iat", now.epochSecond)
+            put("exp", expiresAt.epochSecond)
+            put("type", type.name.lowercase())
+            if (jti != null) put("jti", jti.toString())
         }
+        val headerPart = encodeJson(header)
+        val payloadPart = encodeJson(payload)
+        val unsigned = "$headerPart.$payloadPart"
+        return "$unsigned.${sign(unsigned)}"
     }
 
-    private fun parseClaims(encodedPayload: String): Map<String, Any> {
-        val json = String(decoder.decode(encodedPayload), StandardCharsets.UTF_8)
-        return objectMapper.readValue(json, object : TypeReference<Map<String, Any>>() {})
-    }
+    private fun verify(token: String): JwtClaims {
+        val parts = token.split(".")
+        if (parts.size != 3) {
+            throw KickLogException(ErrorCode.AUTH_INVALID_TOKEN)
+        }
+        val unsigned = "${parts[0]}.${parts[1]}"
+        if (!constantTimeEquals(sign(unsigned), parts[2])) {
+            throw KickLogException(ErrorCode.AUTH_INVALID_TOKEN)
+        }
 
-    private fun hmacSha256(signingInput: String): String {
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(secret.toByteArray(StandardCharsets.UTF_8), "HmacSHA256"))
-        return encoder.encodeToString(mac.doFinal(signingInput.toByteArray(StandardCharsets.UTF_8)))
-    }
+        val payload = parseJson(parts[1])
+        if (payload["iss"] != properties.issuer || payload["aud"] != properties.audience) {
+            throw KickLogException(ErrorCode.AUTH_INVALID_TOKEN)
+        }
 
-    private fun constantTimeEquals(expected: String, actual: String): Boolean =
-        java.security.MessageDigest.isEqual(
-            expected.toByteArray(StandardCharsets.UTF_8),
-            actual.toByteArray(StandardCharsets.UTF_8),
+        val expiresAt = Instant.ofEpochSecond((payload["exp"] as Number).toLong())
+        if (!expiresAt.isAfter(Instant.now(clock))) {
+            throw KickLogException(ErrorCode.AUTH_EXPIRED_TOKEN)
+        }
+
+        val type = when (payload["type"]) {
+            "access" -> TokenType.ACCESS
+            "refresh" -> TokenType.REFRESH
+            else -> throw KickLogException(ErrorCode.AUTH_INVALID_TOKEN)
+        }
+
+        return JwtClaims(
+            userId = (payload["sub"] as String).toLong(),
+            type = type,
+            issuedAt = Instant.ofEpochSecond((payload["iat"] as Number).toLong()),
+            expiresAt = expiresAt,
+            jti = (payload["jti"] as String?)?.let(UUID::fromString),
         )
+    }
 
-    companion object {
-        const val ACCESS_TYPE = "access"
-        const val REFRESH_TYPE = "refresh"
-        private const val ISSUER = "kicklog"
-        private const val AUDIENCE = "kicklog-ios"
+    private fun encodeJson(value: Any): String {
+        return encoder.encodeToString(objectMapper.writeValueAsBytes(value))
+    }
+
+    private fun parseJson(value: String): Map<String, Any?> {
+        val bytes = decoder.decode(value)
+        return objectMapper.readValue(bytes, object : TypeReference<Map<String, Any?>>() {})
+    }
+
+    private fun sign(value: String): String {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(properties.secret.toByteArray(StandardCharsets.UTF_8), "HmacSHA256"))
+        return encoder.encodeToString(mac.doFinal(value.toByteArray(StandardCharsets.UTF_8)))
+    }
+
+    private fun constantTimeEquals(left: String, right: String): Boolean {
+        return java.security.MessageDigest.isEqual(
+            left.toByteArray(StandardCharsets.UTF_8),
+            right.toByteArray(StandardCharsets.UTF_8),
+        )
     }
 }

@@ -126,7 +126,7 @@
 |---|---|
 | 언어/프레임워크 | Kotlin + Spring Boot 4 |
 | DB | PostgreSQL 15 |
-| 인증 | Sign in with Apple + **Kakao Login** + JWT (Access 1h + Refresh 90d) |
+| 인증 | Sign in with Apple + **Kakao Login** + JWT (Access 15m + Refresh 30d + rotation) |
 | API | REST |
 | 운동장 검색 | **카카오 로컬 API (백엔드 프록시)** |
 | 사용자 삭제 | Soft delete + 30일 grace + cron hard delete |

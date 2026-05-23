@@ -117,16 +117,17 @@ ADR-0001에서 백엔드 도입(Kotlin + Spring Boot + PostgreSQL)과 친구 기
   - MVP 단순성: oauth_identities 테이블에 1 row per identity
   - v1.1 확장 시 같은 user_id에 multiple identity 허용 (스키마 변경 없음)
 
-### D7.1. JWT 토큰 정책 — **Access (1h) + Refresh (90d)**
+### D7.1. JWT 토큰 정책 — **Access (15m) + Refresh (30d) + Rotation**
 
-- **선택**: (B) Access (1h) + Refresh (90d), DB 저장 + 사용자별 강제 로그아웃 가능
-- **고려한 옵션**: (A) Access only (90d long-lived), (B) Access + Refresh (선택), (C) Apple/Kakao token 직접 사용
+- **선택**: (B) Access (15m) + Refresh (30d), DB 저장 + refresh rotation + 사용자별 강제 로그아웃 가능
+- **고려한 옵션**: (A) Access only (90d long-lived), (B) Access + Refresh, (C) Apple/Kakao token 직접 사용, (D) Refresh rotation 포함
 - **이유**:
   - OAuth 2.0 표준 (본인 백엔드 개발자 학습 가치)
   - 사용자 마찰 0 (자동 refresh)
   - 보안 사고 시 refresh token revoke로 강제 로그아웃 가능
+  - 위치·운동 기록을 다루므로 refresh 탈취 피해를 줄이기 위해 rotation 적용
   - Apple/Kakao identity token은 만료 10분 — 매번 검증 부적합 (C)
-- **v1.1+**: Refresh token rotation, 디바이스별 세션 관리 화면
+- **v1.1+**: 디바이스별 세션 관리 화면, refresh 재사용 알림
 
 ### D8. 사용자 삭제 — **Soft delete + 30일 grace + hard delete**
 
@@ -384,7 +385,7 @@ GET    /users/:userId/seasons/:year 친구 시즌 통계 (권한 검증)
    c. SELECT oauth_identities WHERE provider='apple' AND provider_user_id=sub
    d. 없으면 INSERT users + oauth_identities (display_name from name)
    e. JWT 발급
-5. iOS ← { accessToken (1h), refreshToken (90d), user }
+5. iOS ← { accessToken (15m), refreshToken (30d), user }
 ```
 
 ### Kakao Login

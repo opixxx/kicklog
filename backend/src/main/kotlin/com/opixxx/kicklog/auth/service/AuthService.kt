@@ -1,97 +1,146 @@
 package com.opixxx.kicklog.auth.service
 
-import com.opixxx.kicklog.auth.dto.AuthUserResponse
 import com.opixxx.kicklog.auth.dto.SignInResponse
 import com.opixxx.kicklog.auth.dto.TokenResponse
 import com.opixxx.kicklog.auth.entity.OAuthIdentity
 import com.opixxx.kicklog.auth.entity.OAuthProvider
-import com.opixxx.kicklog.auth.repository.OAuthIdentityRepository
+import com.opixxx.kicklog.auth.entity.RefreshToken
+import com.opixxx.kicklog.auth.repository.OAuthIdentityStore
+import com.opixxx.kicklog.auth.repository.RefreshTokenStore
+import com.opixxx.kicklog.common.exception.ErrorCode
+import com.opixxx.kicklog.common.exception.KickLogException
 import com.opixxx.kicklog.common.security.JwtTokenProvider
+import com.opixxx.kicklog.user.dto.UserResponse
 import com.opixxx.kicklog.user.entity.User
-import com.opixxx.kicklog.user.repository.UserRepository
-import org.springframework.beans.factory.annotation.Value
+import com.opixxx.kicklog.user.repository.UserStore
 import org.springframework.stereotype.Service
-import org.springframework.transaction.support.TransactionTemplate
-import java.security.SecureRandom
-import java.time.Clock
-import java.time.Duration
+import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 @Service
 class AuthService(
-    private val kakaoOAuthGateway: KakaoOAuthGateway,
-    private val oauthIdentityRepository: OAuthIdentityRepository,
-    private val userRepository: UserRepository,
+    private val userRepository: UserStore,
+    private val oauthIdentityRepository: OAuthIdentityStore,
+    private val refreshTokenRepository: RefreshTokenStore,
     private val jwtTokenProvider: JwtTokenProvider,
-    private val refreshTokenService: RefreshTokenService,
-    private val transactionTemplate: TransactionTemplate,
-    private val clock: Clock,
-    @Value("\${kicklog.jwt.access-expiration-hours}") accessExpirationHours: Long,
 ) {
-    private val accessTtl: Duration = Duration.ofHours(accessExpirationHours)
-    private val random = SecureRandom()
-
-    fun signInWithKakao(kakaoAccessToken: String): SignInResponse {
-        val kakaoUser = kakaoOAuthGateway.fetchUserInfo(kakaoAccessToken)
-        return transactionTemplate.execute {
-            val user = findOrCreateKakaoUser(kakaoUser)
-            createSignInResponse(user)
-        } ?: throw ExternalKakaoException("로그인 처리에 실패했습니다")
-    }
-
-    fun refresh(refreshToken: String): TokenResponse {
-        val user = refreshTokenService.validate(refreshToken)
-        val accessToken = jwtTokenProvider.createAccessToken(user.id, clock.instant().plus(accessTtl))
-        return TokenResponse(accessToken = accessToken, refreshToken = refreshToken)
-    }
-
-    private fun findOrCreateKakaoUser(kakaoUser: KakaoUserInfo): User =
-        findOAuthUser(OAuthProvider.KAKAO, kakaoUser.id)
-            ?: createOAuthUser(
-                provider = OAuthProvider.KAKAO,
-                providerUserId = kakaoUser.id,
-                email = kakaoUser.email,
-                displayNameHint = kakaoUser.nickname?.takeIf { it.isNotBlank() } ?: "사용자",
-            )
-
-    private fun findOAuthUser(provider: OAuthProvider, providerUserId: String): User? {
-        val identity = oauthIdentityRepository.findByProviderAndProviderUserId(provider, providerUserId)
-            ?: return null
-        return userRepository.findById(identity.userId).orElseThrow { InvalidRefreshTokenException() }
-    }
-
-    private fun createOAuthUser(
+    @Transactional
+    fun signIn(
         provider: OAuthProvider,
         providerUserId: String,
         email: String?,
-        displayNameHint: String,
-    ): User {
-        val user = userRepository.save(
-            User(username = nextUsername(provider), displayName = displayNameHint.take(MAX_DISPLAY_NAME), email = email),
+        displayNameHint: String?,
+    ): SignInResponse {
+        val user = findOrCreateUser(provider, providerUserId, email, displayNameHint)
+        val accessToken = jwtTokenProvider.createAccessToken(user.id)
+        val refreshToken = jwtTokenProvider.createRefreshToken(user.id)
+        val refreshClaims = jwtTokenProvider.verifyRefreshToken(refreshToken)
+
+        refreshTokenRepository.save(
+            RefreshToken(
+                jti = refreshClaims.jti!!,
+                user = user,
+                expiresAt = refreshClaims.expiresAt,
+            ),
         )
-        oauthIdentityRepository.save(OAuthIdentity(userId = user.id, provider = provider, providerUserId = providerUserId, email = email))
+
+        return SignInResponse(accessToken, refreshToken, UserResponse.from(user))
+    }
+
+    @Transactional
+    fun refresh(refreshToken: String): TokenResponse {
+        val claims = verifyRefreshClaims(refreshToken)
+        val stored = refreshTokenRepository.findByJti(claims.jti!!)
+            ?: throw KickLogException(ErrorCode.AUTH_INVALID_REFRESH)
+
+        validateRefreshToken(stored)
+
+        val newAccessToken = jwtTokenProvider.createAccessToken(stored.user.id)
+        val newRefreshToken = rotateRefreshToken(stored)
+
+        return TokenResponse(newAccessToken, newRefreshToken)
+    }
+
+    @Transactional
+    fun logout(userId: Long) {
+        revokeAll(userId)
+    }
+
+    @Transactional
+    fun logoutThisDevice(userId: Long, refreshToken: String) {
+        val claims = verifyRefreshClaims(refreshToken)
+        val stored = refreshTokenRepository.findByJti(claims.jti!!)
+            ?: throw KickLogException(ErrorCode.AUTH_INVALID_REFRESH)
+        if (stored.user.id != userId) {
+            throw KickLogException(ErrorCode.AUTH_REFRESH_NOT_OWNED)
+        }
+        stored.revoke()
+        refreshTokenRepository.save(stored)
+    }
+
+    private fun findOrCreateUser(
+        provider: OAuthProvider,
+        providerUserId: String,
+        email: String?,
+        displayNameHint: String?,
+    ): User {
+        val existing = oauthIdentityRepository.findByProviderAndProviderUserId(provider, providerUserId)
+        if (existing != null) {
+            return existing.user
+        }
+
+        val user = userRepository.save(User.create(displayNameHint ?: "사용자", email))
+        oauthIdentityRepository.save(
+            OAuthIdentity(
+                user = user,
+                provider = provider,
+                providerUserId = providerUserId,
+                email = email,
+            ),
+        )
         return user
     }
 
-    private fun createSignInResponse(user: User): SignInResponse {
-        val accessToken = jwtTokenProvider.createAccessToken(user.id, clock.instant().plus(accessTtl))
-        val refreshToken = refreshTokenService.issue(user)
-        return SignInResponse(accessToken = accessToken, refreshToken = refreshToken, user = user.toAuthUserResponse())
-    }
-
-    private fun User.toAuthUserResponse(): AuthUserResponse =
-        AuthUserResponse(id = id, displayName = displayName, email = email, hideHeartRate = hideHeartRate)
-
-    private fun nextUsername(provider: OAuthProvider): String {
-        repeat(USERNAME_RETRY_COUNT) {
-            val candidate = "${provider.name.lowercase()}_${random.nextInt(USERNAME_RANDOM_BOUND)}"
-            if (!userRepository.existsByUsername(candidate)) return candidate
+    private fun verifyRefreshClaims(refreshToken: String) = try {
+        jwtTokenProvider.verifyRefreshToken(refreshToken)
+    } catch (exception: KickLogException) {
+        if (exception.errorCode == ErrorCode.AUTH_EXPIRED_TOKEN) {
+            throw KickLogException(ErrorCode.AUTH_EXPIRED_REFRESH)
         }
-        throw ExternalKakaoException("사용자명을 생성하지 못했습니다")
+        throw KickLogException(ErrorCode.AUTH_INVALID_REFRESH)
     }
 
-    companion object {
-        private const val MAX_DISPLAY_NAME = 50
-        private const val USERNAME_RETRY_COUNT = 10
-        private const val USERNAME_RANDOM_BOUND = 1_000_000_000
+    private fun validateRefreshToken(stored: RefreshToken) {
+        if (stored.isRevoked()) {
+            revokeAll(stored.user.id)
+            throw KickLogException(ErrorCode.AUTH_REFRESH_REUSED)
+        }
+        if (stored.isExpired()) {
+            throw KickLogException(ErrorCode.AUTH_EXPIRED_REFRESH)
+        }
+    }
+
+    private fun rotateRefreshToken(stored: RefreshToken): String {
+        val newRefreshToken = jwtTokenProvider.createRefreshToken(stored.user.id)
+        val newClaims = jwtTokenProvider.verifyRefreshToken(newRefreshToken)
+
+        stored.rotateTo(newClaims.jti!!)
+        refreshTokenRepository.save(stored)
+        refreshTokenRepository.save(
+            RefreshToken(
+                jti = newClaims.jti,
+                user = stored.user,
+                expiresAt = newClaims.expiresAt,
+                createdAt = Instant.now(),
+            ),
+        )
+        return newRefreshToken
+    }
+
+    private fun revokeAll(userId: Long) {
+        refreshTokenRepository.findActiveByUserId(userId).forEach {
+            it.revoke()
+            refreshTokenRepository.save(it)
+        }
     }
 }

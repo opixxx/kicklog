@@ -1,39 +1,37 @@
 package com.opixxx.kicklog.auth.entity
 
+import com.opixxx.kicklog.user.entity.User
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
+import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
-import jakarta.persistence.UniqueConstraint
 import java.time.Instant
 
 @Entity
-@Table(
-    name = "oauth_identities",
-    uniqueConstraints = [UniqueConstraint(columnNames = ["provider", "provider_user_id"])],
-)
+@Table(name = "oauth_identities")
 class OAuthIdentity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long = 0,
+    var id: Long = 0,
 
-    @Column(name = "user_id", nullable = false)
-    val userId: Long,
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    var user: User,
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    val provider: OAuthProvider,
+    @Column(name = "provider", nullable = false, length = 20)
+    var provider: OAuthProvider,
 
     @Column(name = "provider_user_id", nullable = false)
-    val providerUserId: String,
+    var providerUserId: String,
 
-    @Column
-    val email: String? = null,
+    @Column(name = "email")
+    var email: String? = null,
 
-    @Column(name = "created_at", nullable = false)
-    val createdAt: Instant = Instant.now(),
+    @Column(name = "linked_at", nullable = false)
+    var linkedAt: Instant = Instant.now(),
 )

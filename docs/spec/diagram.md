@@ -46,8 +46,9 @@ erDiagram
     refresh_tokens {
         uuid        jti PK
         bigint      user_id FK
-        timestamptz expires_at "90d"
+        timestamptz expires_at "30d"
         timestamptz revoked_at "nullable"
+        uuid        rotated_to_jti "nullable"
         varchar255  device_info "nullable"
         timestamptz created_at
         timestamptz last_used_at "nullable"
@@ -166,7 +167,7 @@ sequenceDiagram
         else 신규
             API->>API: INSERT users (display_name ← name)<br/>+ INSERT oauth_identities
         end
-        API->>API: JWT 발급 (access 1h + refresh 90d)<br/>INSERT refresh_tokens
+        API->>API: JWT 발급 (access 15m + refresh 30d)<br/>INSERT refresh_tokens
         API-->>iOS: 200 { accessToken, refreshToken, user }
     end
 ```
@@ -198,7 +199,7 @@ sequenceDiagram
 
 ### 2.3 Token Refresh
 
-access token(1h) 만료 시 iOS 가 호출. refresh token 자체는 그대로 (rotation v1.1+).
+access token(15m) 만료 시 iOS 가 호출. refresh token 은 매 갱신마다 rotation 된다.
 
 ```mermaid
 sequenceDiagram
@@ -210,15 +211,19 @@ sequenceDiagram
     iOS->>API: POST /auth/refresh<br/>{ refreshToken }
     API->>API: JwtTokenProvider.parse → jti 추출
     API->>DB: SELECT refresh_tokens WHERE jti=?
-    alt 없음 / revoked_at != null
+    alt 없음
         DB-->>API: -
         API-->>iOS: 401 AUTH_INVALID_REFRESH
+    else revoked_at != null
+        API->>DB: UPDATE refresh_tokens SET revoked_at=now WHERE user_id=? AND revoked_at IS NULL
+        API-->>iOS: 401 AUTH_REFRESH_REUSED
     else expires_at <= now
         API-->>iOS: 401 AUTH_EXPIRED_REFRESH<br/>(→ iOS 재로그인 유도)
     else 유효
-        API->>DB: UPDATE last_used_at = now
-        API->>API: 새 accessToken 발급
-        API-->>iOS: 200 { accessToken, refreshToken(echo) }
+        API->>API: 새 accessToken + 새 refreshToken 발급
+        API->>DB: UPDATE 기존 row SET revoked_at=now, rotated_to_jti=새 jti
+        API->>DB: INSERT 새 refresh_tokens row
+        API-->>iOS: 200 { accessToken, refreshToken }
     end
 ```
 

@@ -42,11 +42,12 @@ logging:
 kicklog:
   jwt:
     secret: ${JWT_SECRET:dev-secret-change-me-in-production-min-32-chars}
-    access-expiration-hours: ${JWT_ACCESS_EXPIRATION_HOURS:1}
-    refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:90}
+    issuer: ${JWT_ISSUER:kicklog}
+    audience: ${JWT_AUDIENCE:kicklog-ios}
+    access-token-minutes: ${JWT_ACCESS_TOKEN_MINUTES:15}
+    refresh-token-days: ${JWT_REFRESH_TOKEN_DAYS:30}
   apple:
-    sign-in:
-      team-id: ${APPLE_TEAM_ID:}
-      bundle-id: com.opixxx.kicklog
-      key-id: ${APPLE_KEY_ID:}
-      private-key: ${APPLE_PRIVATE_KEY:}
+    client-id: ${APPLE_CLIENT_ID:com.opixxx.kicklog}
+    jwks-url: ${APPLE_JWKS_URL:https://appleid.apple.com/auth/keys}
+  kakao:
+    user-info-url: ${KAKAO_USER_INFO_URL:https://kapi.kakao.com/v2/user/me}

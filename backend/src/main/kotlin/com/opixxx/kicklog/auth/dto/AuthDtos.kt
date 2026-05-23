@@ -1,31 +1,31 @@
 package com.opixxx.kicklog.auth.dto
 
+import com.opixxx.kicklog.user.dto.UserResponse
 import jakarta.validation.constraints.NotBlank
 
+data class AppleSignInRequest(
+    @field:NotBlank(message = "Apple identity token은 필수입니다")
+    val identityToken: String,
+    val name: String? = null,
+)
+
 data class KakaoSignInRequest(
-    @field:NotBlank(message = "카카오 access token을 입력해주세요")
+    @field:NotBlank(message = "카카오 access token은 필수입니다")
     val kakaoAccessToken: String,
 )
 
 data class RefreshRequest(
-    @field:NotBlank(message = "refresh token을 입력해주세요")
-    val refreshToken: String,
-)
-
-data class TokenResponse(
-    val accessToken: String,
+    @field:NotBlank(message = "Refresh token은 필수입니다")
     val refreshToken: String,
 )
 
 data class SignInResponse(
     val accessToken: String,
     val refreshToken: String,
-    val user: AuthUserResponse,
+    val user: UserResponse,
 )
 
-data class AuthUserResponse(
-    val id: Long,
-    val displayName: String,
-    val email: String?,
-    val hideHeartRate: Boolean,
+data class TokenResponse(
+    val accessToken: String,
+    val refreshToken: String,
 )

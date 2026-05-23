@@ -13,29 +13,31 @@ import java.time.Instant
 class User(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long = 0,
+    var id: Long = 0,
 
-    @Column(name = "apple_user_id")
-    var appleUserId: String? = null,
-
-    @Column(nullable = false, unique = true, length = 50)
-    var username: String,
-
-    @Column(name = "display_name", nullable = false, length = 100)
+    @Column(name = "display_name", nullable = false, length = 50)
     var displayName: String,
 
-    @Column
+    @Column(name = "email")
     var email: String? = null,
 
     @Column(name = "hide_heart_rate", nullable = false)
     var hideHeartRate: Boolean = false,
 
     @Column(name = "created_at", nullable = false)
-    val createdAt: Instant = Instant.now(),
+    var createdAt: Instant = Instant.now(),
 
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant = Instant.now(),
 
     @Column(name = "deleted_at")
     var deletedAt: Instant? = null,
-)
+) {
+    fun isDeleted(): Boolean = deletedAt != null
+
+    companion object {
+        fun create(displayName: String, email: String?): User {
+            return User(displayName = displayName.takeIf { it.isNotBlank() } ?: "사용자", email = email)
+        }
+    }
+}
