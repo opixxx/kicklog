@@ -35,6 +35,22 @@ class User(
 ) {
     fun isDeleted(): Boolean = deletedAt != null
 
+    fun updateProfile(displayName: String?, hideHeartRate: Boolean?, now: Instant) {
+        displayName?.let { this.displayName = it }
+        hideHeartRate?.let { this.hideHeartRate = it }
+        this.updatedAt = now
+    }
+
+    fun markDeleted(now: Instant) {
+        this.deletedAt = now
+        this.updatedAt = now
+    }
+
+    fun cancelDeletion(now: Instant) {
+        this.deletedAt = null
+        this.updatedAt = now
+    }
+
     companion object {
         fun create(displayName: String, email: String?): User {
             return User(displayName = displayName.takeIf { it.isNotBlank() } ?: "사용자", email = email)

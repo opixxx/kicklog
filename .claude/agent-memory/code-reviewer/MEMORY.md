@@ -10,6 +10,9 @@
 
 ## Patterns
 
+- [Filter path matching](feedback_filter_path_matching.md) — Servlet 필터에서 `requestURI == "/literal"` 직접 비교 금지, `PathMatcher` / `shouldNotFilter` 사용
+- [Search empty query](feedback_search_empty_query.md) — `@RequestParam("q") String` 만 두면 빈 문자열에 전체 dump, `@NotBlank` 필수
+
 <!--
 ### YYYY-MM-DD — <pattern>
 - Symptom:
