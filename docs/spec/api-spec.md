@@ -398,31 +398,18 @@ Soft delete 취소. `deleted_at = NULL`.
 {
   "playedAt": "2026-05-18T01:00:00Z",
   "venueId": 5,
-  "opponentName": "옆동네 FC",
-  "result": "W",
+  "playedAt": "2026-05-18T01:00:00Z",
+  "opponent": "옆동네 FC",
+  "result": "WIN",
   "position": "MF",
-  "userGoals": 2,
-  "userAssists": 1,
-  "headline": {
-    "totalDistanceM": 6800,
-    "maxSpeedKmh": 27.3,
-    "sprintCount": 14,
-    "avgHeartRate": 158
-  },
+  "goals": 2,
+  "assists": 1,
   "quarters": [
     {
-      "quarterNo": 1,
-      "sourceWorkoutUuid": "A1B2C3D4-...",
+      "quarterNumber": 1,
+      "healthKitWorkoutId": "A1B2C3D4-...",
       "startedAt": "2026-05-18T01:00:00Z",
-      "endedAt": "2026-05-18T01:25:00Z",
-      "durationSeconds": 1500,
-      "distanceM": 1800,
-      "avgSpeedKmh": 7.2,
-      "avgHeartRate": 152,
-      "maxHeartRate": 178,
-      "sprintCount": 4,
-      "activeEnergyKcal": 240,
-      "trimmed": false
+      "endedAt": "2026-05-18T01:25:00Z"
     }
   ]
 }
@@ -431,12 +418,11 @@ Soft delete 취소. `deleted_at = NULL`.
 |---|---|---|
 | `playedAt` | Instant | `@NotNull` |
 | `venueId` | long? | 본인 venue 만. 없으면 `404 VENUE_NOT_FOUND` |
-| `opponentName` | string? | max 100 |
-| `result` | string? | `@Pattern([WDL])` |
+| `opponent` | string? | max 100 |
+| `result` | string? | `WIN\|DRAW\|LOSS` |
 | `position` | string? | `GK\|DF\|MF\|FW` |
-| `userGoals` / `userAssists` | int? | `@Min(0)` |
-| `headline` | object | `@NotNull @Valid` — 4지표 전부 필수 |
-| `quarters` | array | `@Size(min=1, max=4)`, `quarterNo` 1~4 유일 |
+| `goals` / `assists` | int | `@Min(0)`, 기본 0 |
+| `quarters` | array | `@Size(min=1, max=4)`, `quarterNumber` 1~4 유일 |
 
 **Response** `200` (수정) / `201` (신규) — [`MatchDetailResponse`](#matchdetailresponse)
 
@@ -445,29 +431,29 @@ Soft delete 취소. `deleted_at = NULL`.
 | status | code | 조건 |
 |---|---|---|
 | 400 | `MATCH_QUARTER_OVERFLOW` | 쿼터 4개 초과 |
-| 400 | `MATCH_DUPLICATE_QUARTER_NO` | quarterNo 중복 |
-| 404 | `VENUE_NOT_FOUND` | venueId 가 내 것 아님 |
+| 400 | `MATCH_DUPLICATE_QUARTER_NO` | quarterNumber 중복 |
+| 403 | `VENUE_NOT_OWNED` | venueId 가 내 것 아님 |
+| 404 | `VENUE_NOT_FOUND` | venueId 가 없음 |
 
 ---
 
-### 5.2 `GET /matches?page=0&size=20&season=2026` 🔒
+### 5.2 `GET /matches?cursor=...&size=20` 🔒
 
-내 경기 리스트. 페이지네이션 + 시즌(연도) 필터.
+내 경기 리스트. cursor 페이지네이션. 기본 정렬은 `playedAt DESC, id DESC`.
 
 | 쿼리 | 기본 | 비고 |
 |---|---|---|
-| `page` / `size` | 0 / 20 | Pageable. size 최대 100 |
-| `season` | (전체) | 연도. `played_at` 기준 |
-| `sort` | `playedAt,desc` | — |
+| `cursor` / `size` | null / 20 | cursor는 이전 응답의 `nextCursor`. size 최대 100 |
 
-**Response** `200` — [`PageResponse`](#pageresponset)`<MatchSummaryResponse>`
+**Response** `200` — [`CursorResponse`](#cursorresponset)`<MatchSummaryResponse>`
 ```json
 {
   "content": [
-    { "id": 101, "playedAt": "2026-05-18T01:00:00Z", "venueName": "마포 풋살장", "opponentName": "옆동네 FC",
-      "result": "W", "userGoals": 2, "userAssists": 1, "totalDistanceM": 6800, "quarterCount": 4 }
+    { "id": 101, "clientMatchId": "11111111-1111-1111-1111-111111111111", "venueId": 5,
+      "playedAt": "2026-05-18T01:00:00Z", "opponent": "옆동네 FC",
+      "result": "WIN", "position": "MF", "goals": 2, "assists": 1, "quarterCount": 4 }
   ],
-  "page": 0, "size": 20, "totalElements": 37, "totalPages": 2, "hasNext": true
+  "size": 20, "nextCursor": "eyJwbGF5ZWRBdCI6...", "hasNext": true
 }
 ```
 
@@ -489,11 +475,11 @@ Soft delete 취소. `deleted_at = NULL`.
 
 ---
 
-### 5.5 `GET /users/{userId}/matches?page=0&size=20&season=2026` 🔒
+### 5.5 `GET /users/{userId}/matches?cursor=...&size=20` 🔒
 
 **친구의** 경기 리스트 (read-only). `FriendshipAuthorizer.assertCanView` 통과 필수.
 
-**Response** `200` — [`PageResponse`](#pageresponset)`<MatchSummaryResponse>`
+**Response** `200` — [`CursorResponse`](#cursorresponset)`<MatchSummaryResponse>`
 
 **에러**
 
@@ -764,19 +750,16 @@ Soft delete 취소. `deleted_at = NULL`.
 {
   "id": 101,
   "clientMatchId": "UUID",
+  "venueId": 5,
   "playedAt": "Instant",
-  "venue": { "id": 5, "name": "마포 풋살장" },
-  "opponentName": "string|null",
-  "result": "W|D|L|null",
+  "opponent": "string|null",
+  "result": "WIN|DRAW|LOSS|null",
   "position": "GK|DF|MF|FW|null",
-  "userGoals": 2,
-  "userAssists": 1,
-  "headline": { "totalDistanceM": 6800, "maxSpeedKmh": 27.3, "sprintCount": 14, "avgHeartRate": 158 },
-  "quarters": [ { "quarterNo": 1, "startedAt": "...", "endedAt": "...", "durationSeconds": 1500,
-                  "distanceM": 1800, "avgSpeedKmh": 7.2, "avgHeartRate": 152, "maxHeartRate": 178,
-                  "sprintCount": 4, "activeEnergyKcal": 240, "trimmed": false } ],
-  "createdAt": "Instant",
-  "updatedAt": "Instant"
+  "goals": 2,
+  "assists": 1,
+  "quarters": [
+    { "quarterNumber": 1, "healthKitWorkoutId": "hk-uuid-1", "startedAt": "Instant", "endedAt": "Instant" }
+  ]
 }
 ```
 > 친구 조회 시 `hideHeartRate=true` 면 `headline.avgHeartRate` 및 각 quarter 의 `avgHeartRate`/`maxHeartRate` 가 `null`.
@@ -784,11 +767,11 @@ Soft delete 취소. `deleted_at = NULL`.
 ### SeasonStatResponse
 8.1 참조.
 
-### PageResponse<T>
+### CursorResponse<T>
 ```json
-{ "content": [], "page": 0, "size": 20, "totalElements": 0, "totalPages": 0, "hasNext": false }
+{ "content": [], "size": 20, "nextCursor": null, "hasNext": false }
 ```
-`common/util/PageResponse.kt` 로 wrapping (Spring `Page` 기본 직렬화 미사용).
+Spring `Page` 기본 직렬화 미사용. 목록은 cursor 기반 응답으로 wrapping.
 
 ---
 

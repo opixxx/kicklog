@@ -1,0 +1,37 @@
+package com.opixxx.kicklog.match.repository
+
+import com.opixxx.kicklog.match.entity.Match
+import java.util.UUID
+
+class InMemoryMatchRepository : MatchStore {
+    private val matches = linkedMapOf<Long, Match>()
+    private var sequence = 1L
+
+    override fun save(match: Match): Match {
+        if (match.id == 0L) {
+            match.id = sequence++
+        }
+        matches[match.id] = match
+        return match
+    }
+
+    override fun delete(match: Match) {
+        matches.remove(match.id)
+    }
+
+    override fun findById(id: Long): Match? = matches[id]
+
+    override fun findByUserIdAndClientMatchId(userId: Long, clientMatchId: UUID): Match? {
+        return matches.values.firstOrNull { it.userId == userId && it.clientMatchId == clientMatchId }
+    }
+
+    override fun findAllByUserId(userId: Long, cursor: MatchCursorCondition?, limit: Int): List<Match> {
+        return matches.values
+            .filter { it.userId == userId }
+            .sortedWith(compareByDescending<Match> { it.playedAt }.thenByDescending { it.id })
+            .filter { cursor == null || it.playedAt < cursor.playedAt || it.playedAt == cursor.playedAt && it.id < cursor.id }
+            .take(limit)
+    }
+
+    fun count(): Int = matches.size
+}

@@ -26,7 +26,7 @@
 - 멱등 PUT: `/matches/{clientMatchId}` (ADR-0003 D5)
 
 ### Query
-- 페이지네이션: `?page=0&size=20` (Spring Data Pageable 기본 매핑)
+- 페이지네이션: `?cursor=...&size=20` (첫 페이지는 cursor 생략)
 - 필터: `?season=2026&status=accepted`
 - 검색: `?q=...&limit=20`
 
@@ -100,11 +100,10 @@ fun upsertMatch(
 // Request
 data class PutMatchRequest(
     @field:NotNull val playedAt: Instant,
-    @field:Valid val headline: HeadlineMetrics,
     @field:Size(min = 1, max = 4) val quarters: List<QuarterUpload>,
-    val venueId: Long? = null,
-    val opponentName: String? = null,
-    @field:Pattern(regexp = "[WDL]") val result: String? = null,
+    @field:NotNull val venueId: Long,
+    val opponent: String? = null,
+    val result: MatchResultType? = null,
     /* ... */
 )
 
@@ -238,26 +237,27 @@ Authorization: Bearer <accessToken>
 
 ## 페이지네이션·정렬
 
-### Spring Data Pageable 기반
+### Cursor 기반
 ```
-GET /matches?page=0&size=20&sort=playedAt,desc
+GET /matches?cursor=eyJwbGF5ZWRBdCI6...&size=20
 ```
+
+- 기본 정렬: `playedAt DESC, id DESC`
+- 첫 페이지: `cursor` 생략
+- 다음 페이지: 응답의 `nextCursor` 값을 그대로 전달
+- `size` 기본 20, 최대 100
 
 ### 응답 포맷
 ```json
 {
   "content": [ /* MatchSummaryResponse 배열 */ ],
-  "page": 0,
   "size": 20,
-  "totalElements": 137,
-  "totalPages": 7,
+  "nextCursor": "eyJwbGF5ZWRBdCI6...",
   "hasNext": true
 }
 ```
 
-→ Spring `Page<T>` 의 기본 JSON 직렬화를 그대로 쓰지 말고, 위 포맷으로 wrapping 하는 `PageResponse<T>` 유틸 사용 (`common/util/PageResponse.kt`).
-
-이유: Spring 기본 `Page` 직렬화는 deprecation 경고 잦고 내부 구조 노출 위험.
+→ offset 기반 `Page<T>` 기본 직렬화는 사용하지 않는다. 모바일 동기화 흐름에서는 최신순 목록을 안정적으로 이어받을 수 있도록 cursor 응답을 사용한다.
 
 ---
 
