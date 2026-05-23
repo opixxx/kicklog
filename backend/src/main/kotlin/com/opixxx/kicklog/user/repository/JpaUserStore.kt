@@ -28,4 +28,8 @@ class JpaUserStore(
     override fun delete(user: User) {
         userRepository.delete(user)
     }
+
+    override fun findAllActiveByIds(ids: Collection<Long>): List<User> {
+        return if (ids.isEmpty()) emptyList() else userRepository.findAllByIdInAndDeletedAtIsNull(ids)
+    }
 }

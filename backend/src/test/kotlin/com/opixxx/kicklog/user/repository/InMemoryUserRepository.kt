@@ -40,5 +40,9 @@ class InMemoryUserRepository : UserStore {
         users.remove(user.id)
     }
 
+    override fun findAllActiveByIds(ids: Collection<Long>): List<User> {
+        return ids.mapNotNull(users::get).filterNot(User::isDeleted)
+    }
+
     fun count(): Int = users.size
 }

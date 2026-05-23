@@ -9,4 +9,5 @@ interface UserStore {
     fun searchByDisplayName(query: String, limit: Int, excludeUserId: Long): List<User>
     fun findExpiredDeleted(cutoff: Instant): List<User>
     fun delete(user: User)
+    fun findAllActiveByIds(ids: Collection<Long>): List<User>
 }
