@@ -12,6 +12,7 @@
 #   5) 성공 → 카운터 리셋
 
 set -e
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 MAX_ATTEMPTS=3
 COUNTER_DIR="/tmp/kicklog-selfheal"

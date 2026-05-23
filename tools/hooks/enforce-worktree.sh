@@ -6,6 +6,7 @@
 # iOS 는 보호 대상 아님 (사용자가 Xcode 에서 자유롭게 작업).
 
 set -e
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 input=$(cat)
 file_path=$(echo "$input" | jq -r '.tool_input.file_path // empty')

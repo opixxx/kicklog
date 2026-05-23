@@ -12,6 +12,7 @@
 #   사용자가 명시적으로 위험을 인지하고 실행해야 한다면 터미널에서 직접 실행
 
 set -e
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 input=$(cat)
 cmd=$(echo "$input" | jq -r '.tool_input.command // empty')

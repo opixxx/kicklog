@@ -14,6 +14,7 @@
 # 출력: 30초 이상 걸리는 명령은 사용하지 않는다 (UserPromptSubmit과 달리 SessionStart는 600초 허용이지만 빠르게 유지).
 
 set -e
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 input=$(cat 2>/dev/null || echo "{}")
 cwd=$(echo "$input" | jq -r '.cwd // empty' 2>/dev/null || true)
