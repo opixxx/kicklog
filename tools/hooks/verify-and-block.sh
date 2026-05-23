@@ -17,6 +17,19 @@ MAX_ATTEMPTS=3
 COUNTER_DIR="/tmp/kicklog-selfheal"
 mkdir -p "$COUNTER_DIR"
 
+append_trajectory() {
+  local event="$1"
+  local detail="$2"
+  local traj_dir="${top}/docs/agent/trajectories"
+  local traj_file="${traj_dir}/$(date +%Y-%m).log"
+  mkdir -p "$traj_dir"
+  {
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ${event}"
+    echo "$detail"
+    echo ""
+  } >> "$traj_file"
+}
+
 input=$(cat)
 cwd=$(echo "$input" | jq -r '.cwd // empty')
 [ -z "$cwd" ] && cwd="$(pwd)"
@@ -60,6 +73,11 @@ log_file="${top}/logs/verify-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "${top}/logs"
 
 if (cd "$top/backend" && ./gradlew compileKotlin --quiet) > "$log_file" 2>&1; then
+  if [ "$count" -gt 0 ]; then
+    append_trajectory "SELF_HEAL_RESOLVED check=backend.compileKotlin attempts=${count}" \
+"- resolved_by: subsequent code changes
+- prevention_required: decide whether this was one-off or should update docs/agent/learning.md, EXEC_PLAN template, code-reviewer, or backend-test-writer"
+  fi
   # 성공 — 카운터 리셋
   rm -f "$counter_file"
   exit 0
@@ -70,6 +88,16 @@ new_count=$((count + 1))
 echo "$new_count" > "$counter_file"
 
 err_tail=$(tail -30 "$log_file" 2>/dev/null || echo "(로그 없음)")
+
+append_trajectory "SELF_HEAL_ATTEMPT check=backend.compileKotlin attempt=${new_count}/${MAX_ATTEMPTS}" \
+"- failure_type: compile
+- failed_check: backend.compileKotlin
+- log_file: ${log_file}
+- changed_backend:
+$(echo "$CHANGED_BACKEND" | sed 's/^/  - /')
+- error_tail:
+$(echo "$err_tail" | sed 's/^/  /')
+- learning_action: after fixing, record root cause and prevention in docs/agent/learning.md if this can recur"
 
 reason="❌ 백엔드 컴파일 실패 (시도 ${new_count}/${MAX_ATTEMPTS})
 

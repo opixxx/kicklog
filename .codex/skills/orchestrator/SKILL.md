@@ -35,7 +35,7 @@ description: >
 3. 검증-a (계산적) → compileKotlin (백엔드)
 4. 검증-b (추론적) → code-reviewer 호출
 5. 커밋 + PR     → /pr-guide skill
-6. Post-merge   → 트레젝토리 기록
+6. Learn         → 트레젝토리·학습 저널 기록
 ```
 
 > **iOS 영역은 본 파이프라인 대상 아님.** 사용자가 Xcode 에서 직접 작업한다.
@@ -241,12 +241,12 @@ PR 본문에 `docs/agent/plans/...` EXEC_PLAN 링크 자동 첨부 (worktree 경
 
 ---
 
-## 6. Post-merge
+## 6. Learn
 
 - **트레젝토리 기록**: `docs/agent/trajectories/YYYY-MM.log` 에 완료 라인 추가
-  - 각 단계 소요 시간 · 재시도 횟수 · 실패 원인 · 최종 커밋 해시
+- **학습 승격**: self-heal, Critical 리뷰, 누락 테스트가 재발 가능하면 `docs/agent/learning.md`에 패턴 추가
+  - 필요 시 EXEC_PLAN 템플릿, code-reviewer, backend-test-writer, test-strategy 중 하나를 갱신
 - **worktree 정리**: `git worktree remove <path>`
-- v1.1+ `/review-gap-analysis` 스킬로 월 1회 학습
 
 ---
 
@@ -275,7 +275,7 @@ PR 본문에 `docs/agent/plans/...` EXEC_PLAN 링크 자동 첨부 (worktree 경
 | 4 추론적 검증 | `code-reviewer` | 백엔드 PR 리뷰 |
 | 5 커밋 + PR | `/pr-guide` 스킬 | |
 | 5.5 PR 리뷰 (별도) | `/code-review` 스킬 | PR 번호 받아 GitHub 코멘트 등록 |
-| 6 Post-merge | 트레젝토리 기록 | `docs/agent/trajectories/` |
+| 6 Learn | 트레젝토리·학습 저널 기록 | `docs/agent/trajectories/`, `docs/agent/learning.md` |
 
 ---
 
@@ -285,6 +285,7 @@ PR 본문에 `docs/agent/plans/...` EXEC_PLAN 링크 자동 첨부 (worktree 경
 - 30줄 이상 변경에 EXEC_PLAN 생략
 - 자가수정 루프에서 `--no-verify`, `-DskipTests`, `@Disabled`로 우회
 - 실패 원인 분석 없이 brute-force 재시도
+- 반복 가능한 실패를 trajectory에만 남기고 학습 저널/체크리스트에 승격하지 않기
 - 에스컬레이션 조건 충족인데 혼자 진행
 - `main` 메인 디렉토리에서 백엔드 소스 직접 수정
 - 계획 없이 코드 편집 (훅이 차단)
@@ -296,6 +297,7 @@ PR 본문에 `docs/agent/plans/...` EXEC_PLAN 링크 자동 첨부 (worktree 경
 - **테스트 전략 (SoT)**: `docs/spec/test-strategy.md` — ATDD 1차 · 도구 매핑 · 시나리오 태그 · 금지 사항
 - 워크플로 정책: `references/workflow-policy.md`
 - 자가수정 루프: `references/self-heal-loop.md`
+- 학습 저널: `docs/agent/learning.md`
 - 에스컬레이션: `references/escalation.md`
 - 코딩 컨벤션 (백엔드): `.codex/skills/coding-conventions/SKILL.md`
 - PR 생성: `.codex/skills/pr-guide/SKILL.md`

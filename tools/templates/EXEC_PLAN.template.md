@@ -83,6 +83,15 @@
 
 <TODO: 본 PR 범위 밖이지만 따라오는 작업이 있으면 메모.>
 
+## (Optional) 학습 기록
+
+<TODO: self-heal, Critical 리뷰, 누락 테스트가 있었다면 기록.
+- Trigger: self-heal | review-critical | missing-test | production-risk | security | none
+- Root cause:
+- Prevention:
+- Promoted to: docs/agent/learning.md | EXEC_PLAN template | code-reviewer | backend-test-writer | test-strategy | none
+>
+
 ---
 
 ## TDD 작업 흐름
@@ -100,7 +109,8 @@
    - 테스트 여전히 통과
 5. 다음 케이스 반복
 6. 모든 케이스 통과 → "4. 검증" 섹션의 명령 실행
-7. PR 생성 (/pr-guide)
+7. self-heal/Critical/누락 테스트가 있었으면 학습 기록 판단
+8. PR 생성 (/pr-guide)
 ```
 
 > 완료 시: `상태` 필드를 `done`으로 변경하고 PR 본문에 본 파일 링크 첨부.

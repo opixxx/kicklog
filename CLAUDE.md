@@ -42,6 +42,7 @@
 - `PreToolUse` (Edit/Write): `enforce-plan.sh` — 30줄 이상 백엔드 변경에 EXEC_PLAN 강제 ✅
 - `Stop`: `verify-and-block.sh` — 백엔드 compile + 자가수정 루프 (최대 3회) ✅
 - `.githooks/pre-commit`: 백엔드 Kotlin compile 게이트 ✅
+- `docs/agent/learning.md`: self-heal, Critical 리뷰, 누락 테스트를 재발 방지 규칙으로 승격
 
 **Agents (백엔드 전용):**
 - `code-reviewer` (Kotlin/Spring) — `memory: project` + `skills: [coding-conventions]`
@@ -79,6 +80,7 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 - **작은 변경은 직접**, 큰 변경은 plan 모드 먼저. 30줄 미만은 EXEC_PLAN + TDD 면제.
 - **데이터 정제·분석은 iOS에서** (스프린트 계산·쿼터 통계 등). 백엔드는 저장·공유 책임만.
 - **자가수정 우회 금지**: `--no-verify`, `-DskipTests`, `@Disabled` 우회 금지.
+- **학습 승격**: 자가수정·Critical 리뷰·누락 테스트가 반복 가능하면 `docs/agent/learning.md`와 관련 agent memory/checklist에 반영.
 - 부수 질문은 `/btw` (도구 액세스 없이 빠른 답변).
 - 큰 산출물 격리는 `Explore` 또는 일반 subagent에 위임.
 
@@ -95,6 +97,7 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 리서치 (예정) | `docs/research/` |
 | 작업 플랜 영구본 | `docs/agent/plans/YYYY-MM-DD-<task>.md` |
 | 트레젝토리 | `docs/agent/trajectories/YYYY-MM.log` |
+| 학습 저널 | `docs/agent/learning.md` |
 
 ## v2 후보 / MVP 스코프 외
 

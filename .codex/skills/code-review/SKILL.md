@@ -119,7 +119,7 @@ PR #{번호}를 리뷰하세요.
 ---
 
 **리뷰 에이전트**: {호출된 agent 목록}
-**누적 학습 반영**: 각 에이전트의 `memory: project` (`.codex/agent-memory/`)
+**누적 학습 반영**: Critical/반복 Major는 `.codex/agent-memory/`와 `docs/agent/learning.md`에 명시적으로 기록
 ```
 
 ### 4-2. 판정 결정

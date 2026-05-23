@@ -295,14 +295,14 @@ grep -rn "MATCH_QUARTER_OVERFLOW\|FRIEND_UNAUTHORIZED" backend/src/main/kotlin
 
 ---
 
-## 추가 학습 (review-gap-analysis 누적용)
+## 추가 학습
 
-> review-gap-analysis 스킬이 PR 리뷰 갭을 발견할 때마다 본 섹션에 누적한다.
-> 처음에는 비어있고, 실제 PR 사이클을 돌면서 자라난다.
+> 누락 테스트, self-heal로 드러난 회귀 케이스, Critical 리뷰가 발견한 테스트 공백을 누적한다.
+> `docs/agent/learning.md`와 `.claude/agent-memory/backend-test-writer/MEMORY.md`를 우선 사용한다.
 
 <!-- 예시 형식:
-### 갭 보강 — 2026-MM-DD PR#N
+### 갭 보강 — 2026-MM-DD <task-or-PR>
 - [ ] **패턴 이름**: 구체 설명
-  - 근거: PR#N 의 어떤 코멘트
+  - 근거: SELF_HEAL / code-reviewer / 사용자 리뷰
   - 체크: 실제 grep / 패턴
 -->

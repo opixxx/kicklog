@@ -120,8 +120,8 @@ memory: project
 
 ## 메모리 활용 (memory: project)
 
-리뷰하면서 발견한 패턴·반복되는 이슈는 `.claude/agent-memory/code-reviewer/MEMORY.md`에 자동 누적.
-다음 리뷰에서 활용 — 점진적 학습.
+리뷰하면서 발견한 Critical 또는 반복 Major 패턴은 `.claude/agent-memory/code-reviewer/MEMORY.md`에 명시적으로 누적한다.
+프로젝트 전체 규칙으로 승격할 내용은 `docs/agent/learning.md`에 Root cause와 Prevention을 남기고 관련 체크리스트를 갱신한다.
 
 예시:
 ```

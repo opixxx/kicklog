@@ -45,6 +45,7 @@ Claude Code용 원본은 `CLAUDE.md`와 `.claude/**`에 있으며, Codex는 아�
 - `PreToolUse` (Edit/Write): `tools/hooks/enforce-plan.sh` — 30줄 이상 백엔드 변경 시 EXEC_PLAN 강제
 - `Stop`: `tools/hooks/verify-and-block.sh` — 백엔드 `compileKotlin` + 자가수정 (최대 3회)
 - `.githooks/pre-commit`: 백엔드 Kotlin 컴파일 게이트
+- `docs/agent/learning.md`: self-heal, Critical 리뷰, 누락 테스트를 재발 방지 규칙으로 승격
 
 **Agents (백엔드 전용):**
 - `code-reviewer` (Kotlin/Spring) — `skills: [coding-conventions]`
@@ -72,6 +73,7 @@ Claude Code용 원본은 `CLAUDE.md`와 `.claude/**`에 있으며, Codex는 아�
    - 백엔드: `cd backend && ./gradlew check`
    - iOS: 자동 검증 없음 (사용자가 Xcode 에서 수동)
 6. 검증 실패 시 원인 수정 + 최대 3회 재검증. 3회 연속 실패하면 `blocked` 상태로 보고한다.
+7. 자가수정·Critical 리뷰·누락 테스트가 반복 가능하면 `docs/agent/learning.md`와 관련 agent memory/checklist에 반영한다.
 
 ## 자주 쓰는 명령
 
@@ -109,6 +111,7 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 | 리서치 (예정) | `docs/research/` |
 | 작업 플랜 영구본 | `docs/agent/plans/YYYY-MM-DD-<task>.md` |
 | 트레젝토리 | `docs/agent/trajectories/YYYY-MM.log` |
+| 학습 저널 | `docs/agent/learning.md` |
 
 ## 변경 이력
 

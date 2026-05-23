@@ -37,6 +37,22 @@
 - 검증 로그: `<worktree>/logs/verify-YYYYMMDD-HHMMSS.log`
 - 카운터: `/tmp/kicklog-selfheal/<worktree-escaped>`
 - 트레젝토리: `docs/agent/trajectories/YYYY-MM.log`
+- 학습 저널: `docs/agent/learning.md`
+
+## 학습 승격
+
+자가수정은 고치는 것으로 끝내지 않는다.
+
+1. `verify-and-block.sh`는 compile 실패마다 trajectory에 `SELF_HEAL_ATTEMPT`를 남긴다.
+2. 자가수정 후 검증이 통과하면 `SELF_HEAL_RESOLVED`를 남긴다.
+3. 에이전트는 해결 후 다음을 판단한다.
+   - 일회성 문법/타입 실수면 trajectory만 유지
+   - 반복 가능하면 `docs/agent/learning.md`에 Root cause와 Prevention 추가
+   - 계획 단계에서 막을 수 있으면 `tools/templates/EXEC_PLAN.template.md` 갱신
+   - 리뷰로 잡아야 하면 `code-reviewer` memory/checklist 갱신
+   - 테스트로 잡아야 하면 `backend-test-writer` memory 또는 `docs/spec/test-strategy.md` 갱신
+
+학습 승격은 로컬 trajectory, agent memory, 프로젝트 문서를 단일 진실 원천으로 사용한다.
 
 ## 에스컬레이션 발동 시 보고 양식
 
