@@ -1,17 +1,22 @@
 package com.opixxx.kicklog.config
 
+import com.opixxx.kicklog.common.security.JwtAuthenticationFilter
+import com.opixxx.kicklog.common.security.JwtProperties
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpStatus
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.authentication.HttpStatusEntryPoint
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 
-/**
- * MVP 초기 단계 보안 설정. 모든 요청 허용 (개발 편의).
- * Sign in with Apple + JWT 도입은 ADR-0003 데이터 모델 확정 후.
- */
 @Configuration
-class SecurityConfig {
+@EnableConfigurationProperties(JwtProperties::class)
+class SecurityConfig(
+    private val jwtAuthenticationFilter: JwtAuthenticationFilter,
+) {
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
@@ -21,10 +26,13 @@ class SecurityConfig {
             .authorizeHttpRequests { auth ->
                 auth
                     .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                    .anyRequest().permitAll()  // TODO: JWT 도입 후 authenticated()로 변경
+                    .requestMatchers("/auth/apple/signin", "/auth/kakao/signin", "/auth/refresh").permitAll()
+                    .anyRequest().authenticated()
             }
             .httpBasic { it.disable() }
             .formLogin { it.disable() }
+            .exceptionHandling { it.authenticationEntryPoint(HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)) }
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
     }

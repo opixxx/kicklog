@@ -6,7 +6,7 @@
 
 ## 한 줄 요약
 
-**Apple Sign-In + Kakao Login → 우리 JWT (Access 1h + Refresh 90d) → Spring Security Filter 에서 검증.**
+**Apple Sign-In + Kakao Login → 우리 JWT (Access 15m + Refresh 30d) → Spring Security Filter 에서 검증.**
 
 OAuth provider token 은 첫 가입·로그인 시 1회만 사용. 이후 모든 API 는 우리가 발급한 JWT 로만.
 
@@ -16,11 +16,12 @@ OAuth provider token 은 첫 가입·로그인 시 1회만 사용. 이후 모든
 
 | 토큰 | 수명 | 저장 | 갱신 |
 |---|---|---|---|
-| **Access Token** | 1h | iOS KeyChain | 매 요청 헤더 |
-| **Refresh Token** | 90d | DB (`refresh_tokens` 테이블) + iOS KeyChain | `/auth/refresh` |
+| **Access Token** | 15m | iOS KeyChain | 매 요청 헤더 |
+| **Refresh Token** | 30d | DB (`refresh_tokens` 테이블) + iOS KeyChain | `/auth/refresh` |
 
 - Refresh token 은 **DB 에 저장**해서 강제 로그아웃·revoke 지원
-- JTI(JWT ID) 를 PK 로 사용 → revoke 시 `revoked_at` 만 채움
+- JTI(JWT ID) 를 PK 로 사용 → refresh rotation 시 기존 JTI는 `revoked_at`, `rotated_to_jti` 를 채움
+- 폐기된 refresh token 재사용 감지 시 해당 사용자의 활성 refresh token 을 모두 revoke
 - Access token 은 DB 비저장 (stateless)
 
 ### 클레임
@@ -218,10 +219,12 @@ JwtTokenProvider.parse(refreshToken)  → JTI 추출
    ▼
 refresh_tokens 조회
    │
-   ├─ 없음 / revoked_at != null / expires_at <= NOW()  → 401 InvalidRefreshToken
+   ├─ 없음 / expires_at <= NOW()  → 401 InvalidRefreshToken
    │
-   └─ 유효 → 새 accessToken 발급 + last_used_at = NOW()
-              (refresh token 자체는 그대로 — v1.1 에서 rotation 검토)
+   ├─ revoked_at != null          → 401 RefreshReused + 사용자 활성 세션 전체 revoke
+   │
+   └─ 유효 → 새 accessToken + 새 refreshToken 발급
+              기존 JTI revoked_at/rotated_to_jti 기록, 새 JTI INSERT
 ```
 
 ### 강제 로그아웃 / 로그아웃
@@ -231,7 +234,7 @@ refresh_tokens 조회
 | `POST /auth/logout` | 사용자의 **모든** refresh_tokens 에 `revoked_at = NOW()` |
 | `POST /auth/logout/this-device { refreshToken }` | 해당 JTI 만 revoke |
 
-Access token 은 만료(1h) 까지 살아있지만, 보호 endpoint 가 사용자 상태(deleted_at 등) 를 매번 확인하므로 큰 위험 없음. 즉시 무효화가 필요하면 v1.1 에서 blacklist 도입.
+Access token 은 만료(15m) 까지 살아있지만, 보호 endpoint 가 사용자 상태(deleted_at 등) 를 매번 확인하므로 큰 위험 없음. 즉시 무효화가 필요하면 v1.1 에서 blacklist 도입.
 
 ---
 
@@ -249,8 +252,8 @@ class SecurityConfig(
         .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
         .authorizeHttpRequests {
             it
-                .requestMatchers("/auth/**").permitAll()
-                .requestMatchers("/health", "/actuator/health").permitAll()
+                .requestMatchers("/auth/apple/signin", "/auth/kakao/signin", "/auth/refresh").permitAll()
+                .requestMatchers("/health", "/actuator/health", "/actuator/info").permitAll()
                 .anyRequest().authenticated()
         }
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
@@ -333,6 +336,6 @@ class UserPurgeJob(
 - [ ] **응답에 토큰·apple sub·kakao id·email 노출 없음** (UserResponse 에 절대 포함 X)
 - [ ] **에러 응답에 스택트레이스 노출 없음** — `GlobalExceptionHandler` 가 ErrorCode 만 직렬화
 - [ ] **JWT 시크릿이 코드/Git 에 없음** — AWS Secrets Manager 또는 환경변수
-- [ ] **`/auth/**` 외의 모든 endpoint 가 인증 필수** — `permitAll()` 추가 시 PR 에서 명시 사유
+- [ ] **로그인·refresh·health 외의 모든 endpoint 가 인증 필수** — `permitAll()` 추가 시 PR 에서 명시 사유
 
 위반은 `references/escalation.md` 의 "보안 경계 변경" 조건으로 사용자 확인 필수.

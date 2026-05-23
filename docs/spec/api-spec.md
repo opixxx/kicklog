@@ -95,7 +95,7 @@ Kakao accessToken 으로 로그인/가입. 백엔드가 `/v2/user/me` 호출해 
 
 ### 1.3 `POST /auth/refresh` 🌐
 
-Refresh token 으로 새 access token 발급. refresh token 자체는 그대로 (rotation 은 v1.1+).
+Refresh token 으로 새 access token 과 새 refresh token 을 발급한다. 기존 refresh token 은 즉시 revoke 된다.
 
 **Request**
 ```json
@@ -106,14 +106,15 @@ Refresh token 으로 새 access token 발급. refresh token 자체는 그대로 
 ```json
 { "accessToken": "eyJ...", "refreshToken": "eyJ..." }
 ```
-> `refreshToken` 은 입력값을 그대로 echo (클라이언트 저장 일관성). user 객체는 미포함.
+> refresh token rotation 적용. iOS 는 응답의 새 `refreshToken` 을 Keychain 에 덮어쓴다. user 객체는 미포함.
 
 **에러**
 
 | status | code | 조건 |
 |---|---|---|
-| 401 | `AUTH_INVALID_REFRESH` | DB 에 없음 / `revoked_at != null` |
+| 401 | `AUTH_INVALID_REFRESH` | DB 에 없음 |
 | 401 | `AUTH_EXPIRED_REFRESH` | `expires_at <= now` |
+| 401 | `AUTH_REFRESH_REUSED` | 이미 revoke 된 refresh token 재사용. 해당 사용자의 활성 세션 전체 revoke |
 
 ---
 
@@ -652,6 +653,7 @@ Soft delete 취소. `deleted_at = NULL`.
 | `AUTH_INVALID_KAKAO_TOKEN` | 401 | 카카오 토큰 검증에 실패했습니다 |
 | `AUTH_INVALID_REFRESH` | 401 | 유효하지 않은 리프레시 토큰입니다 |
 | `AUTH_EXPIRED_REFRESH` | 401 | 리프레시 토큰이 만료되었습니다 |
+| `AUTH_REFRESH_REUSED` | 401 | 이미 사용된 리프레시 토큰입니다 |
 | `AUTH_REFRESH_NOT_OWNED` | 403 | 본인의 토큰이 아닙니다 |
 | `USER_NOT_FOUND` | 404 | 사용자를 찾을 수 없습니다 |
 | `USER_DELETED` / `USER_PURGED` | 410 | 탈퇴한 사용자입니다 |

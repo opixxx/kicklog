@@ -140,6 +140,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     // 도메인 prefix + reason
     AUTH_INVALID_TOKEN          (HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다"),
     AUTH_EXPIRED_REFRESH        (HttpStatus.UNAUTHORIZED, "리프레시 토큰이 만료되었습니다"),
+    AUTH_REFRESH_REUSED         (HttpStatus.UNAUTHORIZED, "이미 사용된 리프레시 토큰입니다"),
     USER_NOT_FOUND              (HttpStatus.NOT_FOUND,    "사용자를 찾을 수 없습니다"),
     USER_DELETED                (HttpStatus.GONE,         "탈퇴한 사용자입니다"),
     FRIEND_UNAUTHORIZED         (HttpStatus.FORBIDDEN,    "친구 관계가 아닙니다"),
