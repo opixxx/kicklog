@@ -10,4 +10,8 @@ class JpaUserStore(
     override fun save(user: User): User = userRepository.save(user)
 
     override fun findById(id: Long): User? = userRepository.findById(id).orElse(null)
+
+    override fun findAllActiveByIds(ids: Collection<Long>): List<User> {
+        return if (ids.isEmpty()) emptyList() else userRepository.findAllByIdInAndDeletedAtIsNull(ids)
+    }
 }

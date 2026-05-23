@@ -16,5 +16,9 @@ class InMemoryUserRepository : UserStore {
 
     override fun findById(id: Long): User? = users[id]
 
+    override fun findAllActiveByIds(ids: Collection<Long>): List<User> {
+        return ids.mapNotNull(users::get).filterNot(User::isDeleted)
+    }
+
     fun count(): Int = users.size
 }
