@@ -2,7 +2,12 @@ package com.opixxx.kicklog.match.service
 
 import com.opixxx.kicklog.common.exception.ErrorCode
 import com.opixxx.kicklog.common.exception.KickLogException
+import com.opixxx.kicklog.friend.entity.Friendship
+import com.opixxx.kicklog.friend.repository.InMemoryFriendshipRepository
+import com.opixxx.kicklog.friend.service.FriendshipAuthorizer
 import com.opixxx.kicklog.match.repository.InMemoryMatchRepository
+import com.opixxx.kicklog.user.entity.User
+import com.opixxx.kicklog.user.repository.InMemoryUserRepository
 import com.opixxx.kicklog.venue.entity.Venue
 import com.opixxx.kicklog.venue.repository.InMemoryVenueRepository
 import java.math.BigDecimal
@@ -18,7 +23,10 @@ class MatchServiceTest {
 
     private val matchRepository = InMemoryMatchRepository()
     private val venueRepository = InMemoryVenueRepository()
-    private val service = MatchService(matchRepository, venueRepository)
+    private val friendshipRepository = InMemoryFriendshipRepository()
+    private val userRepository = InMemoryUserRepository()
+    private val friendshipAuthorizer = FriendshipAuthorizer(friendshipRepository, userRepository)
+    private val service = MatchService(matchRepository, venueRepository, friendshipAuthorizer)
 
     @Test
     fun `경기를 신규 저장한다`() {
@@ -106,6 +114,53 @@ class MatchServiceTest {
         assertEquals(ErrorCode.MATCH_NOT_OWNED, exception.errorCode)
     }
 
+    @Test
+    fun `친구 경기 목록은 대상 사용자 경기만 반환한다`() {
+        val viewer = saveUser("조회자")
+        val friend = saveUser("친구")
+        val friendVenue = saveVenue(friend.id)
+        saveAcceptedFriendship(viewer.id, friend.id)
+        service.saveMatch(friend.id, UUID.fromString("00000000-0000-0000-0000-000000000011"), command(friendVenue.id))
+
+        val page = service.listFriendMatches(viewer.id, friend.id, cursor = null, size = 20)
+
+        assertEquals(listOf(friend.id), page.content.map { it.userId })
+    }
+
+    @Test
+    fun `친구 경기 상세는 대상 사용자 경기만 반환한다`() {
+        val viewer = saveUser("조회자")
+        val friend = saveUser("친구")
+        val outsider = saveUser("다른사용자")
+        val friendVenue = saveVenue(friend.id)
+        val outsiderVenue = saveVenue(outsider.id)
+        saveAcceptedFriendship(viewer.id, friend.id)
+        service.saveMatch(friend.id, UUID.fromString("00000000-0000-0000-0000-000000000021"), command(friendVenue.id))
+        val outsiderMatch = service.saveMatch(
+            outsider.id,
+            UUID.fromString("00000000-0000-0000-0000-000000000022"),
+            command(outsiderVenue.id),
+        ).match
+
+        val exception = assertFailsWith<KickLogException> {
+            service.getFriendMatch(viewer.id, friend.id, outsiderMatch.id)
+        }
+
+        assertEquals(ErrorCode.MATCH_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `친구가 아니면 친구 경기 목록을 조회할 수 없다`() {
+        val viewer = saveUser("조회자")
+        val other = saveUser("비친구")
+
+        val exception = assertFailsWith<KickLogException> {
+            service.listFriendMatches(viewer.id, other.id, cursor = null, size = 20)
+        }
+
+        assertEquals(ErrorCode.FRIEND_UNAUTHORIZED, exception.errorCode)
+    }
+
     private fun saveVenue(userId: Long): Venue {
         return venueRepository.save(
             Venue.create(
@@ -119,6 +174,17 @@ class MatchServiceTest {
                 providerPlaceId = "place-$userId",
             ),
         )
+    }
+
+    private fun saveUser(displayName: String): User {
+        return userRepository.save(User.create(displayName = displayName, email = "$displayName@example.com"))
+    }
+
+    private fun saveAcceptedFriendship(userId: Long, targetUserId: Long) {
+        val now = Instant.parse("2026-05-23T09:00:00Z")
+        val friendship = Friendship.createPending(userId, targetUserId, now)
+        friendship.accept(now)
+        friendshipRepository.save(friendship)
     }
 
     private fun command(
