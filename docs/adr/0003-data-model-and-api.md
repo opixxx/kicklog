@@ -244,6 +244,10 @@ CREATE TABLE venues (
   name        VARCHAR(100) NOT NULL,
   geo_lat     NUMERIC(9,6) NOT NULL,
   geo_lng     NUMERIC(9,6) NOT NULL,
+  address     VARCHAR(255),
+  road_address VARCHAR(255),
+  provider    VARCHAR(20),
+  provider_place_id VARCHAR(255),
   created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, name)
 );
@@ -353,7 +357,8 @@ GET    /users/:userId/matches/:id   친구 경기 상세
 ### Venues
 ```
 GET    /venues                      내 운동장 목록
-POST   /venues                      등록 { name, geo_lat, geo_lng }
+POST   /venues                      등록 { name, geo_lat, geo_lng, provider?, provider_place_id? }
+GET    /venues/:id                  상세
 PATCH  /venues/:id                  이름 수정
 DELETE /venues/:id                  삭제 (관련 match.venue_id → NULL)
 ```
