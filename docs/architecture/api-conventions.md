@@ -276,14 +276,18 @@ GET /matches?page=0&size=20&sort=playedAt,desc
 
 ### Kakao Local API (운동장 검색 프록시)
 - 백엔드가 직접 호출 (REST API 키 클라이언트 노출 방지, ADR-0003 D6.1)
+- 동기 호출이므로 connect timeout 2초, read timeout 3초를 기본값으로 둔다.
 - 응답을 그대로 전달하지 말고 **우리 DTO 로 변환**:
   ```kotlin
   data class PlaceSearchResponse(
       val places: List<Place>,
   ) {
       data class Place(
+          val provider: String,          // "kakao"
+          val providerPlaceId: String,
           val name: String,
           val address: String,
+          val roadAddress: String?,
           val lat: BigDecimal,
           val lng: BigDecimal,
           val distanceM: Int?,
