@@ -36,6 +36,8 @@ KickLog 백엔드에 카카오 Local REST API 기반 장소 검색 프록시를 
 - 설정
   - `kicklog.kakao.rest-api-key`
   - `kicklog.kakao.local-search-url`
+  - `kicklog.kakao.connect-timeout-millis` 기본 2000
+  - `kicklog.kakao.read-timeout-millis` 기본 3000
 - 규칙
   - DB 스키마 변경 없음
   - 카카오 REST API 키는 서버 환경변수로만 관리한다.
@@ -43,6 +45,7 @@ KickLog 백엔드에 카카오 Local REST API 기반 장소 검색 프록시를 
   - `radius`는 기본 5000m, 최대 20000m로 제한한다.
   - `lat/lng`는 둘 다 있을 때만 카카오 `x/y/radius` 파라미터로 전달한다.
   - 카카오 5xx/timeout/호출 실패는 `EXTERNAL_KAKAO_UNAVAILABLE` 502로 변환한다.
+  - 동기 외부 호출이므로 connect/read timeout을 명시한다.
 
 ## 3. 테스트 케이스 (Test Cases) — TDD 핵심
 

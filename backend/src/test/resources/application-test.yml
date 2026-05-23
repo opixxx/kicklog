@@ -29,3 +29,5 @@ kicklog:
     user-info-url: http://localhost/kakao/user
     rest-api-key: test-rest-key
     local-search-url: https://dapi.kakao.com/v2/local/search/keyword.json
+    connect-timeout-millis: 2000
+    read-timeout-millis: 3000

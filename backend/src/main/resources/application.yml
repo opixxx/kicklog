@@ -53,3 +53,5 @@ kicklog:
     user-info-url: ${KAKAO_USER_INFO_URL:https://kapi.kakao.com/v2/user/me}
     rest-api-key: ${KAKAO_REST_API_KEY:}
     local-search-url: ${KAKAO_LOCAL_SEARCH_URL:https://dapi.kakao.com/v2/local/search/keyword.json}
+    connect-timeout-millis: ${KAKAO_LOCAL_CONNECT_TIMEOUT_MILLIS:2000}
+    read-timeout-millis: ${KAKAO_LOCAL_READ_TIMEOUT_MILLIS:3000}
