@@ -427,7 +427,7 @@ Soft delete 취소. `deleted_at = NULL`.
 | 필드 | 타입 | 검증 |
 |---|---|---|
 | `playedAt` | Instant | `@NotNull` |
-| `venueId` | long? | 본인 venue 만. 없으면 `404 VENUE_NOT_FOUND` |
+| `venueId` | long | 본인 venue 만. 없으면 `404 VENUE_NOT_FOUND` |
 | `opponent` | string? | max 100 |
 | `result` | string? | `WIN\|DRAW\|LOSS` |
 | `position` | string? | `GK\|DF\|MF\|FW` |
@@ -475,6 +475,7 @@ Soft delete 취소. `deleted_at = NULL`.
   "size": 20, "nextCursor": "eyJwbGF5ZWRBdCI6...", "hasNext": true
 }
 ```
+> 연결된 운동장이 삭제된 경기는 `venueId: null`.
 
 ---
 
@@ -797,6 +798,7 @@ Soft delete 취소. `deleted_at = NULL`.
   ]
 }
 ```
+> `venueId` 는 운동장이 삭제된 과거 경기에서 `null` 가능.
 > 친구 조회 시 `hideHeartRate=true` 면 `avgHeartRate` 및 각 quarter 의 `avgHeartRate`/`maxHeartRate` 가 `null`.
 
 ### SeasonStatResponse

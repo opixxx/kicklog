@@ -45,5 +45,9 @@ class InMemoryMatchRepository : MatchStore {
             .sortedWith(compareByDescending<Match> { it.playedAt }.thenByDescending { it.id })
     }
 
+    override fun clearVenueId(venueId: Long) {
+        matches.values.filter { it.venueId == venueId }.forEach { it.venueId = null }
+    }
+
     fun count(): Int = matches.size
 }

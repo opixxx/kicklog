@@ -37,6 +37,12 @@ data class CreateVenueRequest(
     }
 }
 
+data class UpdateVenueRequest(
+    @field:NotBlank(message = "운동장 이름은 필수입니다")
+    @field:Size(max = 100, message = "운동장 이름은 100자를 넘을 수 없습니다")
+    val name: String,
+)
+
 data class VenueListResponse(
     val venues: List<VenueResponse>,
 )

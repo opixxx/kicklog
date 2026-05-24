@@ -2,6 +2,7 @@ package com.opixxx.kicklog.venue.service
 
 import com.opixxx.kicklog.common.exception.ErrorCode
 import com.opixxx.kicklog.common.exception.KickLogException
+import com.opixxx.kicklog.match.repository.InMemoryMatchRepository
 import com.opixxx.kicklog.venue.repository.InMemoryVenueRepository
 import java.math.BigDecimal
 import kotlin.test.Test
@@ -11,7 +12,8 @@ import kotlin.test.assertFailsWith
 class VenueServiceTest {
 
     private val venueRepository = InMemoryVenueRepository()
-    private val service = VenueService(venueRepository)
+    private val matchRepository = InMemoryMatchRepository()
+    private val service = VenueService(venueRepository, matchRepository)
 
     @Test
     fun `운동장을 저장한다`() {
@@ -61,6 +63,79 @@ class VenueServiceTest {
         }
 
         assertEquals(ErrorCode.VENUE_NOT_OWNED, exception.errorCode)
+    }
+
+    @Test
+    fun `본인 운동장 이름을 수정한다`() {
+        val venue = service.createVenue(1L, sampleCommand())
+
+        val updated = service.updateVenue(1L, venue.id, "  풍경 실내구장  ")
+
+        assertEquals("풍경 실내구장", updated.name)
+    }
+
+    @Test
+    fun `운동장 이름 수정 시 같은 사용자 내 중복 이름은 거부한다`() {
+        service.createVenue(1L, sampleCommand(name = "풍경운동장", providerPlaceId = "place-1"))
+        val target = service.createVenue(1L, sampleCommand(name = "마포구장", providerPlaceId = "place-2"))
+
+        val exception = assertFailsWith<KickLogException> {
+            service.updateVenue(1L, target.id, "풍경운동장")
+        }
+
+        assertEquals(ErrorCode.VENUE_NAME_DUPLICATE, exception.errorCode)
+    }
+
+    @Test
+    fun `다른 사용자 운동장 수정은 거부한다`() {
+        val venue = service.createVenue(1L, sampleCommand())
+
+        val exception = assertFailsWith<KickLogException> {
+            service.updateVenue(2L, venue.id, "남의 구장")
+        }
+
+        assertEquals(ErrorCode.VENUE_NOT_OWNED, exception.errorCode)
+    }
+
+    @Test
+    fun `없는 운동장 수정은 실패한다`() {
+        val exception = assertFailsWith<KickLogException> {
+            service.updateVenue(1L, 999L, "없는 구장")
+        }
+
+        assertEquals(ErrorCode.VENUE_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `본인 운동장을 삭제한다`() {
+        val venue = service.createVenue(1L, sampleCommand())
+
+        service.deleteVenue(1L, venue.id)
+
+        val exception = assertFailsWith<KickLogException> {
+            service.getVenue(1L, venue.id)
+        }
+        assertEquals(ErrorCode.VENUE_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `다른 사용자 운동장 삭제는 거부한다`() {
+        val venue = service.createVenue(1L, sampleCommand())
+
+        val exception = assertFailsWith<KickLogException> {
+            service.deleteVenue(2L, venue.id)
+        }
+
+        assertEquals(ErrorCode.VENUE_NOT_OWNED, exception.errorCode)
+    }
+
+    @Test
+    fun `없는 운동장 삭제는 실패한다`() {
+        val exception = assertFailsWith<KickLogException> {
+            service.deleteVenue(1L, 999L)
+        }
+
+        assertEquals(ErrorCode.VENUE_NOT_FOUND, exception.errorCode)
     }
 
     private fun sampleCommand(

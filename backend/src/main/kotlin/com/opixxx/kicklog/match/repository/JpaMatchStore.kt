@@ -38,4 +38,8 @@ class JpaMatchStore(
     ): List<Match> {
         return matchRepository.findAllByUserIdAndPlayedAtBetween(userId, startInclusive, endExclusive)
     }
+
+    override fun clearVenueId(venueId: Long) {
+        matchRepository.clearVenueId(venueId)
+    }
 }

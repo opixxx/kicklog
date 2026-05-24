@@ -127,7 +127,7 @@ data class UpsertQuarterRequest(
 data class MatchDetailResponse(
     val id: Long,
     val clientMatchId: UUID,
-    val venueId: Long,
+    val venueId: Long?,
     val playedAt: Instant,
     val opponent: String?,
     val result: MatchResultType?,
@@ -165,7 +165,7 @@ data class MatchDetailResponse(
 data class MatchSummaryResponse(
     val id: Long,
     val clientMatchId: UUID,
-    val venueId: Long,
+    val venueId: Long?,
     val playedAt: Instant,
     val opponent: String?,
     val result: MatchResultType?,

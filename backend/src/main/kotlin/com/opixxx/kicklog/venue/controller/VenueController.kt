@@ -2,6 +2,7 @@ package com.opixxx.kicklog.venue.controller
 
 import com.opixxx.kicklog.common.security.KickLogPrincipal
 import com.opixxx.kicklog.venue.dto.CreateVenueRequest
+import com.opixxx.kicklog.venue.dto.UpdateVenueRequest
 import com.opixxx.kicklog.venue.dto.VenueListResponse
 import com.opixxx.kicklog.venue.dto.VenueResponse
 import com.opixxx.kicklog.venue.service.VenueService
@@ -9,7 +10,9 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -46,5 +49,23 @@ class VenueController(
         @PathVariable venueId: Long,
     ): VenueResponse {
         return VenueResponse.from(venueService.getVenue(principal.userId, venueId))
+    }
+
+    @PatchMapping("/{venueId}")
+    fun update(
+        @AuthenticationPrincipal principal: KickLogPrincipal,
+        @PathVariable venueId: Long,
+        @Valid @RequestBody request: UpdateVenueRequest,
+    ): VenueResponse {
+        return VenueResponse.from(venueService.updateVenue(principal.userId, venueId, request.name))
+    }
+
+    @DeleteMapping("/{venueId}")
+    fun delete(
+        @AuthenticationPrincipal principal: KickLogPrincipal,
+        @PathVariable venueId: Long,
+    ): ResponseEntity<Void> {
+        venueService.deleteVenue(principal.userId, venueId)
+        return ResponseEntity.noContent().build()
     }
 }
