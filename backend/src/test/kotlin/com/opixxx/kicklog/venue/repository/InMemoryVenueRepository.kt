@@ -34,5 +34,9 @@ class InMemoryVenueRepository : VenueStore {
         }
     }
 
+    override fun delete(venue: Venue) {
+        venues.remove(venue.id)
+    }
+
     fun count(): Int = venues.size
 }

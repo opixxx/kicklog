@@ -8,4 +8,5 @@ interface VenueStore {
     fun findAllByUserId(userId: Long): List<Venue>
     fun findByUserIdAndName(userId: Long, name: String): Venue?
     fun findByUserIdAndProviderAndProviderPlaceId(userId: Long, provider: String, providerPlaceId: String): Venue?
+    fun delete(venue: Venue)
 }

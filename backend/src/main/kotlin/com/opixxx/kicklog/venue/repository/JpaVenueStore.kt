@@ -22,4 +22,8 @@ class JpaVenueStore(
     ): Venue? {
         return venueRepository.findByUserIdAndProviderAndProviderPlaceId(userId, provider, providerPlaceId)
     }
+
+    override fun delete(venue: Venue) {
+        venueRepository.delete(venue)
+    }
 }

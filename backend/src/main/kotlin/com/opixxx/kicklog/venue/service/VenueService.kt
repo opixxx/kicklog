@@ -2,6 +2,7 @@ package com.opixxx.kicklog.venue.service
 
 import com.opixxx.kicklog.common.exception.ErrorCode
 import com.opixxx.kicklog.common.exception.KickLogException
+import com.opixxx.kicklog.match.repository.MatchStore
 import com.opixxx.kicklog.venue.entity.Venue
 import com.opixxx.kicklog.venue.repository.VenueStore
 import org.springframework.stereotype.Service
@@ -22,6 +23,7 @@ data class CreateVenueCommand(
 @Service
 class VenueService(
     private val venueRepository: VenueStore,
+    private val matchRepository: MatchStore,
 ) {
     @Transactional(readOnly = true)
     fun findExistingByProvider(userId: Long, command: CreateVenueCommand): Venue? {
@@ -69,6 +71,29 @@ class VenueService(
 
     @Transactional(readOnly = true)
     fun getVenue(userId: Long, venueId: Long): Venue {
+        return findOwnedVenue(userId, venueId)
+    }
+
+    @Transactional
+    fun updateVenue(userId: Long, venueId: Long, name: String): Venue {
+        val venue = findOwnedVenue(userId, venueId)
+        val normalizedName = name.trim()
+        val duplicated = venueRepository.findByUserIdAndName(userId, normalizedName)
+        if (duplicated != null && duplicated.id != venue.id) {
+            throw KickLogException(ErrorCode.VENUE_NAME_DUPLICATE)
+        }
+        venue.name = normalizedName
+        return venueRepository.save(venue)
+    }
+
+    @Transactional
+    fun deleteVenue(userId: Long, venueId: Long) {
+        val venue = findOwnedVenue(userId, venueId)
+        matchRepository.clearVenueId(venue.id)
+        venueRepository.delete(venue)
+    }
+
+    private fun findOwnedVenue(userId: Long, venueId: Long): Venue {
         val venue = venueRepository.findById(venueId)
             ?: throw KickLogException(ErrorCode.VENUE_NOT_FOUND)
         if (venue.userId != userId) {

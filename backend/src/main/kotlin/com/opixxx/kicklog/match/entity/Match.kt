@@ -32,8 +32,8 @@ class Match(
     @Column(name = "client_match_id", nullable = false)
     var clientMatchId: UUID,
 
-    @Column(name = "venue_id", nullable = false)
-    var venueId: Long,
+    @Column(name = "venue_id")
+    var venueId: Long?,
 
     @Column(name = "played_at", nullable = false)
     var playedAt: Instant,
