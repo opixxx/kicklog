@@ -31,6 +31,7 @@ enum class ErrorCode(
     FRIEND_NOT_PARTICIPANT(HttpStatus.FORBIDDEN, "해당 친구 관계의 당사자가 아닙니다"),
     FRIEND_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 친구이거나 요청 대기 중입니다"),
     FRIEND_ALREADY_ACCEPTED(HttpStatus.CONFLICT, "이미 수락된 친구 관계입니다"),
+    FRIEND_UNAUTHORIZED(HttpStatus.FORBIDDEN, "친구 관계가 아닙니다"),
     INVITATION_NOT_FOUND(HttpStatus.NOT_FOUND, "초대 링크를 찾을 수 없습니다"),
     INVITATION_NOT_OWNED(HttpStatus.FORBIDDEN, "본인의 초대 링크만 폐기할 수 있습니다"),
     INVITATION_EXPIRED(HttpStatus.GONE, "초대 링크가 만료되었습니다"),

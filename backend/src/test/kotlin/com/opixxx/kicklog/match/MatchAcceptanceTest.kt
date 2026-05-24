@@ -1,6 +1,10 @@
 package com.opixxx.kicklog.match
 
 import com.opixxx.kicklog.common.security.JwtTokenProvider
+import com.opixxx.kicklog.friend.entity.Friendship
+import com.opixxx.kicklog.friend.repository.FriendshipRepository
+import com.opixxx.kicklog.user.entity.User
+import com.opixxx.kicklog.user.repository.UserRepository
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -13,6 +17,7 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import java.time.Instant
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -24,6 +29,12 @@ class MatchAcceptanceTest {
 
     @Autowired
     private lateinit var jwtTokenProvider: JwtTokenProvider
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var friendshipRepository: FriendshipRepository
 
     @Test
     fun `로그인 사용자는 경기와 쿼터를 저장하고 clientMatchId로 다시 조회한다`() {
@@ -183,6 +194,66 @@ class MatchAcceptanceTest {
         }
     }
 
+    @Test
+    fun `accepted 친구의 경기 목록과 상세를 조회한다`() {
+        val viewer = createUser("친구경기조회자")
+        val friend = createUser("친구경기소유자")
+        val viewerToken = jwtTokenProvider.createAccessToken(viewer.id)
+        val friendToken = jwtTokenProvider.createAccessToken(friend.id)
+        saveAcceptedFriendship(viewer.id, friend.id)
+        val venueId = createVenue(friendToken, name = "친구경기장")
+        val matchId = saveMatchAndReturnId(friendToken, "99999999-9999-9999-9999-999999999991", venueId)
+
+        mockMvc.get("/users/${friend.id}/matches") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $viewerToken")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.content[0].id") { value(matchId) }
+            jsonPath("$.content[0].opponent") { value("OO FC") }
+        }
+
+        mockMvc.get("/users/${friend.id}/matches/$matchId") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $viewerToken")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value(matchId) }
+            jsonPath("$.quarters.length()") { value(1) }
+        }
+    }
+
+    @Test
+    fun `accepted 친구가 아니면 친구 경기 목록을 조회할 수 없다`() {
+        val viewer = createUser("비친구조회자")
+        val other = createUser("비친구대상")
+        val viewerToken = jwtTokenProvider.createAccessToken(viewer.id)
+
+        mockMvc.get("/users/${other.id}/matches") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $viewerToken")
+        }.andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("FRIEND_UNAUTHORIZED") }
+        }
+    }
+
+    @Test
+    fun `친구 관계여도 다른 사용자의 matchId 상세는 조회할 수 없다`() {
+        val viewer = createUser("친구상세조회자")
+        val friend = createUser("친구상세대상")
+        val outsider = createUser("친구상세외부자")
+        val viewerToken = jwtTokenProvider.createAccessToken(viewer.id)
+        val outsiderToken = jwtTokenProvider.createAccessToken(outsider.id)
+        saveAcceptedFriendship(viewer.id, friend.id)
+        val venueId = createVenue(outsiderToken, name = "외부자경기장")
+        val matchId = saveMatchAndReturnId(outsiderToken, "99999999-9999-9999-9999-999999999992", venueId)
+
+        mockMvc.get("/users/${friend.id}/matches/$matchId") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $viewerToken")
+        }.andExpect {
+            status { isNotFound() }
+            jsonPath("$.code") { value("MATCH_NOT_FOUND") }
+        }
+    }
+
     private fun createVenue(accessToken: String, name: String = "풍경운동장"): Long {
         val body = """
             {
@@ -203,6 +274,17 @@ class MatchAcceptanceTest {
         }.andReturn().response
 
         return Regex(""""id":(\d+)""").find(response.contentAsString)!!.groupValues[1].toLong()
+    }
+
+    private fun createUser(displayName: String): User {
+        return userRepository.save(User.create(displayName = displayName, email = "$displayName@example.com"))
+    }
+
+    private fun saveAcceptedFriendship(userId: Long, targetUserId: Long) {
+        val now = Instant.parse("2026-05-23T09:00:00Z")
+        val friendship = Friendship.createPending(userId, targetUserId, now)
+        friendship.accept(now)
+        friendshipRepository.save(friendship)
     }
 
     private fun saveMatch(accessToken: String, clientMatchId: String, venueId: Long, playedAt: String) {

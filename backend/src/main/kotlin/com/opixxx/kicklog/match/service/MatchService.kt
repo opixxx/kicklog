@@ -3,6 +3,7 @@ package com.opixxx.kicklog.match.service
 import com.opixxx.kicklog.common.dto.CursorResponse
 import com.opixxx.kicklog.common.exception.ErrorCode
 import com.opixxx.kicklog.common.exception.KickLogException
+import com.opixxx.kicklog.friend.service.FriendshipAuthorizer
 import com.opixxx.kicklog.match.entity.Match
 import com.opixxx.kicklog.match.repository.MatchStore
 import com.opixxx.kicklog.venue.repository.VenueStore
@@ -20,6 +21,7 @@ data class SaveMatchResult(
 class MatchService(
     private val matchRepository: MatchStore,
     private val venueRepository: VenueStore,
+    private val friendshipAuthorizer: FriendshipAuthorizer,
 ) {
     @Transactional
     fun saveMatch(userId: Long, clientMatchId: UUID, command: UpsertMatchCommand): SaveMatchResult {
@@ -65,6 +67,27 @@ class MatchService(
 
     @Transactional(readOnly = true)
     fun listMyMatches(userId: Long, cursor: String?, size: Int): CursorResponse<Match> {
+        return listMatchesByUser(userId, cursor, size)
+    }
+
+    @Transactional(readOnly = true)
+    fun listFriendMatches(viewerId: Long, friendUserId: Long, cursor: String?, size: Int): CursorResponse<Match> {
+        friendshipAuthorizer.assertCanView(viewerId, friendUserId)
+        return listMatchesByUser(friendUserId, cursor, size)
+    }
+
+    @Transactional(readOnly = true)
+    fun getFriendMatch(viewerId: Long, friendUserId: Long, matchId: Long): Match {
+        friendshipAuthorizer.assertCanView(viewerId, friendUserId)
+        val match = matchRepository.findById(matchId)
+            ?: throw KickLogException(ErrorCode.MATCH_NOT_FOUND)
+        if (match.userId != friendUserId) {
+            throw KickLogException(ErrorCode.MATCH_NOT_FOUND)
+        }
+        return initialize(match)
+    }
+
+    private fun listMatchesByUser(userId: Long, cursor: String?, size: Int): CursorResponse<Match> {
         val normalizedSize = min(size.coerceAtLeast(1), MAX_PAGE_SIZE)
         val matches = matchRepository.findAllByUserId(
             userId = userId,
