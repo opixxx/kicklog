@@ -39,6 +39,21 @@ class MatchServiceTest {
     }
 
     @Test
+    fun `경기와 쿼터 metric을 저장한다`() {
+        val venue = saveVenue(userId = 1L)
+
+        val result = service.saveMatch(1L, CLIENT_MATCH_ID, metricCommand(venue.id))
+
+        assertEquals(7200, result.match.totalDistanceM)
+        assertEquals(28.4, result.match.maxSpeedKmh)
+        assertEquals(17, result.match.sprintCount)
+        assertEquals(151, result.match.avgHeartRate)
+        assertEquals(3600, result.match.quarters.single().durationSeconds)
+        assertEquals(4100, result.match.quarters.single().distanceM)
+        assertEquals(156, result.match.quarters.single().maxHeartRate)
+    }
+
+    @Test
     fun `같은 사용자와 clientMatchId면 기존 경기를 덮어쓴다`() {
         val venue = saveVenue(userId = 1L)
         service.saveMatch(1L, CLIENT_MATCH_ID, command(venue.id, goals = 1, workoutId = "hk-old"))
@@ -124,7 +139,7 @@ class MatchServiceTest {
 
         val page = service.listFriendMatches(viewer.id, friend.id, cursor = null, size = 20)
 
-        assertEquals(listOf(friend.id), page.content.map { it.userId })
+        assertEquals(listOf(friend.id), page.page.content.map { it.userId })
     }
 
     @Test
@@ -207,6 +222,26 @@ class MatchServiceTest {
                     healthKitWorkoutId = workoutId,
                     startedAt = Instant.parse(playedAt),
                     endedAt = Instant.parse("2026-05-23T09:15:00Z"),
+                ),
+            ),
+        )
+    }
+
+    private fun metricCommand(venueId: Long): UpsertMatchCommand {
+        return command(venueId).copy(
+            totalDistanceM = 7200,
+            maxSpeedKmh = 28.4,
+            sprintCount = 17,
+            avgHeartRate = 151,
+            quarters = listOf(
+                command(venueId).quarters.single().copy(
+                    durationSeconds = 3600,
+                    distanceM = 4100,
+                    avgSpeedKmh = 6.9,
+                    avgHeartRate = 148,
+                    maxHeartRate = 156,
+                    sprintCount = 9,
+                    activeEnergyKcal = 430,
                 ),
             ),
         )

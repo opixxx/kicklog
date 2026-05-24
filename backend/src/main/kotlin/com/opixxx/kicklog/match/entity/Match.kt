@@ -55,6 +55,18 @@ class Match(
     @Column(name = "assists", nullable = false)
     var assists: Int,
 
+    @Column(name = "total_distance_m", nullable = false)
+    var totalDistanceM: Int = 0,
+
+    @Column(name = "max_speed_kmh", nullable = false)
+    var maxSpeedKmh: Double = 0.0,
+
+    @Column(name = "sprint_count", nullable = false)
+    var sprintCount: Int = 0,
+
+    @Column(name = "avg_heart_rate", nullable = false)
+    var avgHeartRate: Int = 0,
+
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.now(),
 
@@ -76,6 +88,10 @@ class Match(
         position = command.position
         goals = command.goals
         assists = command.assists
+        totalDistanceM = command.totalDistanceM
+        maxSpeedKmh = command.maxSpeedKmh
+        sprintCount = command.sprintCount
+        avgHeartRate = command.avgHeartRate
         updatedAt = Instant.now()
         replaceQuarters(command)
     }
@@ -99,6 +115,13 @@ class Match(
                     healthKitWorkoutId = it.healthKitWorkoutId,
                     startedAt = it.startedAt,
                     endedAt = it.endedAt,
+                    durationSeconds = it.durationSeconds,
+                    distanceM = it.distanceM,
+                    avgSpeedKmh = it.avgSpeedKmh,
+                    avgHeartRate = it.avgHeartRate,
+                    maxHeartRate = it.maxHeartRate,
+                    sprintCount = it.sprintCount,
+                    activeEnergyKcal = it.activeEnergyKcal,
                 ),
             )
         }

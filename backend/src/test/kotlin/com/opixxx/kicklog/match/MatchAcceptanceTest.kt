@@ -254,6 +254,29 @@ class MatchAcceptanceTest {
         }
     }
 
+    @Test
+    fun `친구가 심박 숨김이면 친구 경기 상세의 심박 필드를 null로 마스킹한다`() {
+        val viewer = createUser("심박조회자")
+        val friend = createUser("심박숨김친구").also {
+            it.hideHeartRate = true
+            userRepository.save(it)
+        }
+        val viewerToken = jwtTokenProvider.createAccessToken(viewer.id)
+        val friendToken = jwtTokenProvider.createAccessToken(friend.id)
+        saveAcceptedFriendship(viewer.id, friend.id)
+        val venueId = createVenue(friendToken, name = "심박숨김경기장")
+        val matchId = saveMatchAndReturnId(friendToken, "99999999-9999-9999-9999-999999999993", venueId)
+
+        mockMvc.get("/users/${friend.id}/matches/$matchId") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $viewerToken")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.avgHeartRate") { value(null) }
+            jsonPath("$.quarters[0].avgHeartRate") { value(null) }
+            jsonPath("$.quarters[0].maxHeartRate") { value(null) }
+        }
+    }
+
     private fun createVenue(accessToken: String, name: String = "풍경운동장"): Long {
         val body = """
             {

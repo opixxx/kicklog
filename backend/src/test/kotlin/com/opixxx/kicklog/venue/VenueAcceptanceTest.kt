@@ -27,7 +27,7 @@ class VenueAcceptanceTest {
     fun `로그인 사용자는 운동장을 저장하고 목록에서 조회한다`() {
         val accessToken = jwtTokenProvider.createAccessToken(userId = 1L)
 
-        mockMvc.post("/venues") {
+        val created = mockMvc.post("/venues") {
             header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
             contentType = MediaType.APPLICATION_JSON
             content = venueJson()
@@ -37,7 +37,8 @@ class VenueAcceptanceTest {
             jsonPath("$.name") { value("풍경운동장") }
             jsonPath("$.provider") { value("kakao") }
             jsonPath("$.providerPlaceId") { value("12345") }
-        }
+        }.andReturn().response.contentAsString
+        val venueId = Regex(""""id":(\d+)""").find(created)!!.groupValues[1].toLong()
 
         mockMvc.get("/venues") {
             header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
@@ -46,7 +47,7 @@ class VenueAcceptanceTest {
             jsonPath("$.venues[0].name") { value("풍경운동장") }
         }
 
-        mockMvc.get("/venues/1") {
+        mockMvc.get("/venues/$venueId") {
             header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
         }.andExpect {
             status { isOk() }

@@ -396,7 +396,6 @@ Soft delete 취소. `deleted_at = NULL`.
 **Request** — [`PutMatchRequest`](#putmatchrequest)
 ```json
 {
-  "playedAt": "2026-05-18T01:00:00Z",
   "venueId": 5,
   "playedAt": "2026-05-18T01:00:00Z",
   "opponent": "옆동네 FC",
@@ -404,12 +403,23 @@ Soft delete 취소. `deleted_at = NULL`.
   "position": "MF",
   "goals": 2,
   "assists": 1,
+  "totalDistanceM": 7200,
+  "maxSpeedKmh": 29.4,
+  "sprintCount": 17,
+  "avgHeartRate": 151,
   "quarters": [
     {
       "quarterNumber": 1,
       "healthKitWorkoutId": "A1B2C3D4-...",
       "startedAt": "2026-05-18T01:00:00Z",
-      "endedAt": "2026-05-18T01:25:00Z"
+      "endedAt": "2026-05-18T01:25:00Z",
+      "durationSeconds": 1500,
+      "distanceM": 4100,
+      "avgSpeedKmh": 6.9,
+      "avgHeartRate": 148,
+      "maxHeartRate": 156,
+      "sprintCount": 9,
+      "activeEnergyKcal": 430
     }
   ]
 }
@@ -422,7 +432,16 @@ Soft delete 취소. `deleted_at = NULL`.
 | `result` | string? | `WIN\|DRAW\|LOSS` |
 | `position` | string? | `GK\|DF\|MF\|FW` |
 | `goals` / `assists` | int | `@Min(0)`, 기본 0 |
+| `totalDistanceM` | int | `@Min(0)`, 기본 0 |
+| `maxSpeedKmh` | double | `@DecimalMin(0.0)`, 기본 0 |
+| `sprintCount` | int | `@Min(0)`, 기본 0 |
+| `avgHeartRate` | int | `@Min(0)`, 기본 0 |
 | `quarters` | array | `@Size(min=1, max=4)`, `quarterNumber` 1~4 유일 |
+| `quarters[].durationSeconds` | int | `@Min(0)`, 기본 0 |
+| `quarters[].distanceM` | int | `@Min(0)`, 기본 0 |
+| `quarters[].avgSpeedKmh` | double | `@DecimalMin(0.0)`, 기본 0 |
+| `quarters[].avgHeartRate` / `maxHeartRate` | int | `@Min(0)`, 기본 0 |
+| `quarters[].sprintCount` / `activeEnergyKcal` | int | `@Min(0)`, 기본 0 |
 
 **Response** `200` (수정) / `201` (신규) — [`MatchDetailResponse`](#matchdetailresponse)
 
@@ -757,12 +776,28 @@ Soft delete 취소. `deleted_at = NULL`.
   "position": "GK|DF|MF|FW|null",
   "goals": 2,
   "assists": 1,
+  "totalDistanceM": 7200,
+  "maxSpeedKmh": 29.4,
+  "sprintCount": 17,
+  "avgHeartRate": 151,
   "quarters": [
-    { "quarterNumber": 1, "healthKitWorkoutId": "hk-uuid-1", "startedAt": "Instant", "endedAt": "Instant" }
+    {
+      "quarterNumber": 1,
+      "healthKitWorkoutId": "hk-uuid-1",
+      "startedAt": "Instant",
+      "endedAt": "Instant",
+      "durationSeconds": 1500,
+      "distanceM": 4100,
+      "avgSpeedKmh": 6.9,
+      "avgHeartRate": 148,
+      "maxHeartRate": 156,
+      "sprintCount": 9,
+      "activeEnergyKcal": 430
+    }
   ]
 }
 ```
-> 친구 조회 시 `hideHeartRate=true` 면 `headline.avgHeartRate` 및 각 quarter 의 `avgHeartRate`/`maxHeartRate` 가 `null`.
+> 친구 조회 시 `hideHeartRate=true` 면 `avgHeartRate` 및 각 quarter 의 `avgHeartRate`/`maxHeartRate` 가 `null`.
 
 ### SeasonStatResponse
 8.1 참조.

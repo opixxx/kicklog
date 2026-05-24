@@ -3,6 +3,7 @@ package com.opixxx.kicklog.match.repository
 import com.opixxx.kicklog.match.entity.Match
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Repository
+import java.time.Instant
 import java.util.UUID
 
 @Repository
@@ -28,5 +29,13 @@ class JpaMatchStore(
             cursorId = cursor?.id,
             pageable = PageRequest.of(0, limit),
         )
+    }
+
+    override fun findAllByUserIdAndPlayedAtBetween(
+        userId: Long,
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): List<Match> {
+        return matchRepository.findAllByUserIdAndPlayedAtBetween(userId, startInclusive, endExclusive)
     }
 }

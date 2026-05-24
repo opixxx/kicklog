@@ -15,4 +15,5 @@ interface MatchStore {
     fun findById(id: Long): Match?
     fun findByUserIdAndClientMatchId(userId: Long, clientMatchId: UUID): Match?
     fun findAllByUserId(userId: Long, cursor: MatchCursorCondition?, limit: Int): List<Match>
+    fun findAllByUserIdAndPlayedAtBetween(userId: Long, startInclusive: Instant, endExclusive: Instant): List<Match>
 }
