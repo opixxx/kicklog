@@ -33,4 +33,25 @@ class QuarterWorkout(
 
     @Column(name = "ended_at", nullable = false)
     var endedAt: Instant,
+
+    @Column(name = "duration_seconds", nullable = false)
+    var durationSeconds: Int = 0,
+
+    @Column(name = "distance_m", nullable = false)
+    var distanceM: Int = 0,
+
+    @Column(name = "avg_speed_kmh", nullable = false)
+    var avgSpeedKmh: Double = 0.0,
+
+    @Column(name = "avg_heart_rate", nullable = false)
+    var avgHeartRate: Int = 0,
+
+    @Column(name = "max_heart_rate", nullable = false)
+    var maxHeartRate: Int = 0,
+
+    @Column(name = "sprint_count", nullable = false)
+    var sprintCount: Int = 0,
+
+    @Column(name = "active_energy_kcal", nullable = false)
+    var activeEnergyKcal: Int = 0,
 )

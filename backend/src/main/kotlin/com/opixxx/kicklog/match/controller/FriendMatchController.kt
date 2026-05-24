@@ -24,9 +24,10 @@ class FriendMatchController(
         @RequestParam(required = false) cursor: String?,
         @RequestParam(defaultValue = "20") size: Int,
     ): CursorResponse<MatchSummaryResponse> {
-        val page = matchService.listFriendMatches(principal.userId, userId, cursor, size)
+        val result = matchService.listFriendMatches(principal.userId, userId, cursor, size)
+        val page = result.page
         return CursorResponse(
-            content = page.content.map(MatchSummaryResponse::from),
+            content = page.content.map { MatchSummaryResponse.from(it, result.hideHeartRate) },
             size = page.size,
             nextCursor = page.nextCursor,
             hasNext = page.hasNext,
@@ -39,6 +40,7 @@ class FriendMatchController(
         @PathVariable userId: Long,
         @PathVariable matchId: Long,
     ): MatchDetailResponse {
-        return MatchDetailResponse.from(matchService.getFriendMatch(principal.userId, userId, matchId))
+        val result = matchService.getFriendMatch(principal.userId, userId, matchId)
+        return MatchDetailResponse.from(result.match, result.hideHeartRate)
     }
 }

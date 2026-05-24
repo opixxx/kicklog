@@ -30,4 +30,20 @@ interface MatchRepository : JpaRepository<Match, Long> {
         @Param("cursorId") cursorId: Long?,
         pageable: Pageable,
     ): List<Match>
+
+    @Query(
+        """
+        SELECT m
+        FROM Match m
+        WHERE m.userId = :userId
+          AND m.playedAt >= :startInclusive
+          AND m.playedAt < :endExclusive
+        ORDER BY m.playedAt DESC, m.id DESC
+        """,
+    )
+    fun findAllByUserIdAndPlayedAtBetween(
+        @Param("userId") userId: Long,
+        @Param("startInclusive") startInclusive: Instant,
+        @Param("endExclusive") endExclusive: Instant,
+    ): List<Match>
 }
