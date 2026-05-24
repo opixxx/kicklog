@@ -78,7 +78,7 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
   - 도구: `backend-test-writer` agent — **Cucumber 인수 시나리오 + Testcontainers 통합 + JUnit 단위**
 - **iOS 는 하네스 대상 아님** — 사용자가 Xcode 에서 직접 작업. 테스트/리뷰 강제 없음. UI/API 연동이 동작하면 OK.
 - **작은 변경은 직접**, 큰 변경은 plan 모드 먼저. 30줄 미만은 EXEC_PLAN + TDD 면제.
-- **데이터 정제·분석은 iOS에서** (스프린트 계산·쿼터 통계 등). 백엔드는 저장·공유 책임만.
+- **매 경기 데이터 정제·분석은 iOS에서** (스프린트 계산·쿼터 통계 등). **시즌/월별 집계는 백엔드 SQL derive** (ADR-0004 D9 / ADR-0003 D9.1). 백엔드는 매 경기 저장·공유 + 집계 derive 책임.
 - **자가수정 우회 금지**: `--no-verify`, `-DskipTests`, `@Disabled` 우회 금지.
 - **학습 승격**: 자가수정·Critical 리뷰·누락 테스트가 반복 가능하면 `docs/agent/learning.md`와 관련 agent memory/checklist에 반영.
 - 부수 질문은 `/btw` (도구 액세스 없이 빠른 답변).

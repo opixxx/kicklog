@@ -122,9 +122,26 @@ ADR-0003에서 백엔드 데이터 모델과 동기화 정책(D9: iOS가 1차 So
 - **고려한 옵션**: (A) 영속 캐시 (선택), (B) 매번 재계산, (C) Hybrid + `algorithmVersion`
 - **이유**:
   - ADR-0003 D5와 일관 — Match/QuarterWorkout 집계 필드 이미 서버에도 저장
-  - 성능 — 시즌 통계 17경기 즉시 표시 (재계산은 1~2초)
+  - 성능 — 매 경기 카드 17개 즉시 표시 (raw 재계산은 1~2초). 시즌 통계 derive 위치는 D9 참조
   - MVP 알고리즘 안정 (스프린트 14 km/h 절대 임계, ADR-0001 D8)
   - v1.1+ 개인화 임계 도입 시 (C) Hybrid로 진화 (`algorithmVersion` 컬럼 추가)
+
+### D9. 본인 시즌 통계 derive — **백엔드 API 호출 (iOS SwiftData reduce X)**
+
+- **선택**: (A2) 매 경기 카드 = SwiftData / 본인·친구 시즌 통계 = 백엔드 `GET /users/:userId/seasons/:year`
+- **고려한 옵션**:
+  - (A1) 양쪽 백엔드 — 매 경기 카드까지 백엔드 fetch
+  - (A2) 하이브리드 — 매 경기는 SwiftData, 시즌은 백엔드 (선택)
+  - (B) 양쪽 iOS — 시즌도 SwiftData reduce
+- **이유**:
+  - **알고리즘 단일 소스** — 본인/친구 시즌 집계가 Kotlin 1벌. Swift reduce 미구현으로 언어 간 divergence 위험 0
+  - **시즌은 가끔 보는 화면** — 매 경기 카드의 즉각성과 달리 PUT 완료 후 정합으로 충분
+  - **백엔드 코드 재사용** — `SeasonStatService.calculate()`가 본인/친구 동일 (PR #11에서 구현됨)
+  - 매 경기 카드는 SwiftData 그대로 유지 — D8 결정 보존
+- **트레이드오프**:
+  - 시즌 통계는 **오프라인 시 표시 불가** (매 경기 카드는 SwiftData로 정상 표시)
+  - **PUT 미완료 경기 = 시즌 합계 누락** — ADR-0003 D9 "동기화 대기 N건" 배너로 사용자 인지 채널 제공
+- **v1.1+ 후보**: 시즌 통계도 iOS SwiftData reduce로 이전 (오프라인 가치 vs 코드 2벌 부담 재평가 시)
 
 ---
 
@@ -537,3 +554,4 @@ class FriendDataService {
 |---|---|---|
 | 2026-05-21 | 초기 작성 | grill-me 인터뷰 D1~D8 |
 | 2026-05-21 | PRD 4.7 정정 (D7) — 사용자 프로필 HealthKit read 안 함 | D3 최소 권한 결정과 충돌 → 일관성 유지 |
+| 2026-05-24 | D8 표현 명확화 + D9 신설 — 본인 시즌 통계는 백엔드 API 호출 (A2 하이브리드) | grill-me 후속 결정 — 백엔드 `SeasonStatService` 이미 구현 (PR #11), 묵시적 (A2) 미끄러짐을 명시화 |

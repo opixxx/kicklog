@@ -151,6 +151,20 @@ ADR-0001에서 백엔드 도입(Kotlin + Spring Boot + PostgreSQL)과 친구 기
   - 사용자 인지 명확: "동기화 대기 N건" 배너 + "다시 시도" 버튼
   - v1.1+ 필요해지면 (B)/(C) 도입
 
+### D9.1. SoT 범위 — **매 경기 데이터에 한정 (집계 derive는 백엔드)**
+
+- **본인/친구 매 경기 데이터** (`Match`, `QuarterWorkout`) = **iOS SwiftData가 1차 SoT** (D9), 백엔드 매 경기 저장은 백업 + 친구 공유 채널
+- **본인/친구 시즌·월별 집계** = **백엔드 SQL derive** (`SeasonStatService`, `GET /users/:userId/seasons/:year`)
+- **이유**:
+  - 집계 알고리즘 단일 소스 — 본인/친구 코드 1벌, 언어 간(Swift/Kotlin) divergence 위험 0
+  - 시즌은 가끔 보는 화면 — 매 경기 카드의 즉각성과 달리 PUT 완료 후 정합으로 UX 충분
+  - 백엔드 `SeasonStatService.calculate()`가 본인/친구 동일 (PR #11)
+- **iOS 클라이언트 행태**:
+  - 매 경기 카드 → SwiftData `FetchDescriptor` (즉시 + 오프라인 OK)
+  - 본인 시즌 통계 → 백엔드 API 호출 (오프라인 시 표시 불가)
+- **트레이드오프**: PUT 미완료 경기는 시즌 합계에 누락 — D9의 "동기화 대기 N건" 배너로 사용자 인지 채널 제공
+- **v1.1+**: 오프라인 가치 vs 코드 2벌 부담 재평가 시 iOS reduce로 이전 가능 (ADR-0004 D9 참조)
+
 ### D10. REST API 엔드포인트 목록
 
 전체 목록은 본 ADR 끝 [API Endpoints](#api-endpoints) 섹션 참조. 별도 결정 사항 없음 — D1~D9에서 자연 도출.
@@ -496,3 +510,4 @@ iOS UI: "동기화 대기 N건" 배너 (미동기화 있을 때만 표시)
 | 날짜 | 변경 | 사유 |
 |---|---|---|
 | 2026-05-21 | 초기 작성 | grill-me 인터뷰 D1~D10 기반 |
+| 2026-05-24 | D9.1 신설 — SoT 범위 명시 (매 경기 SwiftData / 시즌 집계 백엔드 derive) | grill-me 후속 결정 (ADR-0004 D9 cross-reference) |
