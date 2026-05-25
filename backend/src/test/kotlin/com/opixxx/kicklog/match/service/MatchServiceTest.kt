@@ -54,6 +54,36 @@ class MatchServiceTest {
     }
 
     @Test
+    fun `opponentGoals 를 저장하고 읽을 수 있다`() {
+        val venue = saveVenue(userId = 1L)
+        val cmd = command(venue.id, goals = 4).copy(opponentGoals = 2)
+
+        val result = service.saveMatch(1L, CLIENT_MATCH_ID, cmd)
+
+        assertEquals(4, result.match.goals)
+        assertEquals(2, result.match.opponentGoals)
+    }
+
+    @Test
+    fun `opponentGoals 미입력 시 null 로 저장된다`() {
+        val venue = saveVenue(userId = 1L)
+
+        val result = service.saveMatch(1L, CLIENT_MATCH_ID, command(venue.id))
+
+        assertEquals(null, result.match.opponentGoals)
+    }
+
+    @Test
+    fun `opponentGoals 가 0 이면 명시적 무실점으로 저장된다`() {
+        val venue = saveVenue(userId = 1L)
+        val cmd = command(venue.id).copy(opponentGoals = 0)
+
+        val result = service.saveMatch(1L, CLIENT_MATCH_ID, cmd)
+
+        assertEquals(0, result.match.opponentGoals)
+    }
+
+    @Test
     fun `같은 사용자와 clientMatchId면 기존 경기를 덮어쓴다`() {
         val venue = saveVenue(userId = 1L)
         service.saveMatch(1L, CLIENT_MATCH_ID, command(venue.id, goals = 1, workoutId = "hk-old"))

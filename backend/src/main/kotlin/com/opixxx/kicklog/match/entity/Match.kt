@@ -55,6 +55,10 @@ class Match(
     @Column(name = "assists", nullable = false)
     var assists: Int,
 
+    // 상대팀 득점. null = 사용자가 점수 미입력. 0 = 명시적 무실점 (0:0 등).
+    @Column(name = "opponent_goals")
+    var opponentGoals: Int?,
+
     @Column(name = "total_distance_m", nullable = false)
     var totalDistanceM: Int = 0,
 
@@ -88,6 +92,7 @@ class Match(
         position = command.position
         goals = command.goals
         assists = command.assists
+        opponentGoals = command.opponentGoals
         totalDistanceM = command.totalDistanceM
         maxSpeedKmh = command.maxSpeedKmh
         sprintCount = command.sprintCount
@@ -141,6 +146,7 @@ class Match(
                 position = null,
                 goals = 0,
                 assists = 0,
+                opponentGoals = null,
             ).also { it.replaceWith(command) }
         }
     }
