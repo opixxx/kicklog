@@ -61,7 +61,8 @@ final class URLSessionAPIClient: APIClient {
         method: String,
         path: String,
         query: [URLQueryItem]?,
-        body: B?
+        body: B?,
+        isRetry: Bool = false
     ) async throws -> T {
         var components = URLComponents(url: config.baseURL.appendingPathComponent(path),
                                        resolvingAgainstBaseURL: false)
@@ -112,6 +113,16 @@ final class URLSessionAPIClient: APIClient {
                 throw APIError.decodingFailed(underlying: error)
             }
         case 401:
+            // /auth/refresh 자체가 401 받았으면 retry 안 함 (무한 루프 방지).
+            // 또한 한 요청당 단 1회만 refresh + retry.
+            if !isRetry && path != "/auth/refresh" {
+                let refreshed = await TokenRefresher.shared.refresh()
+                if refreshed {
+                    return try await self.request(
+                        method: method, path: path, query: query, body: body, isRetry: true
+                    )
+                }
+            }
             let body = try? decoder.decode(APIErrorBody.self, from: data)
             throw APIError.unauthorized(body: body)
         default:
