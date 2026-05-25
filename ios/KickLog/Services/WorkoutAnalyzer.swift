@@ -1,5 +1,6 @@
 import Foundation
 import HealthKit
+import SwiftData
 
 // ADR-0004 D8 + ADR-0001 D8 — HKWorkout raw → 헤드라인 집계.
 // 스프린트는 runningSpeed 14 km/h 절대 임계 기반 (ADR-0001 D8 MVP).
@@ -10,6 +11,54 @@ struct WorkoutMetrics: Equatable {
     var maxHeartRate: Int = 0
     var sprintCount: Int = 0
     var activeEnergyKcal: Int = 0
+}
+
+// MARK: - QuarterWorkout.retrim() (ADR-0004 D8)
+
+@MainActor
+extension QuarterWorkout {
+    // 시작/종료 시간 조정 → HKWorkout raw 다시 fetch + 해당 range 로 metrics 재계산.
+    // 시뮬레이터에서 HK fetch 실패 시 시간 필드만 갱신 (metrics 는 stale — UI 검증용).
+    func retrim(
+        newStart: Date,
+        newEnd: Date,
+        store: HKHealthStore,
+        analyzer: WorkoutAnalyzer
+    ) async {
+        startedAt = newStart
+        endedAt = newEnd
+        durationSeconds = Int(newEnd.timeIntervalSince(newStart))
+        trimmed = true
+
+        if let uuid = UUID(uuidString: sourceWorkoutUUID),
+           let workout = await fetchWorkout(uuid: uuid, store: store) {
+            let metrics = await analyzer.analyze(workout: workout, store: store, range: newStart...newEnd)
+            distanceM = metrics.distanceM
+            avgSpeedKmh = metrics.avgSpeedKmh
+            avgHeartRate = metrics.avgHeartRate
+            maxHeartRate = metrics.maxHeartRate
+            sprintCount = metrics.sprintCount
+            activeEnergyKcal = metrics.activeEnergyKcal
+        }
+        // (HK fetch 실패 시 — 시뮬레이터 시드 데이터 — metrics 는 stale 유지)
+
+        match?.recalculateHeadlineMetrics()
+    }
+
+    private func fetchWorkout(uuid: UUID, store: HKHealthStore) async -> HKWorkout? {
+        await withCheckedContinuation { (continuation: CheckedContinuation<HKWorkout?, Never>) in
+            let predicate = HKQuery.predicateForObject(with: uuid)
+            let query = HKSampleQuery(
+                sampleType: .workoutType(),
+                predicate: predicate,
+                limit: 1,
+                sortDescriptors: nil
+            ) { _, samples, _ in
+                continuation.resume(returning: samples?.first as? HKWorkout)
+            }
+            store.execute(query)
+        }
+    }
 }
 
 @MainActor

@@ -24,6 +24,14 @@ struct LabelingScreen: View {
     @State private var userAssists: Int = 0
     @State private var selectedVenue: Venue?
     @State private var showingVenueSheet: Bool = false
+    @State private var trimTargetQuarter: QuarterWorkout?
+
+    private var amberButtonFg: Color {
+        scheme == .dark ? KLTokens.amber : Color(hex: 0x9A5C00)
+    }
+    private var amberButtonBg: Color {
+        scheme == .dark ? KLTokens.amber.opacity(0.18) : .white
+    }
 
     var body: some View {
         NavigationStack {
@@ -63,6 +71,24 @@ struct LabelingScreen: View {
         .sheet(isPresented: $showingVenueSheet) {
             VenueSelectionScreen { venue in
                 selectedVenue = venue
+            }
+        }
+        .sheet(item: $trimTargetQuarter) { quarter in
+            let index = (detectedQuarters.firstIndex { $0.persistentModelID == quarter.persistentModelID } ?? 0) + 1
+            TrimSheet(
+                label: "Q\(index)",
+                detectedStart: quarter.startedAt,
+                detectedEnd: quarter.endedAt
+            ) { newStart, newEnd in
+                Task {
+                    await quarter.retrim(
+                        newStart: newStart,
+                        newEnd: newEnd,
+                        store: HealthKitService.shared.store,
+                        analyzer: WorkoutAnalyzer()
+                    )
+                    try? modelContext.save()
+                }
             }
         }
     }
@@ -212,11 +238,24 @@ struct LabelingScreen: View {
                     .foregroundStyle(KLTokens.textSec)
                     .lineSpacing(2)
 
-                // 시간 조정 (Trim) 은 D 묶음에서 dual-thumb slider 도입
-                Text("Trim 도구는 곧 추가됩니다")
-                    .font(.system(size: 12))
-                    .foregroundStyle(KLTokens.textTer)
-                    .padding(.top, 6)
+                Button {
+                    trimTargetQuarter = overtime
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("시간 조정")
+                            .font(.system(size: 13, weight: .bold))
+                        KLIcon(name: "chevron.right", size: 12, color: amberButtonFg)
+                    }
+                    .foregroundStyle(amberButtonFg)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(amberButtonBg, in: Capsule())
+                    .overlay(
+                        Capsule().stroke(KLTokens.amber.opacity(0.4), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 6)
             }
         }
         .padding(14)
