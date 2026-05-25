@@ -46,6 +46,7 @@ extension User {
             existing.displayName = dto.displayName
             existing.email = dto.email
             existing.hideHeartRate = dto.hideHeartRate
+            existing.createdAt = dto.createdAt
             existing.lastSyncedAt = .now
             try? context.save()
             return existing
@@ -55,7 +56,7 @@ extension User {
             displayName: dto.displayName,
             email: dto.email,
             hideHeartRate: dto.hideHeartRate,
-            createdAt: .now,
+            createdAt: dto.createdAt,
             lastSyncedAt: .now
         )
         context.insert(user)

@@ -195,8 +195,10 @@ private struct WatchIllustration: View {
 private struct OnboardPage3: View {
     @Binding var currentPage: Int
     @Environment(\.modelContext) private var modelContext
+    @Query private var users: [User]
     @State private var signInErrorMessage: String?
     @State private var isSigningIn: Bool = false
+    @State private var showDeletedAccountRecovery: Bool = false
 
     var body: some View {
         VStack {
@@ -263,6 +265,12 @@ private struct OnboardPage3: View {
             } message: {
                 Text(signInErrorMessage ?? "")
             }
+            .alert("삭제 대기 계정", isPresented: $showDeletedAccountRecovery) {
+                Button("로그아웃", role: .cancel) { clearSignedInUser() }
+                Button("복구") { recoverDeletedAccount() }
+            } message: {
+                Text("계정 삭제를 취소하고 다시 사용할 수 있습니다.")
+            }
 
             Spacer()
 
@@ -295,7 +303,7 @@ private extension OnboardPage3 {
             defer { isSigningIn = false }
             do {
                 _ = try await AuthService.shared.signInWithApple(modelContext: modelContext)
-                withAnimation { currentPage += 1 }
+                try await continueAfterSignIn()
             } catch {
                 signInErrorMessage = error.localizedDescription
             }
@@ -309,11 +317,52 @@ private extension OnboardPage3 {
             defer { isSigningIn = false }
             do {
                 _ = try await AuthService.shared.signInWithKakao(modelContext: modelContext)
+                try await continueAfterSignIn()
+            } catch {
+                signInErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func continueAfterSignIn() async throws {
+        do {
+            _ = try await UserService.shared.fetchMe(into: modelContext)
+            withAnimation { currentPage += 1 }
+        } catch let apiError as APIError where apiError.isUserDeleted {
+            showDeletedAccountRecovery = true
+        }
+    }
+
+    func recoverDeletedAccount() {
+        guard !isSigningIn else { return }
+        isSigningIn = true
+        Task {
+            defer { isSigningIn = false }
+            do {
+                _ = try await UserService.shared.cancelDeletion(into: modelContext)
+                showDeletedAccountRecovery = false
                 withAnimation { currentPage += 1 }
             } catch {
                 signInErrorMessage = error.localizedDescription
             }
         }
+    }
+
+    func clearSignedInUser() {
+        AuthTokenStore.shared.clear()
+        for user in users {
+            modelContext.delete(user)
+        }
+        try? modelContext.save()
+    }
+}
+
+private extension APIError {
+    var isUserDeleted: Bool {
+        if case .server(status: 410, let body, _) = self {
+            return body?.code == "USER_DELETED"
+        }
+        return false
     }
 }
 

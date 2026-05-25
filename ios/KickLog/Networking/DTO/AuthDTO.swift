@@ -37,4 +37,10 @@ struct UserDTO: Decodable {
     let displayName: String
     let email: String?
     let hideHeartRate: Bool
+    let createdAt: Date
+}
+
+struct UpdateMeRequest: Encodable {
+    let displayName: String?
+    let hideHeartRate: Bool?
 }

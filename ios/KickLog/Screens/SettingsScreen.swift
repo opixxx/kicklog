@@ -16,6 +16,12 @@ struct SettingsScreen: View {
     private var pendingSyncMatches: [Match]
 
     @State private var hideHeartRate: Bool = false
+    @State private var displayNameDraft: String = ""
+    @State private var isShowingNameEditor: Bool = false
+    @State private var isUpdatingProfile: Bool = false
+    @State private var isDeletingAccount: Bool = false
+    @State private var showDeleteConfirmation: Bool = false
+    @State private var settingsErrorMessage: String?
 
     var body: some View {
         ScrollView {
@@ -33,6 +39,30 @@ struct SettingsScreen: View {
         }
         .background(KLTokens.bg)
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .onAppear {
+            hideHeartRate = me?.hideHeartRate ?? false
+        }
+        .task { await refreshMe() }
+        .onChange(of: me?.hideHeartRate) { _, newValue in
+            hideHeartRate = newValue ?? false
+        }
+        .alert("오류", isPresented: Binding(
+            get: { settingsErrorMessage != nil },
+            set: { if !$0 { settingsErrorMessage = nil } }
+        )) {
+            Button("확인", role: .cancel) { settingsErrorMessage = nil }
+        } message: {
+            Text(settingsErrorMessage ?? "")
+        }
+        .alert("계정을 삭제할까요?", isPresented: $showDeleteConfirmation) {
+            Button("취소", role: .cancel) {}
+            Button("삭제", role: .destructive) { handleDeleteAccount() }
+        } message: {
+            Text("30일 안에 다시 로그인하면 복구할 수 있습니다.")
+        }
+        .sheet(isPresented: $isShowingNameEditor) {
+            displayNameEditor
+        }
     }
 
     // MARK: - Profile 카드 (상단)
@@ -72,7 +102,10 @@ struct SettingsScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             KLSettingsHeader(text: "프로필")
             KLSettingsGroup {
-                KLSettingsRow(label: "이름", value: me?.displayName ?? "—")
+                Button(action: showDisplayNameEditor) {
+                    KLSettingsRow(label: "이름", value: me?.displayName ?? "—")
+                }
+                .buttonStyle(.plain)
                 KLSettingsRow(label: "이메일", chevron: false, value: me?.email ?? "—")
                 KLSettingsRow(label: "가입일", chevron: false, isLast: true,
                               value: profileJoinDate)
@@ -104,9 +137,13 @@ struct SettingsScreen: View {
                             .foregroundStyle(KLTokens.textSec)
                     }
                     Spacer(minLength: 0)
-                    Toggle("", isOn: $hideHeartRate)
+                    Toggle("", isOn: Binding(
+                        get: { me?.hideHeartRate ?? hideHeartRate },
+                        set: { updateHideHeartRate($0) }
+                    ))
                         .labelsHidden()
                         .tint(KLTokens.pitch)
+                        .disabled(me == nil || isUpdatingProfile)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 11)
@@ -159,9 +196,13 @@ struct SettingsScreen: View {
                     KLSettingsRow(labelOnly: "모든 기기에서 로그아웃", chevron: false)
                 }
                 .buttonStyle(.plain)
-                KLSettingsRow(labelOnly: "계정 삭제",
-                              sub: "30일 안에 다시 로그인하면 복구됩니다",
-                              chevron: false, destructive: true, isLast: true)
+                Button(action: { showDeleteConfirmation = true }) {
+                    KLSettingsRow(labelOnly: isDeletingAccount ? "계정 삭제 중" : "계정 삭제",
+                                  sub: "30일 안에 다시 로그인하면 복구됩니다",
+                                  chevron: false, destructive: true, isLast: true)
+                }
+                .buttonStyle(.plain)
+                .disabled(isDeletingAccount)
             }
         }
     }
@@ -185,6 +226,108 @@ struct SettingsScreen: View {
         for u in users { modelContext.delete(u) }
         try? modelContext.save()
         hasCompletedOnboarding = false
+    }
+
+    private var displayNameEditor: some View {
+        NavigationStack {
+            Form {
+                TextField("이름", text: $displayNameDraft)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+            .navigationTitle("이름 수정")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("취소") { isShowingNameEditor = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("저장") { saveDisplayName() }
+                        .disabled(!canSaveDisplayName || isUpdatingProfile)
+                }
+            }
+        }
+        .presentationDetents([.height(180)])
+    }
+
+    private var canSaveDisplayName: Bool {
+        let trimmed = displayNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed.count <= 50 && trimmed != me?.displayName
+    }
+
+    private func refreshMe() async {
+        do {
+            let user = try await UserService.shared.fetchMe(into: modelContext)
+            hideHeartRate = user.hideHeartRate
+        } catch {
+            settingsErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func showDisplayNameEditor() {
+        displayNameDraft = me?.displayName ?? ""
+        isShowingNameEditor = true
+    }
+
+    private func saveDisplayName() {
+        let newDisplayName = displayNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !newDisplayName.isEmpty, newDisplayName.count <= 50 else { return }
+
+        Task { @MainActor in
+            isUpdatingProfile = true
+            defer { isUpdatingProfile = false }
+            do {
+                _ = try await UserService.shared.updateMe(
+                    displayName: newDisplayName,
+                    into: modelContext
+                )
+                isShowingNameEditor = false
+            } catch {
+                settingsErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func updateHideHeartRate(_ newValue: Bool) {
+        guard let user = me else { return }
+        let previousValue = user.hideHeartRate
+        guard previousValue != newValue else { return }
+
+        hideHeartRate = newValue
+        user.hideHeartRate = newValue
+        try? modelContext.save()
+
+        Task { @MainActor in
+            isUpdatingProfile = true
+            defer { isUpdatingProfile = false }
+            do {
+                _ = try await UserService.shared.updateMe(
+                    hideHeartRate: newValue,
+                    into: modelContext
+                )
+            } catch {
+                hideHeartRate = previousValue
+                user.hideHeartRate = previousValue
+                try? modelContext.save()
+                settingsErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func handleDeleteAccount() {
+        guard !isDeletingAccount else { return }
+
+        Task { @MainActor in
+            isDeletingAccount = true
+            defer { isDeletingAccount = false }
+            do {
+                try await UserService.shared.deleteMe()
+                AuthTokenStore.shared.clear()
+                clearLocalSession()
+            } catch {
+                settingsErrorMessage = error.localizedDescription
+            }
+        }
     }
 
     private var infoSection: some View {
