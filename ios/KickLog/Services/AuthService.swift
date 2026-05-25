@@ -54,7 +54,7 @@ final class AuthService: NSObject {
 
     // MARK: - Logout
 
-    func logout(modelContext: ModelContext) async {
+    func logout(modelContext _: ModelContext) async {
         guard let refreshToken = tokenStore.refreshToken else {
             tokenStore.clear()
             return
@@ -77,7 +77,7 @@ final class AuthService: NSObject {
 
 extension AuthService: ASAuthorizationControllerDelegate {
     nonisolated func authorizationController(
-        controller: ASAuthorizationController,
+        controller _: ASAuthorizationController,
         didCompleteWithAuthorization authorization: ASAuthorization
     ) {
         Task { @MainActor in
@@ -91,7 +91,7 @@ extension AuthService: ASAuthorizationControllerDelegate {
     }
 
     nonisolated func authorizationController(
-        controller: ASAuthorizationController,
+        controller _: ASAuthorizationController,
         didCompleteWithError error: Error
     ) {
         Task { @MainActor in
@@ -104,7 +104,7 @@ extension AuthService: ASAuthorizationControllerDelegate {
 // MARK: - ASAuthorizationControllerPresentationContextProviding
 
 extension AuthService: ASAuthorizationControllerPresentationContextProviding {
-    nonisolated func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+    nonisolated func presentationAnchor(for _: ASAuthorizationController) -> ASPresentationAnchor {
         // 첫 active scene 의 window — MVP 1단말
         let scene = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }

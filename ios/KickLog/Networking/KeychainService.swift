@@ -7,10 +7,14 @@ enum KeychainService {
 
     static func set(_ value: String, forKey key: String) {
         let data = Data(value.utf8)
+        // kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly:
+        // - 첫 잠금 해제 후 접근 (백그라운드 HealthKit observer 동작 가능)
+        // - ThisDeviceOnly: iCloud 백업/디바이스 이전 시 제외 (JWT 누설 방지)
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: key
+            kSecAttrAccount as String: key,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
         SecItemDelete(query as CFDictionary)
         query[kSecValueData as String] = data
