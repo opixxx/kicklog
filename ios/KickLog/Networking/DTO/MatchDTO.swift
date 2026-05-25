@@ -12,6 +12,7 @@ struct PutMatchRequest: Encodable {
     let position: String?         // "GK" | "DF" | "MF" | "FW"
     let goals: Int
     let assists: Int
+    let opponentGoals: Int?       // null = 미입력, 0 = 명시적 무실점 (api-spec §5.1)
     let totalDistanceM: Int
     let maxSpeedKmh: Double
     let sprintCount: Int
@@ -45,6 +46,7 @@ struct MatchDetailResponse: Decodable {
     let position: String?
     let goals: Int
     let assists: Int
+    let opponentGoals: Int?
     let totalDistanceM: Int
     let maxSpeedKmh: Double
     let sprintCount: Int
@@ -71,7 +73,7 @@ struct QuarterDetailResponse: Decodable {
 extension Match {
     // PutMatchRequest 변환. venueId 가 nil 또는 음수(로컬 임시) 면 nil 반환 — 동기화 skip.
     // result 는 "W"/"D"/"L" → "WIN"/"DRAW"/"LOSS" 변환 (api-spec 형식).
-    // opponentGoals 는 backend schema 에 없어 미전송 (PR #15 후속 ADR-0003 보강 필요).
+    // opponentGoals 는 backend V9 (PR #26) 이후 정상 sync.
     func toPutRequest() -> PutMatchRequest? {
         guard let venueId, venueId > 0 else { return nil }
         let sortedQuarters = quarters
@@ -87,6 +89,7 @@ extension Match {
             position: position,
             goals: userGoals ?? 0,
             assists: userAssists ?? 0,
+            opponentGoals: opponentGoals,
             totalDistanceM: totalDistanceM,
             maxSpeedKmh: maxSpeedKmh,
             sprintCount: sprintCount,
