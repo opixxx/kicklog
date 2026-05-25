@@ -2,12 +2,13 @@ import SwiftUI
 
 // 친구 상세 — 아바타 헤더 + 4개 통계 카드 + 최근 경기 리스트.
 // 본인 시즌 통계와 달리 평균심박은 비공개(KickLog 정책 — heart rate 공유 안함).
+// E4: friend 시그니처를 도메인 모델 Friend 로 교체. 통계/최근경기 실연동은 후속 단계.
 struct FriendDetailScreen: View {
-    let friend: SampleFriend
+    let friend: Friend
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
 
-    // 더미 통계 (실제로는 백엔드에서 가져옴)
+    // 더미 통계 (실제로는 백엔드에서 가져옴 — 후속 단계)
     private let totalGames = 12
     private let distanceKm = 78.2
     private let goals = 9
@@ -252,6 +253,6 @@ struct FriendDetailScreen: View {
 
 #Preview {
     NavigationStack {
-        FriendDetailScreen(friend: SampleFriend.samples[1])
+        FriendDetailScreen(friend: Friend.previewSamples[1])
     }
 }
