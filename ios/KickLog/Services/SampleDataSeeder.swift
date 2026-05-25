@@ -83,19 +83,22 @@ enum SampleDataSeeder {
         }
 
         // 라벨링 대기 큐 2개 (labeledAt == nil)
+        // 첫 번째: Q2 가 32분 (30분 초과 워닝 케이스 — Trim sheet 테스트용)
         for daysAgo in [1, 4] {
             guard let detectedAt = calendar.date(byAdding: .day, value: -daysAgo, to: now) else { continue }
             let pending = Match(playedAt: detectedAt)
             context.insert(pending)
             for q in 1...4 {
                 let qStart = calendar.date(byAdding: .minute, value: (q - 1) * 30, to: detectedAt) ?? detectedAt
-                let qEnd = calendar.date(byAdding: .minute, value: 25, to: qStart) ?? qStart
+                // daysAgo == 1 이고 q == 2 면 32분 (overtime), 나머지 25분
+                let durationMinutes = (daysAgo == 1 && q == 2) ? 32 : 25
+                let qEnd = calendar.date(byAdding: .minute, value: durationMinutes, to: qStart) ?? qStart
                 let quarter = QuarterWorkout(
                     sourceWorkoutUUID: UUID().uuidString,
                     quarterNo: 0,
                     startedAt: qStart,
                     endedAt: qEnd,
-                    durationSeconds: 25 * 60,
+                    durationSeconds: durationMinutes * 60,
                     distanceM: 800,
                     avgSpeedKmh: 16,
                     avgHeartRate: 155,
