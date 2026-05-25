@@ -13,7 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest
 		"spring.jpa.hibernate.ddl-auto=create-drop",
 		"spring.flyway.enabled=false",
 		"kicklog.jwt.secret=test-secret-test-secret-test-secret-test-secret",
-		"kicklog.apple.client-id=com.opixxx.kicklog",
+		"kicklog.apple.client-id=com.opixxx.KickLog",
 		"kicklog.apple.jwks-url=http://localhost/apple/keys",
 		"kicklog.kakao.user-info-url=http://localhost/kakao/user",
 	],

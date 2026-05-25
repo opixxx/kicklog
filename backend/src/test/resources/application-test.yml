@@ -23,7 +23,7 @@ kicklog:
     access-token-minutes: 15
     refresh-token-days: 30
   apple:
-    client-id: com.opixxx.kicklog
+    client-id: com.opixxx.KickLog
     jwks-url: http://localhost/apple/keys
   kakao:
     user-info-url: http://localhost/kakao/user

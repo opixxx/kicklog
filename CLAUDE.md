@@ -13,7 +13,7 @@
   - iOS 26.4 / SwiftUI / SwiftData / Swift Charts / HealthKit / CoreLocation
   - Kotlin / Spring Boot 4 / PostgreSQL 16 / Flyway / Spring Security (JWT)
   - **호스팅: AWS EC2 + RDS (ap-northeast-2 서울) + Terraform** (ADR-0006)
-- Bundle ID: `com.opixxx.kicklog` · GitHub: `opixxx/kicklog` (private)
+- Bundle ID: `com.opixxx.KickLog` · GitHub: `opixxx/kicklog` (private)
 - Architecture: 1인 사이드 — **구조는 3-tier** (Controller/Service/Repository), 도메인별 패키지 (`auth/user/friend/match/place/venue/stat/common`), **모델링은 DDD-lite** (Rich Aggregate + VO + Ubiquitous Language). 헥사고날 Port/Adapter 강제 X. iOS 는 본 하네스 대상 아님.
   - **세부**: `docs/architecture/{overview,domain-modeling,auth,api-conventions}.md` (코드 레벨 적용 — ADR 의 how)
   - **결정 근거**: `docs/adr/` (ADR 의 why)

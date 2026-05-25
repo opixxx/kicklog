@@ -47,7 +47,7 @@ kicklog:
     access-token-minutes: ${JWT_ACCESS_TOKEN_MINUTES:15}
     refresh-token-days: ${JWT_REFRESH_TOKEN_DAYS:30}
   apple:
-    client-id: ${APPLE_CLIENT_ID:com.opixxx.kicklog}
+    client-id: ${APPLE_CLIENT_ID:com.opixxx.KickLog}
     jwks-url: ${APPLE_JWKS_URL:https://appleid.apple.com/auth/keys}
   kakao:
     user-info-url: ${KAKAO_USER_INFO_URL:https://kapi.kakao.com/v2/user/me}
