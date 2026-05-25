@@ -683,6 +683,11 @@ Soft delete 취소. `deleted_at = NULL`.
   "totalAssists": 11,
   "matchCount": 14,
   "quarterCount": 47,
+  "winCount": 8,
+  "drawCount": 3,
+  "lossCount": 3,
+  "avgHeartRate": 152,
+  "monthlyDistanceM": [4800, 6200, 7400, 8100, 9000, 0, 0, 0, 0, 0, 0, 0],
   "best": {
     "maxSpeedKmh": 29.4,
     "longestMatchDistanceM": 8200,
@@ -691,6 +696,9 @@ Soft delete 취소. `deleted_at = NULL`.
 }
 ```
 > 데이터 없는 연도도 `200` + 0값 (404 아님 — 시즌 탭은 항상 카드 렌더).
+> `winCount`/`drawCount`/`lossCount` 는 `Match.result` 가 `WIN`/`DRAW`/`LOSS` 인 매치 개수.
+> `avgHeartRate` 는 모든 매치의 모든 쿼터에 대한 `durationSeconds` 가중평균 (정수, 소수점 버림).
+> `monthlyDistanceM` 은 항상 12개 (1월~12월, UTC `playedAt.month` 기준). 빈 월은 0.
 
 ---
 
