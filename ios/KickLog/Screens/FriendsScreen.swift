@@ -5,7 +5,7 @@ import SwiftUI
 struct FriendsScreen: View {
     @Environment(\.colorScheme) private var scheme
 
-    @State private var friends: [Friend] = []
+    @State private var friends: [FriendSummary] = []
     @State private var pendingRequests: [PendingFriendRequest] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -41,7 +41,7 @@ struct FriendsScreen: View {
         }
         .background(KLTokens.bg)
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .navigationDestination(for: Friend.self) { friend in
+        .navigationDestination(for: FriendSummary.self) { friend in
             FriendDetailScreen(friend: friend)
         }
         .sheet(isPresented: $showingAddSheet, onDismiss: { Task { await load() } }) {
@@ -184,7 +184,7 @@ struct FriendsScreen: View {
         .padding(.horizontal, 16)
     }
 
-    private func friendRow(_ friend: Friend, isLast: Bool) -> some View {
+    private func friendRow(_ friend: FriendSummary, isLast: Bool) -> some View {
         HStack(spacing: 12) {
             KLAvatar(name: friend.displayName)
             VStack(alignment: .leading, spacing: 2) {
@@ -241,7 +241,7 @@ struct FriendsScreen: View {
             async let friendsTask = FriendService.shared.fetchFriends()
             async let pendingTask = FriendService.shared.fetchPendingRequests()
             let (friendsResp, pendingResp) = try await (friendsTask, pendingTask)
-            friends = friendsResp.friends.map(Friend.init(from:))
+            friends = friendsResp.friends.map(FriendSummary.init(from:))
             pendingRequests = pendingResp.requests.map(PendingFriendRequest.init(from:))
         } catch {
             errorMessage = friendlyMessage(error)
@@ -256,10 +256,12 @@ struct FriendsScreen: View {
             let response = try await FriendService.shared.acceptFriendship(id: request.id)
             pendingRequests.removeAll { $0.id == request.id }
             friends.insert(
-                Friend(id: response.friendshipId,
-                       userId: request.fromUserId,
-                       displayName: request.displayName,
-                       acceptedAt: response.acceptedAt),
+                FriendSummary(
+                    id: response.friendshipId,
+                    userId: request.fromUserId,
+                    displayName: request.displayName,
+                    acceptedAt: response.acceptedAt
+                ),
                 at: 0
             )
         } catch {

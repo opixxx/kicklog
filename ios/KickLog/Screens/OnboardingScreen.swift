@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // 온보딩 4페이지 — TabView paging 으로 구현.
 // 1) KickLog 로고/태그라인 → 2) Watch 안내 → 3) Apple/Kakao 로그인 → 4) HealthKit 권한

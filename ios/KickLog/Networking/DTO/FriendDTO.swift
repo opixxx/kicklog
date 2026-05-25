@@ -71,7 +71,7 @@ struct PatchFriendshipResponse: Decodable {
 
 // MARK: - GET /users/search (2.5) — 친구 추가 시트 보조
 
-struct UserSearchItem: Decodable, Hashable {
+struct UserSearchItem: Decodable, Hashable, Identifiable {
     let id: Int64
     let displayName: String
 }
