@@ -16,19 +16,36 @@ enum SampleDataSeeder {
         let calendar = Calendar(identifier: .gregorian)
         let now = Date()
 
-        let scenarios: [(daysAgo: Int, opponent: String, result: String, userGoals: Int, opponentGoals: Int, distance: Int, maxSpeed: Double, sprint: Int, hr: Int)] = [
-            (7, "FC블루스", "W", 4, 2, 3200, 19.4, 14, 158),
-            (14, "레전드FC", "D", 2, 2, 2800, 17.1, 9, 162),
-            (21, "어반FC", "L", 1, 3, 3400, 18.0, 11, 168),
-            (28, "옆동네FC", "W", 3, 1, 3000, 18.6, 12, 156),
-            (35, "한강조축", "W", 5, 3, 3700, 20.2, 16, 161),
+        // Venue 4개 시드 — geo 는 더미 좌표
+        let venueSeeds: [(serverId: Int64, name: String, lat: Double, lng: Double)] = [
+            (1, "마포 풋살장", 37.547, 126.910),
+            (2, "양화 한강", 37.547, 126.901),
+            (3, "○○공원 운동장", 37.560, 126.930),
+            (4, "성수 스카이파크", 37.544, 127.057),
+        ]
+        var venuesById: [Int64: Venue] = [:]
+        for v in venueSeeds {
+            let venue = Venue(serverId: v.serverId, name: v.name, geoLat: v.lat, geoLng: v.lng)
+            context.insert(venue)
+            venuesById[v.serverId] = venue
+        }
+
+        let scenarios: [(daysAgo: Int, opponent: String, venueId: Int64, result: String, userGoals: Int, opponentGoals: Int, distance: Int, maxSpeed: Double, sprint: Int, hr: Int)] = [
+            (7, "FC블루스", 1, "W", 4, 2, 3200, 19.4, 14, 158),
+            (14, "레전드FC", 2, "D", 2, 2, 2800, 17.1, 9, 162),
+            (21, "어반FC", 1, "L", 1, 3, 3400, 18.0, 11, 168),
+            (28, "옆동네FC", 3, "W", 3, 1, 3000, 18.6, 12, 156),
+            (35, "한강조축", 2, "W", 5, 3, 3700, 20.2, 16, 161),
         ]
 
         for scenario in scenarios {
             guard let playedAt = calendar.date(byAdding: .day, value: -scenario.daysAgo, to: now) else { continue }
 
+            let venue = venuesById[scenario.venueId]
             let match = Match(
                 playedAt: playedAt,
+                venueId: scenario.venueId,
+                venueName: venue?.name,
                 opponentName: scenario.opponent,
                 result: scenario.result,
                 position: "MF",
