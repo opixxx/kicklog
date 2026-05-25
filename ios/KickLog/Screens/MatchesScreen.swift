@@ -45,8 +45,7 @@ struct MatchesScreen: View {
             MatchDetailScreen(match: match)
         }
         .sheet(item: $labelingTarget) { match in
-            // 라벨링 편집 흐름은 B 묶음 (후속 PR) — 1차는 감지 결과만 안내.
-            LabelingPlaceholderSheet(match: match)
+            LabelingScreen(match: match)
         }
     }
 
@@ -162,36 +161,6 @@ extension Match {
             time: "\(timeFormatter.string(from: firstStart)) ~ \(timeFormatter.string(from: lastEnd))",
             detectedQuarters: quarters.count
         )
-    }
-}
-
-// MARK: - 라벨링 placeholder (Phase E2 에서 실제 편집 화면으로 전환)
-
-private struct LabelingPlaceholderSheet: View {
-    let match: Match
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                KLIcon(name: "checkmark", size: 56, color: KLTokens.pitch)
-                Text("라벨링 화면은 곧 SwiftData 편집으로 전환됩니다")
-                    .font(.system(size: 17, weight: .semibold))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(KLTokens.text)
-                Text("감지된 쿼터: \(match.quarters.count)개")
-                    .font(.system(size: 14).monospacedDigit())
-                    .foregroundStyle(KLTokens.textSec)
-                Spacer()
-            }
-            .padding()
-            .padding(.top, 40)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
-                }
-            }
-        }
     }
 }
 
