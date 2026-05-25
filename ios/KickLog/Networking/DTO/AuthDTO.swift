@@ -8,8 +8,7 @@ struct AppleSignInRequest: Encodable {
 }
 
 struct KakaoSignInRequest: Encodable {
-    let accessToken: String      // Kakao iOS SDK 에서 받은 토큰
-    let name: String?
+    let kakaoAccessToken: String      // Kakao iOS SDK 에서 받은 토큰
 }
 
 struct RefreshRequest: Encodable {

@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+import KakaoSDKAuth
+import KakaoSDKCommon
 
 @main
 struct KickLogApp: App {
@@ -13,6 +15,14 @@ struct KickLogApp: App {
             fatalError("ModelContainer 초기화 실패: \(error)")
         }
     }()
+
+    init() {
+        KakaoSDK.initSDK(appKey: Self.kakaoNativeAppKey)
+    }
+
+    private static var kakaoNativeAppKey: String {
+        Bundle.main.object(forInfoDictionaryKey: "KAKAO_NATIVE_APP_KEY") as? String ?? ""
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -33,6 +43,11 @@ struct KickLogApp: App {
                     await MatchSyncService.shared.syncPending(
                         in: modelContainer.mainContext
                     )
+                }
+                .onOpenURL { url in
+                    if AuthApi.isKakaoTalkLoginUrl(url) {
+                        _ = AuthController.handleOpenUrl(url: url)
+                    }
                 }
         }
         .modelContainer(modelContainer)

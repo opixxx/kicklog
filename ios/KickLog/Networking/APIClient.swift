@@ -2,6 +2,7 @@ import Foundation
 
 protocol APIClient {
     func get<T: Decodable>(_ path: String, query: [URLQueryItem]?) async throws -> T
+    func post<T: Decodable>(_ path: String) async throws -> T
     func post<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T
     func put<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T
     func patch<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T
@@ -37,6 +38,10 @@ final class URLSessionAPIClient: APIClient {
 
     func get<T: Decodable>(_ path: String, query: [URLQueryItem]? = nil) async throws -> T {
         try await request(method: "GET", path: path, query: query, body: nil as Empty?)
+    }
+
+    func post<T: Decodable>(_ path: String) async throws -> T {
+        try await request(method: "POST", path: path, query: nil, body: nil as Empty?)
     }
 
     func post<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {

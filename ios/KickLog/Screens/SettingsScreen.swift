@@ -151,8 +151,12 @@ struct SettingsScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             KLSettingsHeader(text: "계정")
             KLSettingsGroup {
-                Button(action: handleLogout) {
+                Button(action: handleCurrentDeviceLogout) {
                     KLSettingsRow(labelOnly: "로그아웃", chevron: false)
+                }
+                .buttonStyle(.plain)
+                Button(action: handleAllDevicesLogout) {
+                    KLSettingsRow(labelOnly: "모든 기기에서 로그아웃", chevron: false)
                 }
                 .buttonStyle(.plain)
                 KLSettingsRow(labelOnly: "계정 삭제",
@@ -162,14 +166,25 @@ struct SettingsScreen: View {
         }
     }
 
-    private func handleLogout() {
+    private func handleCurrentDeviceLogout() {
         Task {
-            await AuthService.shared.logout(modelContext: modelContext)
-            // 로컬 User 도 정리 + onboarding 재진입
-            for u in users { modelContext.delete(u) }
-            try? modelContext.save()
-            hasCompletedOnboarding = false
+            await AuthService.shared.logoutCurrentDevice()
+            clearLocalSession()
         }
+    }
+
+    private func handleAllDevicesLogout() {
+        Task {
+            await AuthService.shared.logoutAllDevices()
+            clearLocalSession()
+        }
+    }
+
+    private func clearLocalSession() {
+        // 로컬 User 도 정리 + onboarding 재진입
+        for u in users { modelContext.delete(u) }
+        try? modelContext.save()
+        hasCompletedOnboarding = false
     }
 
     private var infoSection: some View {
