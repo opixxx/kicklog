@@ -1,9 +1,9 @@
 import Foundation
 
-// 친구 도메인 모델 — 백엔드 §3 Friends 응답을 화면 단에서 다루기 쉽게 정규화.
+// 친구 목록 화면 모델 — 백엔드 §3 Friends 응답을 화면 단에서 다루기 쉽게 정규화.
 // id = friendshipId (NavigationLink / ForEach 키로 사용).
 
-struct Friend: Identifiable, Hashable {
+struct FriendSummary: Identifiable, Hashable {
     let id: Int64               // friendshipId
     let userId: Int64
     let displayName: String
@@ -47,8 +47,8 @@ struct PendingFriendRequest: Identifiable, Hashable {
 
 // MARK: - Preview 용 샘플
 
-extension Friend {
-    static let previewSamples: [Friend] = [
+extension FriendSummary {
+    static let previewSamples: [FriendSummary] = [
         .init(id: 1, userId: 101, displayName: "김조축", acceptedAt: Date().addingTimeInterval(-86_400 * 30)),
         .init(id: 2, userId: 102, displayName: "이미드", acceptedAt: Date().addingTimeInterval(-86_400 * 14)),
         .init(id: 3, userId: 103, displayName: "박수비", acceptedAt: Date().addingTimeInterval(-86_400 * 7))

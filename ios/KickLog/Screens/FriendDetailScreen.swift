@@ -2,9 +2,9 @@ import SwiftUI
 
 // 친구 상세 — 아바타 헤더 + 4개 통계 카드 + 최근 경기 리스트.
 // 본인 시즌 통계와 달리 평균심박은 비공개(KickLog 정책 — heart rate 공유 안함).
-// E4: friend 시그니처를 도메인 모델 Friend 로 교체. 통계/최근경기 실연동은 후속 단계.
+// E4: friend 시그니처를 목록 화면 모델로 교체. 통계/최근경기 실연동은 후속 단계.
 struct FriendDetailScreen: View {
-    let friend: Friend
+    let friend: FriendSummary
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
 
@@ -60,8 +60,8 @@ struct FriendDetailScreen: View {
 
     private var profileHeader: some View {
         VStack(spacing: 0) {
-            KLAvatar(name: friend.name, size: 76)
-            Text(friend.name)
+            KLAvatar(name: friend.displayName, size: 76)
+            Text(friend.displayName)
                 .font(.system(size: 22, weight: .bold))
                 .tracking(-0.5)
                 .foregroundStyle(KLTokens.text)
@@ -253,6 +253,6 @@ struct FriendDetailScreen: View {
 
 #Preview {
     NavigationStack {
-        FriendDetailScreen(friend: Friend.previewSamples[1])
+        FriendDetailScreen(friend: FriendSummary.previewSamples[1])
     }
 }
