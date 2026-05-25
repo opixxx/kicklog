@@ -259,7 +259,9 @@ private struct OnboardPage3: View {
                 Text(signInErrorMessage ?? "")
             }
             .alert("카카오 로그인 준비 중", isPresented: $showingKakaoSoon) {
-                Button("확인", role: .cancel) {}
+                Button("확인", role: .cancel) {
+                    // role: .cancel — Alert 가 자동 dismiss 되므로 별도 액션 불요
+                }
             } message: {
                 Text("Kakao 로그인은 SDK 통합 이후 사용 가능합니다.")
             }

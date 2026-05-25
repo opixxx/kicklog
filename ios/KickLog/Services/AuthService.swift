@@ -36,7 +36,7 @@ final class AuthService: NSObject {
         )
 
         tokenStore.save(accessToken: response.accessToken, refreshToken: response.refreshToken)
-        return upsertLocalUser(from: response.user, into: modelContext)
+        return User.upsert(from: response.user, into: modelContext)
     }
 
     private func requestAppleCredential() async throws -> ASAuthorizationAppleIDCredential {
@@ -71,33 +71,6 @@ final class AuthService: NSObject {
         tokenStore.clear()
     }
 
-    // MARK: - User UPSERT (ADR-0004 D2 — SwiftData @Model 갱신)
-
-    private func upsertLocalUser(from dto: UserDTO, into context: ModelContext) -> User {
-        let serverId = dto.id
-        let descriptor = FetchDescriptor<User>(
-            predicate: #Predicate { $0.serverId == serverId }
-        )
-        if let existing = try? context.fetch(descriptor).first {
-            existing.displayName = dto.displayName
-            existing.email = dto.email
-            existing.hideHeartRate = dto.hideHeartRate
-            existing.lastSyncedAt = .now
-            try? context.save()
-            return existing
-        }
-        let user = User(
-            serverId: dto.id,
-            displayName: dto.displayName,
-            email: dto.email,
-            hideHeartRate: dto.hideHeartRate,
-            createdAt: .now,
-            lastSyncedAt: .now
-        )
-        context.insert(user)
-        try? context.save()
-        return user
-    }
 }
 
 // MARK: - ASAuthorizationControllerDelegate
