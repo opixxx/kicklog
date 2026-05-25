@@ -380,7 +380,7 @@ private struct OnboardPage4: View {
             Spacer()
 
             VStack(spacing: 16) {
-                Button(action: onComplete) {
+                Button(action: requestHealthAuthorization) {
                     Text("권한 허용하기")
                         .font(.system(size: 17, weight: .bold))
                         .tracking(-0.3)
@@ -395,6 +395,19 @@ private struct OnboardPage4: View {
                 KLPageDots(index: 3)
             }
             .padding(.bottom, 50)
+        }
+    }
+
+    // 실제 HealthKit 권한 다이얼로그 표시. 결과와 무관하게 onComplete (사용자가 거부해도 앱 진입 — 설정에서 다시 켤 수 있음).
+    private func requestHealthAuthorization() {
+        Task {
+            do {
+                try await HealthKitService.shared.requestAuthorization()
+            } catch {
+                // 시뮬레이터에서 HealthKit 미지원이거나 거부됨 — MVP 는 그래도 앱 진입 허용
+                print("HealthKit authorization failed: \(error.localizedDescription)")
+            }
+            await MainActor.run { onComplete() }
         }
     }
 }

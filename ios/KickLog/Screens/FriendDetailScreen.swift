@@ -3,7 +3,7 @@ import SwiftUI
 // 친구 상세 — 아바타 헤더 + 4개 통계 카드 + 최근 경기 리스트.
 // 본인 시즌 통계와 달리 평균심박은 비공개(KickLog 정책 — heart rate 공유 안함).
 struct FriendDetailScreen: View {
-    let friend: Friend
+    let friend: SampleFriend
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
 
@@ -16,7 +16,7 @@ struct FriendDetailScreen: View {
     private let draws = 3
     private let losses = 2
 
-    private let recentMatches: [Match] = Array(Match.samples.prefix(2))
+    private let recentMatches: [SampleMatch] = Array(SampleMatch.samples.prefix(2))
 
     var body: some View {
         ScrollView {
@@ -202,7 +202,7 @@ struct FriendDetailScreen: View {
         }
     }
 
-    private func compactMatchRow(_ match: Match, isLast: Bool) -> some View {
+    private func compactMatchRow(_ match: SampleMatch, isLast: Bool) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(match.dateNum)
@@ -252,6 +252,6 @@ struct FriendDetailScreen: View {
 
 #Preview {
     NavigationStack {
-        FriendDetailScreen(friend: Friend.samples[1])
+        FriendDetailScreen(friend: SampleFriend.samples[1])
     }
 }

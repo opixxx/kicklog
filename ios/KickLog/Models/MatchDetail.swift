@@ -20,7 +20,7 @@ struct MatchDetail: Hashable {
 
 extension MatchDetail {
     // matches.jsx 의 첫 번째 행(5/18 FC블루스)와 동일한 더미 detail.
-    static func sample(for match: Match) -> MatchDetail {
+    static func sample(for match: SampleMatch) -> MatchDetail {
         MatchDetail(
             matchId: match.id,
             dateTime: "2026-05-21 (수) 09:00",
