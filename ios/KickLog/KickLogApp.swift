@@ -28,6 +28,11 @@ struct KickLogApp: App {
                     await HealthKitService.shared.startObserver(
                         modelContext: modelContainer.mainContext
                     )
+
+                    // 미동기화 Match 일괄 PUT (ADR-0003 D9 fire-and-forget)
+                    await MatchSyncService.shared.syncPending(
+                        in: modelContainer.mainContext
+                    )
                 }
         }
         .modelContainer(modelContainer)

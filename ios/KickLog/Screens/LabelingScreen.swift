@@ -397,13 +397,21 @@ struct LabelingScreen: View {
         // 3. 헤드라인 4지표 재계산 (선택된 쿼터 기준)
         match.recalculateHeadlineMetrics()
 
-        // 4. SwiftData 저장 — TODO: 후속 단계에서 백엔드 PUT sync (fire-and-forget)
+        // 4. SwiftData 저장
         do {
             try modelContext.save()
-            dismiss()
         } catch {
             print("LabelingScreen: 저장 실패 — \(error)")
+            return
         }
+
+        // 5. 백엔드 PUT sync (ADR-0003 D9 fire-and-forget). 실패해도 dismiss.
+        let matchToSync = match
+        let contextToSync = modelContext
+        Task {
+            await MatchSyncService.shared.sync(matchToSync, in: contextToSync)
+        }
+        dismiss()
     }
 
     // MARK: - 섹션 헤더

@@ -11,6 +11,10 @@ struct SettingsScreen: View {
     @Query private var users: [User]
     private var me: User? { users.first }
 
+    // 동기화 대기 — 라벨링 완료(labeledAt != nil) but 아직 백엔드 PUT 못 한 매치 (syncedAt == nil)
+    @Query(filter: #Predicate<Match> { $0.labeledAt != nil && $0.syncedAt == nil })
+    private var pendingSyncMatches: [Match]
+
     @State private var hideHeartRate: Bool = false
 
     var body: some View {
@@ -120,13 +124,25 @@ struct SettingsScreen: View {
     }
 
     private var dataSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let pendingCount = pendingSyncMatches.count
+        return VStack(alignment: .leading, spacing: 0) {
             KLSettingsHeader(text: "데이터")
             KLSettingsGroup {
-                KLSettingsRow(labelOnly: "동기화 대기",
-                              sub: "네트워크가 안정되면 자동으로 재시도합니다",
-                              badge: "2건",
-                              isLast: true)
+                if pendingCount > 0 {
+                    KLSettingsRow(
+                        labelOnly: "동기화 대기",
+                        sub: "네트워크가 안정되면 자동으로 재시도합니다",
+                        badge: "\(pendingCount)건",
+                        isLast: true
+                    )
+                } else {
+                    KLSettingsRow(
+                        labelOnly: "모두 동기화됨",
+                        sub: "백엔드와 정합 상태입니다",
+                        chevron: false,
+                        isLast: true
+                    )
+                }
             }
         }
     }
