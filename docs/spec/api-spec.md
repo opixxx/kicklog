@@ -403,6 +403,7 @@ Soft delete 취소. `deleted_at = NULL`.
   "position": "MF",
   "goals": 2,
   "assists": 1,
+  "opponentGoals": 1,
   "totalDistanceM": 7200,
   "maxSpeedKmh": 29.4,
   "sprintCount": 17,
@@ -432,6 +433,7 @@ Soft delete 취소. `deleted_at = NULL`.
 | `result` | string? | `WIN\|DRAW\|LOSS` |
 | `position` | string? | `GK\|DF\|MF\|FW` |
 | `goals` / `assists` | int | `@Min(0)`, 기본 0 |
+| `opponentGoals` | int? | `@Min(0)`. null = 점수 미입력. 0 = 명시적 무실점 |
 | `totalDistanceM` | int | `@Min(0)`, 기본 0 |
 | `maxSpeedKmh` | double | `@DecimalMin(0.0)`, 기본 0 |
 | `sprintCount` | int | `@Min(0)`, 기본 0 |
@@ -785,6 +787,7 @@ Soft delete 취소. `deleted_at = NULL`.
   "position": "GK|DF|MF|FW|null",
   "goals": 2,
   "assists": 1,
+  "opponentGoals": 1,
   "totalDistanceM": 7200,
   "maxSpeedKmh": 29.4,
   "sprintCount": 17,

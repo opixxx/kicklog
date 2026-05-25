@@ -37,6 +37,9 @@ data class UpsertMatchRequest(
     @field:Min(value = 0, message = "도움은 0 이상이어야 합니다")
     val assists: Int = 0,
 
+    @field:Min(value = 0, message = "상대팀 득점은 0 이상이어야 합니다")
+    val opponentGoals: Int? = null,
+
     @field:Min(value = 0, message = "총 이동거리는 0 이상이어야 합니다")
     val totalDistanceM: Int = 0,
 
@@ -63,6 +66,7 @@ data class UpsertMatchRequest(
             position = position,
             goals = goals,
             assists = assists,
+            opponentGoals = opponentGoals,
             quarters = quarters.map { it.toCommand() },
             totalDistanceM = totalDistanceM,
             maxSpeedKmh = maxSpeedKmh,
@@ -134,6 +138,7 @@ data class MatchDetailResponse(
     val position: MatchPosition?,
     val goals: Int,
     val assists: Int,
+    val opponentGoals: Int?,
     val totalDistanceM: Int,
     val maxSpeedKmh: Double,
     val sprintCount: Int,
@@ -152,6 +157,7 @@ data class MatchDetailResponse(
                 position = match.position,
                 goals = match.goals,
                 assists = match.assists,
+                opponentGoals = match.opponentGoals,
                 totalDistanceM = match.totalDistanceM,
                 maxSpeedKmh = match.maxSpeedKmh,
                 sprintCount = match.sprintCount,
@@ -172,6 +178,7 @@ data class MatchSummaryResponse(
     val position: MatchPosition?,
     val goals: Int,
     val assists: Int,
+    val opponentGoals: Int?,
     val totalDistanceM: Int,
     val maxSpeedKmh: Double,
     val sprintCount: Int,
@@ -190,6 +197,7 @@ data class MatchSummaryResponse(
                 position = match.position,
                 goals = match.goals,
                 assists = match.assists,
+                opponentGoals = match.opponentGoals,
                 totalDistanceM = match.totalDistanceM,
                 maxSpeedKmh = match.maxSpeedKmh,
                 sprintCount = match.sprintCount,

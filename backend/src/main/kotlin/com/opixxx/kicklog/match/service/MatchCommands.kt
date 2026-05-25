@@ -11,6 +11,7 @@ data class UpsertMatchCommand(
     val goals: Int,
     val assists: Int,
     val quarters: List<UpsertQuarterCommand>,
+    val opponentGoals: Int? = null,
     val totalDistanceM: Int = 0,
     val maxSpeedKmh: Double = 0.0,
     val sprintCount: Int = 0,
