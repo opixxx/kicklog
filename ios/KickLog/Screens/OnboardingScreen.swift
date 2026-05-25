@@ -196,7 +196,6 @@ private struct OnboardPage3: View {
     @Binding var currentPage: Int
     @Environment(\.modelContext) private var modelContext
     @State private var signInErrorMessage: String?
-    @State private var showingKakaoSoon: Bool = false
     @State private var isSigningIn: Bool = false
 
     var body: some View {
@@ -235,19 +234,24 @@ private struct OnboardPage3: View {
                 .buttonStyle(.plain)
                 .disabled(isSigningIn)
 
-                Button { showingKakaoSoon = true } label: {
+                Button(action: handleKakaoSignIn) {
                     HStack(spacing: 8) {
-                        KLIcon(name: "kakao.bubble", size: 20, color: Color(hex: 0x3C1E1E))
-                        Text("카카오로 시작하기")
-                            .font(.system(size: 17, weight: .semibold))
-                            .tracking(-0.3)
-                            .foregroundStyle(Color(hex: 0x3C1E1E))
+                        if isSigningIn {
+                            ProgressView().tint(Color(hex: 0x3C1E1E))
+                        } else {
+                            KLIcon(name: "kakao.bubble", size: 20, color: Color(hex: 0x3C1E1E))
+                            Text("카카오로 시작하기")
+                                .font(.system(size: 17, weight: .semibold))
+                                .tracking(-0.3)
+                                .foregroundStyle(Color(hex: 0x3C1E1E))
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
                     .background(Color(hex: 0xFEE500), in: RoundedRectangle(cornerRadius: 14))
                 }
                 .buttonStyle(.plain)
+                .disabled(isSigningIn)
             }
             .padding(.horizontal, 20)
             .padding(.top, 28)
@@ -258,13 +262,6 @@ private struct OnboardPage3: View {
                 Button("확인", role: .cancel) { signInErrorMessage = nil }
             } message: {
                 Text(signInErrorMessage ?? "")
-            }
-            .alert("카카오 로그인 준비 중", isPresented: $showingKakaoSoon) {
-                Button("확인", role: .cancel) {
-                    // role: .cancel — Alert 가 자동 dismiss 되므로 별도 액션 불요
-                }
-            } message: {
-                Text("Kakao 로그인은 SDK 통합 이후 사용 가능합니다.")
             }
 
             Spacer()
@@ -298,6 +295,20 @@ private extension OnboardPage3 {
             defer { isSigningIn = false }
             do {
                 _ = try await AuthService.shared.signInWithApple(modelContext: modelContext)
+                withAnimation { currentPage += 1 }
+            } catch {
+                signInErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func handleKakaoSignIn() {
+        guard !isSigningIn else { return }
+        isSigningIn = true
+        Task {
+            defer { isSigningIn = false }
+            do {
+                _ = try await AuthService.shared.signInWithKakao(modelContext: modelContext)
                 withAnimation { currentPage += 1 }
             } catch {
                 signInErrorMessage = error.localizedDescription

@@ -1,9 +1,10 @@
 import Foundation
 import AuthenticationServices
+import KakaoSDKAuth
+import KakaoSDKUser
 import SwiftData
 
-// Apple Sign-In 흐름 + 백엔드 `/auth/apple/signin` 호출 + Keychain 저장 + User @Model UPSERT.
-// Kakao 는 별도 (SDK 의존) — E1 후속.
+// Apple/Kakao Sign-In 흐름 + 백엔드 Auth API 호출 + Keychain 저장 + User @Model UPSERT.
 @MainActor
 final class AuthService: NSObject {
     static let shared = AuthService()
@@ -39,6 +40,41 @@ final class AuthService: NSObject {
         return User.upsert(from: response.user, into: modelContext)
     }
 
+    // MARK: - Kakao Sign-In
+
+    func signInWithKakao(modelContext: ModelContext) async throws -> User {
+        let kakaoAccessToken = try await requestKakaoAccessToken()
+        let response: SignInResponse = try await apiClient.post(
+            "/auth/kakao/signin",
+            body: KakaoSignInRequest(kakaoAccessToken: kakaoAccessToken)
+        )
+
+        tokenStore.save(accessToken: response.accessToken, refreshToken: response.refreshToken)
+        return User.upsert(from: response.user, into: modelContext)
+    }
+
+    private func requestKakaoAccessToken() async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            let completion: (OAuthToken?, Error?) -> Void = { oauthToken, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let accessToken = oauthToken?.accessToken else {
+                    continuation.resume(throwing: AuthError.kakaoNoAccessToken)
+                    return
+                }
+                continuation.resume(returning: accessToken)
+            }
+
+            if UserApi.isKakaoTalkLoginAvailable() {
+                UserApi.shared.loginWithKakaoTalk(completion: completion)
+            } else {
+                UserApi.shared.loginWithKakaoAccount(completion: completion)
+            }
+        }
+    }
+
     private func requestAppleCredential() async throws -> ASAuthorizationAppleIDCredential {
         try await withCheckedThrowingContinuation { continuation in
             self.pendingContinuation = continuation
@@ -54,23 +90,33 @@ final class AuthService: NSObject {
 
     // MARK: - Logout
 
-    func logout(modelContext _: ModelContext) async {
+    func logoutCurrentDevice() async {
         guard let refreshToken = tokenStore.refreshToken else {
             tokenStore.clear()
             return
         }
-        // /auth/logout 호출 후 실패해도 로컬은 정리 (fire-and-forget)
+
+        // /auth/logout/this-device 호출 후 실패해도 로컬은 정리한다.
         do {
             let _: EmptyResponse = try await apiClient.post(
-                "/auth/logout",
+                "/auth/logout/this-device",
                 body: LogoutRequest(refreshToken: refreshToken)
             )
         } catch {
-            print("AuthService.logout 백엔드 호출 실패 — \(error). 로컬 정리만 진행.")
+            print("AuthService.logoutCurrentDevice 백엔드 호출 실패 — \(error). 로컬 정리만 진행.")
         }
         tokenStore.clear()
     }
 
+    func logoutAllDevices() async {
+        // /auth/logout 호출 후 실패해도 현재 기기의 로컬 토큰은 정리한다.
+        do {
+            let _: EmptyResponse = try await apiClient.post("/auth/logout")
+        } catch {
+            print("AuthService.logoutAllDevices 백엔드 호출 실패 — \(error). 로컬 정리만 진행.")
+        }
+        tokenStore.clear()
+    }
 }
 
 // MARK: - ASAuthorizationControllerDelegate
@@ -120,11 +166,13 @@ extension AuthService: ASAuthorizationControllerPresentationContextProviding {
 enum AuthError: LocalizedError {
     case appleNoIdentityToken
     case appleUnknownCredential
+    case kakaoNoAccessToken
 
     var errorDescription: String? {
         switch self {
         case .appleNoIdentityToken: return "Apple identityToken 을 받지 못했습니다."
         case .appleUnknownCredential: return "Apple 자격 증명 형식이 예상과 다릅니다."
+        case .kakaoNoAccessToken: return "Kakao accessToken 을 받지 못했습니다."
         }
     }
 }

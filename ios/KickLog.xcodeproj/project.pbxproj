@@ -23,6 +23,12 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXBuildFile section */
+		A10000012FC4A00100000001 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = A10000052FC4A00100000001 /* KakaoSDKCommon */; };
+		A10000022FC4A00100000001 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A10000062FC4A00100000001 /* KakaoSDKAuth */; };
+		A10000032FC4A00100000001 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = A10000072FC4A00100000001 /* KakaoSDKUser */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		445115132FBF1D930027614D /* KickLog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KickLog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		445115222FBF1D950027614D /* KickLogTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KickLogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -52,6 +58,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000012FC4A00100000001 /* KakaoSDKCommon in Frameworks */,
+				A10000022FC4A00100000001 /* KakaoSDKAuth in Frameworks */,
+				A10000032FC4A00100000001 /* KakaoSDKUser in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +121,9 @@
 			);
 			name = KickLog;
 			packageProductDependencies = (
+				A10000052FC4A00100000001 /* KakaoSDKCommon */,
+				A10000062FC4A00100000001 /* KakaoSDKAuth */,
+				A10000072FC4A00100000001 /* KakaoSDKUser */,
 			);
 			productName = KickLog;
 			productReference = 445115132FBF1D930027614D /* KickLog.app */;
@@ -195,6 +207,9 @@
 			);
 			mainGroup = 4451150A2FBF1D930027614D;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A10000042FC4A00100000001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 445115142FBF1D930027614D /* Products */;
 			projectDirPath = "";
@@ -400,15 +415,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 89V5W5F62V;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "축구 경기 데이터를 분석해 거리·속도·심박수·쿼터별 체력 변화 리포트를 제공합니다.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "KickLog는 HealthKit 데이터를 수정하지 않습니다. (현재 미사용)";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UIBackgroundModes = "fetch processing";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "KickLog-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -436,15 +444,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 89V5W5F62V;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "축구 경기 데이터를 분석해 거리·속도·심박수·쿼터별 체력 변화 리포트를 제공합니다.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "KickLog는 HealthKit 데이터를 수정하지 않습니다. (현재 미사용)";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UIBackgroundModes = "fetch processing";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "KickLog-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -586,6 +587,35 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A10000042FC4A00100000001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kakao/kakao-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.27.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A10000052FC4A00100000001 /* KakaoSDKCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000042FC4A00100000001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKCommon;
+		};
+		A10000062FC4A00100000001 /* KakaoSDKAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000042FC4A00100000001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKAuth;
+		};
+		A10000072FC4A00100000001 /* KakaoSDKUser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000042FC4A00100000001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKUser;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4451150B2FBF1D930027614D /* Project object */;
 }
