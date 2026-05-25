@@ -22,6 +22,8 @@ struct LabelingScreen: View {
     @State private var userGoals: Int = 0
     @State private var opponentGoals: Int = 0
     @State private var userAssists: Int = 0
+    @State private var selectedVenue: Venue?
+    @State private var showingVenueSheet: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -58,6 +60,11 @@ struct LabelingScreen: View {
             }
         }
         .onAppear(perform: loadInitialState)
+        .sheet(isPresented: $showingVenueSheet) {
+            VenueSelectionScreen { venue in
+                selectedVenue = venue
+            }
+        }
     }
 
     // MARK: - 초기 상태
@@ -71,6 +78,13 @@ struct LabelingScreen: View {
         userGoals = match.userGoals ?? 0
         opponentGoals = match.opponentGoals ?? 0
         userAssists = match.userAssists ?? 0
+        // venueId 로 기존 Venue 조회
+        if let venueId = match.venueId {
+            let descriptor = FetchDescriptor<Venue>(
+                predicate: #Predicate { $0.serverId == venueId }
+            )
+            selectedVenue = try? modelContext.fetch(descriptor).first
+        }
     }
 
     // MARK: - 감지된 워크아웃
@@ -252,17 +266,30 @@ struct LabelingScreen: View {
                     KLStepper(value: $userAssists)
                 }
                 KLFormRow(label: "운동장", isLast: true) {
-                    HStack(spacing: 8) {
-                        Text("미지정")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(KLTokens.textSec)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(KLTokens.chipBg, in: Capsule())
-                        Text("나중에")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(KLTokens.textTer)
+                    Button { showingVenueSheet = true } label: {
+                        HStack(spacing: 8) {
+                            if let venue = selectedVenue {
+                                HStack(spacing: 4) {
+                                    Text(venue.name)
+                                        .font(.system(size: 13, weight: .bold))
+                                    KLIcon(name: "checkmark", size: 11, color: KLTokens.pitch)
+                                }
+                                .foregroundStyle(KLTokens.pitch)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(KLTokens.pitchSoft, in: Capsule())
+                                Text("변경")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(KLTokens.pitch)
+                            } else {
+                                Text("선택")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(KLTokens.pitch)
+                                KLIcon(name: "chevron.right", size: 12, color: KLTokens.pitch)
+                            }
+                        }
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .background(KLTokens.bgElev)
@@ -324,6 +351,8 @@ struct LabelingScreen: View {
         match.userGoals = userGoals
         match.opponentGoals = opponentGoals
         match.userAssists = userAssists
+        match.venueId = selectedVenue?.serverId
+        match.venueName = selectedVenue?.name
         match.labeledAt = .now
 
         // 3. 헤드라인 4지표 재계산 (선택된 쿼터 기준)

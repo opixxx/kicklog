@@ -259,8 +259,7 @@ struct MatchDetailScreen: View {
     }
 
     private var venueDisplay: String {
-        // venueId → Venue.name 조회는 C 묶음에서 도입. 1차 placeholder.
-        "—"
+        match.venueName ?? "—"
     }
 
     private var scoreDisplay: String {

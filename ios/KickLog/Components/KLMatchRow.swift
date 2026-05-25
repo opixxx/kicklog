@@ -37,7 +37,7 @@ extension Match {
             dateNum: Self.dateNumFormatter.string(from: playedAt),
             dow: Self.dowFormatter.string(from: playedAt),
             opponent: opponentName ?? "—",
-            venue: "—",                         // venueId → Venue.name 은 후속 (Service 필요)
+            venue: venueName ?? "—",
             result: MatchResult.from(result),
             score: Self.formatScore(userGoals: userGoals, opponentGoals: opponentGoals),
             distanceKm: Double(totalDistanceM) / 1000.0,

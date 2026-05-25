@@ -40,6 +40,7 @@ final class Match {
     var serverId: Int64?
     var playedAt: Date
     var venueId: Int64?
+    var venueName: String?     // FriendMatch.venueName 패턴 — 백엔드 join 캐시
     var opponentName: String?
     var result: String?        // "W" | "D" | "L"
     var position: String?      // "GK" | "DF" | "MF" | "FW"
@@ -66,6 +67,7 @@ final class Match {
         clientMatchId: UUID = UUID(),
         playedAt: Date,
         venueId: Int64? = nil,
+        venueName: String? = nil,
         opponentName: String? = nil,
         result: String? = nil,
         position: String? = nil,
@@ -81,6 +83,7 @@ final class Match {
         self.clientMatchId = clientMatchId
         self.playedAt = playedAt
         self.venueId = venueId
+        self.venueName = venueName
         self.opponentName = opponentName
         self.result = result
         self.position = position
@@ -321,8 +324,7 @@ protocol MatchDisplayable {
 }
 
 extension Match: MatchDisplayable {
-    // venueId → Venue.name 조회는 Phase E 에서 ViewModel/Service 로. 1차는 nil.
-    var venueDisplayName: String? { nil }
+    var venueDisplayName: String? { venueName }
     var displayedAvgHeartRate: Int? { avgHeartRate }
 }
 
