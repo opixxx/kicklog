@@ -1,61 +1,36 @@
-//
-//  ContentView.swift
-//  KickLog
-//
-//  Created by opix on 5/21/26.
-//
-
 import SwiftUI
-import SwiftData
 
-struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+// 앱 루트 — 첫 실행 시 onboarding, 이후 TabView.
+struct RootView: View {
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
+        if !hasCompletedOnboarding {
+            OnboardingScreen(onComplete: { hasCompletedOnboarding = true })
+        } else {
+            mainTabs
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+    private var mainTabs: some View {
+        TabView {
+            Tab("경기", systemImage: KLIcon.resolve("tab.matches")) {
+                NavigationStack { MatchesScreen() }
+            }
+            Tab("시즌", systemImage: KLIcon.resolve("tab.season")) {
+                NavigationStack { SeasonScreen() }
+            }
+            Tab("친구", systemImage: KLIcon.resolve("tab.friends")) {
+                NavigationStack { FriendsScreen() }
+            }
+            Tab("설정", systemImage: KLIcon.resolve("tab.settings")) {
+                NavigationStack { SettingsScreen() }
             }
         }
+        .tint(KLTokens.pitch)
     }
 }
 
 #Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+    RootView()
 }
