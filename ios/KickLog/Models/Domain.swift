@@ -196,6 +196,36 @@ final class Venue {
     }
 }
 
+extension Venue {
+    // 서버 VenueResponse → SwiftData @Model UPSERT.
+    @MainActor
+    static func upsert(from dto: VenueResponse, into context: ModelContext) -> Venue {
+        let serverId = dto.id
+        let descriptor = FetchDescriptor<Venue>(
+            predicate: #Predicate { $0.serverId == serverId }
+        )
+        if let existing = try? context.fetch(descriptor).first {
+            existing.name = dto.name
+            existing.geoLat = dto.geoLat
+            existing.geoLng = dto.geoLng
+            existing.createdAt = dto.createdAt
+            try? context.save()
+            return existing
+        }
+
+        let venue = Venue(
+            serverId: dto.id,
+            name: dto.name,
+            geoLat: dto.geoLat,
+            geoLng: dto.geoLng,
+            createdAt: dto.createdAt
+        )
+        context.insert(venue)
+        try? context.save()
+        return venue
+    }
+}
+
 // MARK: - 친구 (read-only 캐시)
 
 @Model
