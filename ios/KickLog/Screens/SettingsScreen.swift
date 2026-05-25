@@ -1,8 +1,16 @@
 import SwiftUI
+import SwiftData
 
 // 설정 탭 — Form 스타일 리스트.
-// JSX settings.jsx 와 동일 구조 + iOS native Toggle 사용.
+// JSX settings.jsx + SwiftData User 실데이터.
 struct SettingsScreen: View {
+    @Environment(\.modelContext) private var modelContext
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
+
+    // 본인 User — SwiftData (AuthService 가 로그인 시 UPSERT 한 결과). 1단말 MVP 라 first 만.
+    @Query private var users: [User]
+    private var me: User? { users.first }
+
     @State private var hideHeartRate: Bool = false
 
     var body: some View {
@@ -27,13 +35,13 @@ struct SettingsScreen: View {
 
     private var profileCard: some View {
         HStack(spacing: 14) {
-            KLAvatar(name: "김조축", size: 56)
+            KLAvatar(name: me?.displayName ?? "?", size: 56)
             VStack(alignment: .leading, spacing: 2) {
-                Text("김조축")
+                Text(me?.displayName ?? "—")
                     .font(.system(size: 20, weight: .bold))
                     .tracking(-0.4)
                     .foregroundStyle(KLTokens.text)
-                (Text("2026").monospacedDigit() + Text("년 ") + Text("1").monospacedDigit() + Text("월부터 함께"))
+                Text(joinDateLabel)
                     .font(.system(size: 13))
                     .foregroundStyle(KLTokens.textSec)
             }
@@ -46,19 +54,34 @@ struct SettingsScreen: View {
         .padding(.bottom, 8)
     }
 
+    private var joinDateLabel: String {
+        guard let createdAt = me?.createdAt else { return "—" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "yyyy년 M월부터 함께"
+        return formatter.string(from: createdAt)
+    }
+
     // MARK: - 섹션들
 
     private var profileSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             KLSettingsHeader(text: "프로필")
             KLSettingsGroup {
-                KLSettingsRow(label: "이름", value: "김조축")
-                KLSettingsRow(label: "이메일", chevron: false,
-                              value: "abc@privaterelay.appleid.com")
+                KLSettingsRow(label: "이름", value: me?.displayName ?? "—")
+                KLSettingsRow(label: "이메일", chevron: false, value: me?.email ?? "—")
                 KLSettingsRow(label: "가입일", chevron: false, isLast: true,
-                              value: "2026년 1월 2일")
+                              value: profileJoinDate)
             }
         }
+    }
+
+    private var profileJoinDate: String {
+        guard let createdAt = me?.createdAt else { return "—" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "yyyy년 M월 d일"
+        return f.string(from: createdAt)
     }
 
     private var visibilitySection: some View {
@@ -112,11 +135,24 @@ struct SettingsScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             KLSettingsHeader(text: "계정")
             KLSettingsGroup {
-                KLSettingsRow(labelOnly: "로그아웃", chevron: false)
+                Button(action: handleLogout) {
+                    KLSettingsRow(labelOnly: "로그아웃", chevron: false)
+                }
+                .buttonStyle(.plain)
                 KLSettingsRow(labelOnly: "계정 삭제",
                               sub: "30일 안에 다시 로그인하면 복구됩니다",
                               chevron: false, destructive: true, isLast: true)
             }
+        }
+    }
+
+    private func handleLogout() {
+        Task {
+            await AuthService.shared.logout(modelContext: modelContext)
+            // 로컬 User 도 정리 + onboarding 재진입
+            for u in users { modelContext.delete(u) }
+            try? modelContext.save()
+            hasCompletedOnboarding = false
         }
     }
 

@@ -34,6 +34,36 @@ final class User {
     }
 }
 
+extension User {
+    // 서버 UserDTO → SwiftData @Model UPSERT. AuthService 로그인 + UserService.fetchMe 공통 경로.
+    @MainActor
+    static func upsert(from dto: UserDTO, into context: ModelContext) -> User {
+        let serverId = dto.id
+        let descriptor = FetchDescriptor<User>(
+            predicate: #Predicate { $0.serverId == serverId }
+        )
+        if let existing = try? context.fetch(descriptor).first {
+            existing.displayName = dto.displayName
+            existing.email = dto.email
+            existing.hideHeartRate = dto.hideHeartRate
+            existing.lastSyncedAt = .now
+            try? context.save()
+            return existing
+        }
+        let user = User(
+            serverId: dto.id,
+            displayName: dto.displayName,
+            email: dto.email,
+            hideHeartRate: dto.hideHeartRate,
+            createdAt: .now,
+            lastSyncedAt: .now
+        )
+        context.insert(user)
+        try? context.save()
+        return user
+    }
+}
+
 @Model
 final class Match {
     @Attribute(.unique) var clientMatchId: UUID
