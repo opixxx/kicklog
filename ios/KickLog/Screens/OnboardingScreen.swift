@@ -193,6 +193,10 @@ private struct WatchIllustration: View {
 
 private struct OnboardPage3: View {
     @Binding var currentPage: Int
+    @Environment(\.modelContext) private var modelContext
+    @State private var signInErrorMessage: String?
+    @State private var showingKakaoSoon: Bool = false
+    @State private var isSigningIn: Bool = false
 
     var body: some View {
         VStack {
@@ -211,21 +215,26 @@ private struct OnboardPage3: View {
                 .padding(.top, 8)
 
             VStack(spacing: 12) {
-                Button(action: {}) {
+                Button(action: handleAppleSignIn) {
                     HStack(spacing: 8) {
-                        KLIcon(name: "apple.logo", size: 20, color: .white)
-                        Text("Apple로 시작하기")
-                            .font(.system(size: 17, weight: .semibold))
-                            .tracking(-0.3)
-                            .foregroundStyle(.white)
+                        if isSigningIn {
+                            ProgressView().tint(.white)
+                        } else {
+                            KLIcon(name: "apple.logo", size: 20, color: .white)
+                            Text("Apple로 시작하기")
+                                .font(.system(size: 17, weight: .semibold))
+                                .tracking(-0.3)
+                                .foregroundStyle(.white)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
                     .background(.black, in: RoundedRectangle(cornerRadius: 14))
                 }
                 .buttonStyle(.plain)
+                .disabled(isSigningIn)
 
-                Button(action: {}) {
+                Button { showingKakaoSoon = true } label: {
                     HStack(spacing: 8) {
                         KLIcon(name: "kakao.bubble", size: 20, color: Color(hex: 0x3C1E1E))
                         Text("카카오로 시작하기")
@@ -241,6 +250,19 @@ private struct OnboardPage3: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 28)
+            .alert("로그인 실패", isPresented: Binding(
+                get: { signInErrorMessage != nil },
+                set: { if !$0 { signInErrorMessage = nil } }
+            )) {
+                Button("확인", role: .cancel) { signInErrorMessage = nil }
+            } message: {
+                Text(signInErrorMessage ?? "")
+            }
+            .alert("카카오 로그인 준비 중", isPresented: $showingKakaoSoon) {
+                Button("확인", role: .cancel) {}
+            } message: {
+                Text("Kakao 로그인은 SDK 통합 이후 사용 가능합니다.")
+            }
 
             Spacer()
 
@@ -259,6 +281,24 @@ private struct OnboardPage3: View {
                 KLPageDots(index: 2)
             }
             .padding(.bottom, 50)
+        }
+    }
+}
+
+// MARK: - Page 3 helpers
+
+private extension OnboardPage3 {
+    func handleAppleSignIn() {
+        guard !isSigningIn else { return }
+        isSigningIn = true
+        Task {
+            defer { isSigningIn = false }
+            do {
+                _ = try await AuthService.shared.signInWithApple(modelContext: modelContext)
+                withAnimation { currentPage += 1 }
+            } catch {
+                signInErrorMessage = error.localizedDescription
+            }
         }
     }
 }
