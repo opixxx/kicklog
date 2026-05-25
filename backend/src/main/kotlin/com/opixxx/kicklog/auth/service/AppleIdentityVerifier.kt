@@ -1,6 +1,7 @@
 package com.opixxx.kicklog.auth.service
 
-import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.core.JsonProcessingException
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.opixxx.kicklog.common.exception.ErrorCode
 import com.opixxx.kicklog.common.exception.KickLogException
@@ -63,8 +64,8 @@ class AppleIdentityVerifier(
             throw KickLogException(ErrorCode.AUTH_INVALID_APPLE_TOKEN)
         }
 
-        val header = decode(parts[0], AppleJwtHeader::class.java)
-        val payload = decode(parts[1], AppleJwtPayload::class.java)
+        val header = decodeHeader(parts[0])
+        val payload = decodePayload(parts[1])
         if (header.alg != "RS256" || payload.iss != "https://appleid.apple.com" || payload.aud != properties.clientId) {
             throw KickLogException(ErrorCode.AUTH_INVALID_APPLE_TOKEN)
         }
@@ -109,7 +110,42 @@ class AppleIdentityVerifier(
         }
     }
 
-    private fun <T> decode(value: String, type: Class<T>): T {
-        return objectMapper.readValue(decoder.decode(value), type)
+    private fun decodeHeader(value: String): AppleJwtHeader {
+        val json = decodeJson(value)
+        return AppleJwtHeader(
+            kid = json.textOrNull("kid"),
+            alg = json.textOrNull("alg"),
+        )
+    }
+
+    private fun decodePayload(value: String): AppleJwtPayload {
+        val json = decodeJson(value)
+        return AppleJwtPayload(
+            sub = json.textOrNull("sub"),
+            email = json.textOrNull("email"),
+            iss = json.textOrNull("iss"),
+            aud = json.textOrNull("aud"),
+            exp = json.longOrNull("exp"),
+        )
+    }
+
+    private fun decodeJson(value: String): JsonNode {
+        return try {
+            objectMapper.readTree(decoder.decode(value))
+        } catch (exception: IllegalArgumentException) {
+            throw KickLogException(ErrorCode.AUTH_INVALID_APPLE_TOKEN, cause = exception)
+        } catch (exception: JsonProcessingException) {
+            throw KickLogException(ErrorCode.AUTH_INVALID_APPLE_TOKEN, cause = exception)
+        }
+    }
+
+    private fun JsonNode.textOrNull(fieldName: String): String? {
+        val field = get(fieldName)?.takeUnless { it.isNull } ?: return null
+        return if (field.isTextual) field.asText() else null
+    }
+
+    private fun JsonNode.longOrNull(fieldName: String): Long? {
+        val field = get(fieldName)?.takeUnless { it.isNull } ?: return null
+        return if (field.isNumber) field.asLong() else null
     }
 }
