@@ -41,8 +41,11 @@ struct MatchesScreen: View {
         }
         .background(KLTokens.bg)
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .navigationDestination(for: Match.self) { match in
+            MatchDetailScreen(match: match)
+        }
         .sheet(item: $labelingTarget) { match in
-            // 라벨링 편집 흐름은 Phase E2 (후속 PR) — 1차는 감지 결과만 안내.
+            // 라벨링 편집 흐름은 B 묶음 (후속 PR) — 1차는 감지 결과만 안내.
             LabelingPlaceholderSheet(match: match)
         }
     }
@@ -128,8 +131,10 @@ struct MatchesScreen: View {
             KLSectionTitle(text: "최근 경기")
             VStack(spacing: 0) {
                 ForEach(Array(labeledMatches.enumerated()), id: \.element.persistentModelID) { index, match in
-                    // Detail push 는 Phase E2 (후속 PR) — Match → MatchDetailScreen 마이그레이션 후 활성화
-                    KLMatchRow(data: match.rowData, isLast: index == labeledMatches.count - 1)
+                    NavigationLink(value: match) {
+                        KLMatchRow(data: match.rowData, isLast: index == labeledMatches.count - 1)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .background(KLTokens.bgElev)
