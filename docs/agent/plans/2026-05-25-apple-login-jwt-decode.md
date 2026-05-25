@@ -26,6 +26,7 @@ Apple Sign-In identityToken 검증이 백엔드에서 `AppleJwtHeader` Jackson �
 ## 2. 접근 (Approach)
 
 - `AppleIdentityVerifier`의 JWT header/payload decode 경로를 Jackson Kotlin 생성자 역직렬화에 의존하지 않도록 변경한다.
+- iOS 앱에 Apple Sign-In entitlement를 추가한다.
 - API 계약, DB 스키마, iOS 요청 형식은 변경하지 않는다.
 - Apple JWT의 `alg`, `iss`, `aud`, `exp`, `kid`, 서명 검증 규칙은 유지한다.
 
@@ -61,6 +62,7 @@ Apple Sign-In identityToken 검증이 백엔드에서 `AppleJwtHeader` Jackson �
 - `./gradlew test --tests com.opixxx.kicklog.auth.service.AppleIdentityVerifierTest` 통과
 - `./gradlew test --tests 'com.opixxx.kicklog.auth.service.*' --tests 'com.opixxx.kicklog.common.security.*'` 통과
 - `./gradlew compileKotlin` 통과
+- `plutil -lint ios/KickLog/KickLog.entitlements` 통과
 - `./gradlew check`는 `FriendshipMigrationTest`의 Testcontainers/Docker 확인 단계에서 로컬 Docker 상태 영향으로 3분 이상 정체되어 중단
 
 ---
