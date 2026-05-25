@@ -39,7 +39,7 @@ extension Match {
             opponent: opponentName ?? "—",
             venue: "—",                         // venueId → Venue.name 은 후속 (Service 필요)
             result: MatchResult.from(result),
-            score: userGoals.map { "\($0)점" } ?? "—",
+            score: Self.formatScore(userGoals: userGoals, opponentGoals: opponentGoals),
             distanceKm: Double(totalDistanceM) / 1000.0,
             avgSpeedKmh: maxSpeedKmh,           // 헤드라인은 max — 평균은 quarter 단위
             sprintCount: sprintCount,
@@ -59,6 +59,15 @@ extension Match {
         f.dateFormat = "E"
         return f
     }()
+
+    // userGoals + opponentGoals → "N-M" / "N점" / "—"
+    static func formatScore(userGoals: Int?, opponentGoals: Int?) -> String {
+        switch (userGoals, opponentGoals) {
+        case let (u?, o?): return "\(u)-\(o)"
+        case let (u?, nil): return "\(u)점"
+        default: return "—"
+        }
+    }
 }
 
 // MARK: - String("W"/"D"/"L") → MatchResult

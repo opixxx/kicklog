@@ -16,12 +16,12 @@ enum SampleDataSeeder {
         let calendar = Calendar(identifier: .gregorian)
         let now = Date()
 
-        let scenarios: [(daysAgo: Int, opponent: String, result: String, goals: Int, distance: Int, maxSpeed: Double, sprint: Int, hr: Int)] = [
-            (7, "FC블루스", "W", 2, 3200, 19.4, 14, 158),
-            (14, "레전드FC", "D", 1, 2800, 17.1, 9, 162),
-            (21, "어반FC", "L", 0, 3400, 18.0, 11, 168),
-            (28, "옆동네FC", "W", 1, 3000, 18.6, 12, 156),
-            (35, "한강조축", "W", 3, 3700, 20.2, 16, 161),
+        let scenarios: [(daysAgo: Int, opponent: String, result: String, userGoals: Int, opponentGoals: Int, distance: Int, maxSpeed: Double, sprint: Int, hr: Int)] = [
+            (7, "FC블루스", "W", 4, 2, 3200, 19.4, 14, 158),
+            (14, "레전드FC", "D", 2, 2, 2800, 17.1, 9, 162),
+            (21, "어반FC", "L", 1, 3, 3400, 18.0, 11, 168),
+            (28, "옆동네FC", "W", 3, 1, 3000, 18.6, 12, 156),
+            (35, "한강조축", "W", 5, 3, 3700, 20.2, 16, 161),
         ]
 
         for scenario in scenarios {
@@ -32,8 +32,9 @@ enum SampleDataSeeder {
                 opponentName: scenario.opponent,
                 result: scenario.result,
                 position: "MF",
-                userGoals: scenario.goals,
+                userGoals: scenario.userGoals,
                 userAssists: 1,
+                opponentGoals: scenario.opponentGoals,
                 totalDistanceM: scenario.distance,
                 maxSpeedKmh: scenario.maxSpeed,
                 sprintCount: scenario.sprint,
