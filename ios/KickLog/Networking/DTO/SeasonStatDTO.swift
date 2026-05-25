@@ -9,6 +9,11 @@ struct SeasonStatResponse: Decodable {
     let totalAssists: Int
     let matchCount: Int
     let quarterCount: Int
+    let winCount: Int
+    let drawCount: Int
+    let lossCount: Int
+    let avgHeartRate: Int
+    let monthlyDistanceM: [Int]   // 항상 12개 (1월~12월, UTC playedAt 기준, 빈 월 0)
     let best: SeasonBestResponse
 }
 

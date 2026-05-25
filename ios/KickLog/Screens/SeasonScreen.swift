@@ -17,9 +17,6 @@ struct SeasonScreen: View {
         case unauthenticated
     }
 
-    // 월별 라인 차트는 별도 endpoint 없음 — 1차는 빈 차트 / 후속 backend 추가 시 연결
-    private let monthlyDistance: [Double] = []
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -39,7 +36,7 @@ struct SeasonScreen: View {
                 case .data(let stats):
                     seasonHeader(stats: stats)
                     statsGrid(stats: stats)
-                    monthlyChart
+                    monthlyChart(stats: stats)
                     footer
                 }
             }
@@ -178,8 +175,7 @@ struct SeasonScreen: View {
         .padding(.bottom, 14)
     }
 
-    // MARK: - 2×2 통계 그리드 (api-spec §8.1 매핑 가능한 4개)
-    // 승무패/평균/월별 차트는 backend Season schema 확장 후 추가 (api-spec.md TODO)
+    // MARK: - 2×3 통계 그리드 (api-spec §8.1 6개 카드 — 와이어프레임 완성형)
 
     private func statsGrid(stats: SeasonStatResponse) -> some View {
         LazyVGrid(
@@ -213,13 +209,25 @@ struct SeasonScreen: View {
                 }
             }
 
-            // 3. 출전
-            KLSeasonCard(icon: "calendar", title: "출전") {
-                bigStat(value: "\(stats.matchCount)", unit: "경기")
-                (Text("\(stats.quarterCount)").monospacedDigit() + Text(" 쿼터 출전"))
-                    .font(.system(size: 12))
-                    .foregroundStyle(KLTokens.textSec)
-                    .padding(.top, 8)
+            // 3. 승무패 — winCount/drawCount/lossCount + 승률 derive
+            KLSeasonCard(icon: "trophy.fill", iconColor: KLTokens.amber, title: "승무패") {
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text("\(stats.winCount)")
+                        .font(KLFont.numeric(30, weight: .bold))
+                        .tracking(-1)
+                        .foregroundStyle(KLTokens.winFg)
+                    dash
+                    Text("\(stats.drawCount)")
+                        .font(KLFont.numeric(30, weight: .bold))
+                        .tracking(-1)
+                        .foregroundStyle(KLTokens.text)
+                    dash
+                    Text("\(stats.lossCount)")
+                        .font(KLFont.numeric(30, weight: .bold))
+                        .tracking(-1)
+                        .foregroundStyle(KLTokens.loseFg)
+                }
+                winRateLabel(stats: stats)
             }
 
             // 4. 시즌 베스트
@@ -233,16 +241,68 @@ struct SeasonScreen: View {
                                   value: "\(stats.best.mostSprintCount)", unit: "회")
                 }
             }
+
+            // 5. 출전
+            KLSeasonCard(icon: "calendar", title: "출전") {
+                bigStat(value: "\(stats.matchCount)", unit: "경기")
+                (Text("\(stats.quarterCount)").monospacedDigit() + Text(" 쿼터 출전"))
+                    .font(.system(size: 12))
+                    .foregroundStyle(KLTokens.textSec)
+                    .padding(.top, 8)
+            }
+
+            // 6. 평균 — km/경기 derive + avgHeartRate
+            KLSeasonCard(icon: "chart.line.uptrend", title: "평균") {
+                let perMatchKm = stats.matchCount > 0
+                    ? Double(stats.totalDistanceM) / Double(stats.matchCount) / 1000.0
+                    : 0.0
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(String(format: "%.1f", perMatchKm))
+                        .font(KLFont.numeric(26, weight: .bold))
+                        .tracking(-0.9)
+                        .foregroundStyle(KLTokens.text)
+                    Text("km / 경기")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(KLTokens.textSec)
+                }
+                if stats.avgHeartRate > 0 {
+                    (Text("평균심박 ")
+                     + Text("\(stats.avgHeartRate)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(KLTokens.text)
+                     + Text(" bpm"))
+                        .font(.system(size: 12).monospacedDigit())
+                        .foregroundStyle(KLTokens.textSec)
+                        .padding(.top, 8)
+                }
+            }
         }
         .padding(.horizontal, 16)
+    }
+
+    // 승률 텍스트 — `winCount / (W+D+L) * 100`, 매치 0개면 표시 X
+    @ViewBuilder
+    private func winRateLabel(stats: SeasonStatResponse) -> some View {
+        let total = stats.winCount + stats.drawCount + stats.lossCount
+        if total > 0 {
+            let pct = Int((Double(stats.winCount) / Double(total) * 100).rounded())
+            (Text("승률 ")
+             + Text("\(pct)%")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(KLTokens.text))
+                .font(.system(size: 12).monospacedDigit())
+                .foregroundStyle(KLTokens.textSec)
+                .padding(.top, 8)
+        }
     }
 
     // MARK: - 월별 라인 차트
 
     @ViewBuilder
-    private var monthlyChart: some View {
-        // 월별 이동거리 API 는 후속 — backend Season schema 확장 시 활성화
-        if !monthlyDistance.isEmpty {
+    private func monthlyChart(stats: SeasonStatResponse) -> some View {
+        // monthlyDistanceM 는 백엔드 응답 12개 (m 단위). km 로 변환해 라인 차트.
+        // 모든 월이 0이면 표시 X (데이터 없음 시 차트 의미 없음)
+        if stats.monthlyDistanceM.contains(where: { $0 > 0 }) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("월별 이동거리")
@@ -254,7 +314,7 @@ struct SeasonScreen: View {
                         .font(.system(size: 12))
                         .foregroundStyle(KLTokens.textSec)
                 }
-                MonthlyLineChart(values: monthlyDistance)
+                MonthlyLineChart(values: stats.monthlyDistanceM.map { Double($0) / 1000.0 })
                     .frame(height: 80)
             }
             .padding(16)
@@ -329,7 +389,7 @@ struct SeasonScreen: View {
 // MARK: - 월별 라인 차트 Path
 
 private struct MonthlyLineChart: View {
-    let values: [Double]  // 1~5월 데이터 (6~12월은 미래)
+    let values: [Double]  // 12개 (1월~12월). 0인 월은 0 baseline.
 
     var body: some View {
         GeometryReader { proxy in
@@ -337,7 +397,8 @@ private struct MonthlyLineChart: View {
             let h = proxy.size.height
             let totalMonths = 12
             let xStep = (w - 20) / CGFloat(totalMonths - 1)
-            let maxValue: CGFloat = 10  // 5×y_max=10 기준
+            // 최대값 기준 dynamic scale + 15% 여유. 모두 0이면 baseline.
+            let maxValue: CGFloat = max(CGFloat(values.max() ?? 0) * 1.15, 1)
             let plotHeight = h - 20
 
             // 12개 월 점선 그리드
