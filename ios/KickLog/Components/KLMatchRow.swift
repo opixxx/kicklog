@@ -1,9 +1,83 @@
 import SwiftUI
 
-// JSX 의 KLMatchRow — 경기 리스트 한 행.
-// 날짜 컬럼 + 상대팀/운동장 + 결과 칩 + chevron, 하단에 sub-stats 줄.
+// 경기 리스트 행에 필요한 표시 데이터.
+// SampleMatch / SwiftData Match 양쪽 다 `.rowData` 로 변환해 전달한다.
+struct MatchRowData {
+    let dateNum: String
+    let dow: String
+    let opponent: String
+    let venue: String
+    let result: MatchResult
+    let score: String
+    let distanceKm: Double
+    let avgSpeedKmh: Double
+    let sprintCount: Int
+    let avgHeartRateBpm: Int
+}
+
+// MARK: - SampleMatch → MatchRowData
+
+extension SampleMatch {
+    var rowData: MatchRowData {
+        MatchRowData(
+            dateNum: dateNum, dow: dow,
+            opponent: opponent, venue: venue,
+            result: result, score: score,
+            distanceKm: distanceKm, avgSpeedKmh: avgSpeedKmh,
+            sprintCount: sprintCount, avgHeartRateBpm: avgHeartRateBpm
+        )
+    }
+}
+
+// MARK: - SwiftData Match → MatchRowData
+
+extension Match {
+    var rowData: MatchRowData {
+        MatchRowData(
+            dateNum: Self.dateNumFormatter.string(from: playedAt),
+            dow: Self.dowFormatter.string(from: playedAt),
+            opponent: opponentName ?? "—",
+            venue: "—",                         // venueId → Venue.name 은 후속 (Service 필요)
+            result: MatchResult.from(result),
+            score: userGoals.map { "\($0)점" } ?? "—",
+            distanceKm: Double(totalDistanceM) / 1000.0,
+            avgSpeedKmh: maxSpeedKmh,           // 헤드라인은 max — 평균은 quarter 단위
+            sprintCount: sprintCount,
+            avgHeartRateBpm: avgHeartRate
+        )
+    }
+
+    private static let dateNumFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "M/d"
+        return f
+    }()
+
+    private static let dowFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "E"
+        return f
+    }()
+}
+
+// MARK: - String("W"/"D"/"L") → MatchResult
+
+extension MatchResult {
+    static func from(_ code: String?) -> MatchResult {
+        switch code {
+        case "W": return .win
+        case "L": return .lose
+        case "D": return .draw
+        default: return .draw                   // 미라벨링 — 일단 draw 색으로 표시
+        }
+    }
+}
+
+// MARK: - 경기 행 View
+
 struct KLMatchRow: View {
-    let match: Match
+    let data: MatchRowData
     var isLast: Bool = false
     var onTap: () -> Void = {}
 
@@ -11,49 +85,44 @@ struct KLMatchRow: View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 14) {
-                    // 날짜 컬럼
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(match.dateNum)
+                        Text(data.dateNum)
                             .font(KLFont.numeric(22, weight: .bold))
                             .tracking(-0.6)
                             .foregroundStyle(KLTokens.text)
-                        Text(match.dow)
+                        Text(data.dow)
                             .font(.system(size: 12))
                             .foregroundStyle(KLTokens.textSec)
                     }
                     .frame(minWidth: 38, alignment: .leading)
 
-                    // 상대팀 + 운동장
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(match.opponent)
+                        Text(data.opponent)
                             .font(.system(size: 17, weight: .semibold))
                             .tracking(-0.4)
                             .foregroundStyle(KLTokens.text)
-                        Text(match.venue)
+                        Text(data.venue)
                             .font(.system(size: 13))
                             .foregroundStyle(KLTokens.textSec)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    // 결과 칩
                     KLChip(bg: resultBg, fg: resultFg, size: .md) {
-                        Text(match.score).monospacedDigit()
-                        Text(match.result.rawValue)
-                            .padding(.leading, 2)
+                        Text(data.score).monospacedDigit()
+                        Text(data.result.rawValue).padding(.leading, 2)
                     }
 
                     KLIcon(name: "chevron.right", size: 14, color: KLTokens.textTer)
                 }
 
-                // sub-stats 줄
                 HStack(spacing: 0) {
-                    StatPiece(text: "\(formatted(match.distanceKm))km")
+                    StatPiece(text: "\(formatted(data.distanceKm))km")
                     StatDot()
-                    StatPiece(text: "\(formatted(match.avgSpeedKmh))km/h")
+                    StatPiece(text: "\(formatted(data.avgSpeedKmh))km/h")
                     StatDot()
-                    StatPiece(text: "\(match.sprintCount)회")
+                    StatPiece(text: "\(data.sprintCount)회")
                     StatDot()
-                    StatPiece(text: "\(match.avgHeartRateBpm)bpm")
+                    StatPiece(text: "\(data.avgHeartRateBpm)bpm")
                 }
                 .font(.system(size: 12).monospacedDigit())
                 .foregroundStyle(KLTokens.textSec)
@@ -74,10 +143,8 @@ struct KLMatchRow: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 결과별 색
-
     private var resultBg: Color {
-        switch match.result {
+        switch data.result {
         case .win: return KLTokens.winBg
         case .draw: return KLTokens.drawBg
         case .lose: return KLTokens.loseBg
@@ -85,26 +152,21 @@ struct KLMatchRow: View {
     }
 
     private var resultFg: Color {
-        switch match.result {
+        switch data.result {
         case .win: return KLTokens.winFg
         case .draw: return KLTokens.drawFg
         case .lose: return KLTokens.loseFg
         }
     }
 
-    // 소수점 1자리 (JSX 표기 그대로)
     private func formatted(_ value: Double) -> String {
         String(format: "%.1f", value)
     }
 }
 
-// MARK: - sub-stats 보조 컴포넌트
-
 private struct StatPiece: View {
     let text: String
-    var body: some View {
-        Text(text)
-    }
+    var body: some View { Text(text) }
 }
 
 private struct StatDot: View {
@@ -117,8 +179,8 @@ private struct StatDot: View {
 
 #Preview {
     VStack(spacing: 0) {
-        ForEach(Array(Match.samples.enumerated()), id: \.element.id) { index, match in
-            KLMatchRow(match: match, isLast: index == Match.samples.count - 1)
+        ForEach(Array(SampleMatch.samples.enumerated()), id: \.element.id) { index, match in
+            KLMatchRow(data: match.rowData, isLast: index == SampleMatch.samples.count - 1)
         }
     }
     .background(KLTokens.bgElev)

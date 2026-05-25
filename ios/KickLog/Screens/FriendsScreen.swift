@@ -4,7 +4,7 @@ import SwiftUI
 // JSX friends.jsx 의 KLFriendsPopulatedScreen 1차 포팅 (empty 변형은 후속).
 struct FriendsScreen: View {
     @Environment(\.colorScheme) private var scheme
-    @State private var friends: [Friend] = Friend.samples
+    @State private var friends: [SampleFriend] = SampleFriend.samples
     @State private var pendingRequest: FriendRequest? = FriendRequest.pendingSample
 
     var body: some View {
@@ -36,7 +36,7 @@ struct FriendsScreen: View {
         }
         .background(KLTokens.bg)
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .navigationDestination(for: Friend.self) { friend in
+        .navigationDestination(for: SampleFriend.self) { friend in
             FriendDetailScreen(friend: friend)
         }
     }
@@ -113,7 +113,7 @@ struct FriendsScreen: View {
         }
     }
 
-    private func friendRow(_ friend: Friend, isLast: Bool) -> some View {
+    private func friendRow(_ friend: SampleFriend, isLast: Bool) -> some View {
         HStack(spacing: 12) {
             KLAvatar(name: friend.name)
             VStack(alignment: .leading, spacing: 2) {

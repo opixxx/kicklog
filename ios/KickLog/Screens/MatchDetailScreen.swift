@@ -3,7 +3,7 @@ import SwiftUI
 // 매치 상세 — JSX match-detail.jsx 그대로 옮김.
 // Hero(pitch 그라디언트) → 2×2 통계 → 3개 막대 차트 → 메타 정보 → 카카오 공유.
 struct MatchDetailScreen: View {
-    let match: Match
+    let match: SampleMatch
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
 
@@ -301,6 +301,6 @@ private struct HeroPitchDecoration: Shape {
 
 #Preview {
     NavigationStack {
-        MatchDetailScreen(match: Match.samples[0])
+        MatchDetailScreen(match: SampleMatch.samples[0])
     }
 }

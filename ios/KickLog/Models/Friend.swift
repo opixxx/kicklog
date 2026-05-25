@@ -1,14 +1,14 @@
 import Foundation
 
 // 친구 — 더미 단계 모델.
-struct Friend: Identifiable, Hashable {
+struct SampleFriend: Identifiable, Hashable {
     let id = UUID()
     let name: String
     let lastMatchLabel: String   // "최근 경기: 3일 전 · 95.4km"
 }
 
-extension Friend {
-    static let samples: [Friend] = [
+extension SampleFriend {
+    static let samples: [SampleFriend] = [
         .init(name: "김조축", lastMatchLabel: "최근 경기: 3일 전 · 95.4km"),
         .init(name: "이미드", lastMatchLabel: "최근 경기: 5일 전 · 78.2km"),
         .init(name: "박수비", lastMatchLabel: "최근 경기: 어제 · 102.6km"),

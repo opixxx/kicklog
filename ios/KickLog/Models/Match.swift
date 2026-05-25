@@ -2,7 +2,7 @@ import Foundation
 
 // 더미 단계 모델 — 추후 SwiftData @Model + 백엔드 API 응답 모델로 교체 예정.
 // JSX 와이어프레임의 matches 배열 구조를 그대로 따른다.
-struct Match: Identifiable, Hashable {
+struct SampleMatch: Identifiable, Hashable {
     let id = UUID()
     let dateNum: String       // "5/18" — 와이어프레임 표기 그대로
     let dow: String           // "수" / "일"
@@ -33,8 +33,8 @@ struct LabelingQueueItem: Identifiable, Hashable {
 
 // MARK: - Sample data (와이어프레임의 matches.jsx 하드코딩 값 그대로)
 
-extension Match {
-    static let samples: [Match] = [
+extension SampleMatch {
+    static let samples: [SampleMatch] = [
         .init(dateNum: "5/18", dow: "수", opponent: "FC블루스",
               venue: "마포 풋살장", result: .win, score: "4-2",
               distanceKm: 3.2, avgSpeedKmh: 19.4, sprintCount: 14, avgHeartRateBpm: 158),
