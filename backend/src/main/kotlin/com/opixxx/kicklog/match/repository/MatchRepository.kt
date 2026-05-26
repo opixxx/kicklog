@@ -17,9 +17,21 @@ interface MatchRepository : JpaRepository<Match, Long> {
         SELECT m
         FROM Match m
         WHERE m.userId = :userId
+        ORDER BY m.playedAt DESC, m.id DESC
+        """,
+    )
+    fun findFirstPageByUserId(
+        @Param("userId") userId: Long,
+        pageable: Pageable,
+    ): List<Match>
+
+    @Query(
+        """
+        SELECT m
+        FROM Match m
+        WHERE m.userId = :userId
           AND (
-              :cursorPlayedAt IS NULL
-              OR m.playedAt < :cursorPlayedAt
+              m.playedAt < :cursorPlayedAt
               OR (m.playedAt = :cursorPlayedAt AND m.id < :cursorId)
           )
         ORDER BY m.playedAt DESC, m.id DESC
@@ -27,8 +39,8 @@ interface MatchRepository : JpaRepository<Match, Long> {
     )
     fun findAllByUserIdAfterCursor(
         @Param("userId") userId: Long,
-        @Param("cursorPlayedAt") cursorPlayedAt: Instant?,
-        @Param("cursorId") cursorId: Long?,
+        @Param("cursorPlayedAt") cursorPlayedAt: Instant,
+        @Param("cursorId") cursorId: Long,
         pageable: Pageable,
     ): List<Match>
 
