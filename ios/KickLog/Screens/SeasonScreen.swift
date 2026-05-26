@@ -158,7 +158,7 @@ struct SeasonScreen: View {
 
     private func seasonHeader(stats: SeasonStatResponse) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("\(stats.year)")
+            Text(String(stats.year))
                 .font(KLFont.numeric(26, weight: .bold))
                 .tracking(-0.7)
                 .foregroundStyle(KLTokens.text)
