@@ -2,6 +2,11 @@ spring:
   application:
     name: kicklog
 
+  # 로컬 개발용 .env 파일 로드 (없으면 무시) — OS 환경변수가 우선.
+  # 운영 환경(EC2/systemd, SSM)에서는 .env 없이 OS env 만으로 동작한다.
+  config:
+    import: "optional:file:.env[.properties]"
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/kicklog}
     username: ${DB_USERNAME:kicklog}
