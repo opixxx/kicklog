@@ -68,6 +68,75 @@ struct QuarterDetailResponse: Decodable {
     let activeEnergyKcal: Int
 }
 
+// MARK: - 목록 응답 (5.2 본인, 5.5 친구 공용)
+
+struct MatchSummaryResponse: Decodable, Hashable {
+    let id: Int64
+    let clientMatchId: UUID
+    let venueId: Int64?
+    let playedAt: Date
+    let opponent: String?
+    let result: String?           // "WIN" | "DRAW" | "LOSS" | null
+    let position: String?         // "GK" | "DF" | "MF" | "FW" | null
+    let goals: Int
+    let assists: Int
+    let opponentGoals: Int?
+    let totalDistanceM: Int
+    let maxSpeedKmh: Double
+    let sprintCount: Int
+    let avgHeartRate: Int?        // 친구 hideHeartRate=true 면 null
+    let quarterCount: Int
+}
+
+struct CursorMatchResponse: Decodable {
+    let content: [MatchSummaryResponse]
+    let size: Int
+    let nextCursor: String?
+    let hasNext: Bool
+}
+
+// MARK: - 표시 변환 — MatchSummaryResponse → MatchRowData
+
+extension MatchSummaryResponse {
+    var rowData: MatchRowData {
+        MatchRowData(
+            dateNum: Self.dateNumFormatter.string(from: playedAt),
+            dow: Self.dowFormatter.string(from: playedAt),
+            opponent: opponent ?? "—",
+            venue: "—",                               // 친구 경기는 venue 이름이 응답에 없음 (venueId 만 노출)
+            result: MatchResult.from(Self.resultToCode(result)),
+            score: Match.formatScore(userGoals: goals, opponentGoals: opponentGoals),
+            distanceKm: Double(totalDistanceM) / 1000.0,
+            avgSpeedKmh: maxSpeedKmh,
+            sprintCount: sprintCount,
+            avgHeartRateBpm: avgHeartRate ?? 0        // null = 비공개 → 행에서는 0 으로 표시
+        )
+    }
+
+    // "WIN"/"DRAW"/"LOSS" → "W"/"D"/"L" (MatchResult.from 입력 형식)
+    private static func resultToCode(_ wire: String?) -> String? {
+        switch wire {
+        case "WIN": return "W"
+        case "DRAW": return "D"
+        case "LOSS": return "L"
+        default: return nil
+        }
+    }
+
+    private static let dateNumFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "M/d"
+        return f
+    }()
+
+    private static let dowFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "E"
+        return f
+    }()
+}
+
 // MARK: - SwiftData Match → PutMatchRequest
 
 extension Match {

@@ -44,4 +44,23 @@ final class FriendService {
         ]
         return try await apiClient.get("/users/search", query: items)
     }
+
+    // MARK: - 친구 경기 (5.5, 5.6) — FRIEND_UNAUTHORIZED / USER_NOT_FOUND 가능
+    // 친구가 hideHeartRate=true 면 응답의 avgHeartRate / quarter heart rate 가 null 로 마스킹됨.
+
+    func fetchFriendMatches(
+        userId: Int64,
+        cursor: String? = nil,
+        size: Int = 20
+    ) async throws -> CursorMatchResponse {
+        var items: [URLQueryItem] = [URLQueryItem(name: "size", value: String(size))]
+        if let cursor {
+            items.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        return try await apiClient.get("/users/\(userId)/matches", query: items)
+    }
+
+    func fetchFriendMatch(userId: Int64, matchId: Int64) async throws -> MatchDetailResponse {
+        try await apiClient.get("/users/\(userId)/matches/\(matchId)", query: nil)
+    }
 }
