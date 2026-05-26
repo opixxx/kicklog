@@ -2,7 +2,7 @@
 -- iOS 라벨링 화면에서 "본인 골" 과 분리되어 입력되며, result(W/D/L) 는 team_goals vs opponent_goals 로 자동 derive 한다.
 -- nullable — 사용자가 점수를 모르는 경우 NULL 유지 (result 도 NULL).
 ALTER TABLE matches
-    ADD COLUMN team_goals SMALLINT;
+    ADD COLUMN team_goals INTEGER;
 
 -- 0 이상 검증 (Bean Validation 과 이중 안전망).
 ALTER TABLE matches

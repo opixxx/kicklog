@@ -278,8 +278,8 @@ CREATE TABLE matches (
   result            VARCHAR(1),                       -- 'W' | 'D' | 'L' | NULL — team_goals vs opponent_goals 로 백엔드 자동 derive (V10+)
   position          VARCHAR(2),                       -- 'GK' | 'DF' | 'MF' | 'FW' | NULL
   user_goals        SMALLINT,                         -- 본인이 직접 넣은 골
-  team_goals        SMALLINT,                         -- 팀 전체 골 (V10+). NULL=미입력
-  opponent_goals    SMALLINT,                         -- 상대팀 골 (V9+). NULL=미입력
+  team_goals        INTEGER,                          -- 팀 전체 골 (V10+). NULL=미입력
+  opponent_goals    INTEGER,                          -- 상대팀 골 (V9+). NULL=미입력
   user_assists      SMALLINT,
   -- 헤드라인 4지표
   total_distance_m  INT          NOT NULL,
