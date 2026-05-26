@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A10000012FC4A00100000001 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = A10000052FC4A00100000001 /* KakaoSDKCommon */; };
+		A10000022FC4A00100000001 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A10000062FC4A00100000001 /* KakaoSDKAuth */; };
+		A10000032FC4A00100000001 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = A10000072FC4A00100000001 /* KakaoSDKUser */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		445115232FBF1D950027614D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -22,12 +28,6 @@
 			remoteInfo = KickLog;
 		};
 /* End PBXContainerItemProxy section */
-
-/* Begin PBXBuildFile section */
-		A10000012FC4A00100000001 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = A10000052FC4A00100000001 /* KakaoSDKCommon */; };
-		A10000022FC4A00100000001 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A10000062FC4A00100000001 /* KakaoSDKAuth */; };
-		A10000032FC4A00100000001 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = A10000072FC4A00100000001 /* KakaoSDKUser */; };
-/* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		445115132FBF1D930027614D /* KickLog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KickLog.app; sourceTree = BUILT_PRODUCTS_DIR; };
