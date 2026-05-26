@@ -275,9 +275,11 @@ CREATE TABLE matches (
   played_at         TIMESTAMPTZ  NOT NULL,
   venue_id          BIGINT                REFERENCES venues(id) ON DELETE SET NULL,
   opponent_name     VARCHAR(100),
-  result            VARCHAR(1),                       -- 'W' | 'D' | 'L' | NULL
+  result            VARCHAR(1),                       -- 'W' | 'D' | 'L' | NULL — team_goals vs opponent_goals 로 백엔드 자동 derive (V10+)
   position          VARCHAR(2),                       -- 'GK' | 'DF' | 'MF' | 'FW' | NULL
-  user_goals        SMALLINT,
+  user_goals        SMALLINT,                         -- 본인이 직접 넣은 골
+  team_goals        SMALLINT,                         -- 팀 전체 골 (V10+). NULL=미입력
+  opponent_goals    SMALLINT,                         -- 상대팀 골 (V9+). NULL=미입력
   user_assists      SMALLINT,
   -- 헤드라인 4지표
   total_distance_m  INT          NOT NULL,
@@ -290,8 +292,20 @@ CREATE TABLE matches (
   CHECK (result IN ('W','D','L') OR result IS NULL),
   CHECK (position IN ('GK','DF','MF','FW') OR position IS NULL),
   CHECK (user_goals IS NULL OR user_goals >= 0),
-  CHECK (user_assists IS NULL OR user_assists >= 0)
+  CHECK (user_assists IS NULL OR user_assists >= 0),
+  CHECK (team_goals IS NULL OR team_goals >= 0),
+  CHECK (team_goals IS NULL OR team_goals >= user_goals)  -- 본인 골은 팀 골 초과 불가 (V10+)
 );
+
+-- 매치 결과(result) 도출 규칙 (V10+):
+--   result = derive(team_goals, opponent_goals)
+--     · 둘 중 하나라도 NULL  → result = NULL ("점수 모름" 상태)
+--     · team_goals >  opponent_goals → 'W'
+--     · team_goals == opponent_goals → 'D'
+--     · team_goals <  opponent_goals → 'L'
+-- 클라이언트는 result 필드를 보낼 수 없다 (UpsertMatchRequest 에서 제거됨). 보내도 무시.
+-- 기존 row 의 result 가 'W'/'D'/'L' 이지만 team_goals 가 NULL 인 경우, 사용자가 라벨링을 다시 저장하면 (team_goals 미입력 유지 시) result 는 NULL 로 의도적 리셋된다.
+-- user_goals 는 NOT NULL DEFAULT 0 (미입력 = 0 으로 간주), team_goals / opponent_goals 는 NULL 허용 (모름 상태).
 CREATE INDEX idx_matches_user_played ON matches(user_id, played_at DESC);
 
 -- Quarter Workouts (쿼터별 집계)
