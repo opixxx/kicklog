@@ -33,7 +33,9 @@ struct FriendMatchDetailScreen: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .ignoresSafeArea(edges: match == nil ? [] : .top)
         .task { await load() }
-        .refreshable { await load() }
+        // .refreshable 클로저는 view rebuild 시 내부 Task 가 자동 cancel 되어
+        // URLSession 요청이 -999 cancelled 로 끊긴다. 새 Task 로 wrapping 해 lifetime 분리.
+        .refreshable { _ = await Task { await load() }.value }
     }
 
     // MARK: - Hero
