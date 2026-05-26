@@ -28,6 +28,23 @@ final class HealthKitService {
         return types
     }()
 
+    // DEBUG 빌드 전용 — E2E 테스트용 워크아웃 시드를 위한 share(write) 권한.
+    // 릴리즈 빌드에서는 빈 set 으로 권한 다이얼로그에 노출되지 않는다.
+    static let writeTypes: Set<HKSampleType> = {
+        #if DEBUG
+        return [
+            HKObjectType.workoutType(),
+            HKQuantityType(.heartRate),
+            HKQuantityType(.distanceWalkingRunning),
+            HKQuantityType(.activeEnergyBurned),
+            HKQuantityType(.runningSpeed),
+            HKSeriesType.workoutRoute(),
+        ]
+        #else
+        return []
+        #endif
+    }()
+
     enum AuthorizationStatus {
         case notDetermined
         case authorized          // 권한 화면 한 번 본 상태 (Apple 정책상 read 권한은 share status 로만 확인 가능)
@@ -44,7 +61,7 @@ final class HealthKitService {
     // 주의: HealthKit read 권한은 Apple 정책상 "사용자가 허용했는지" 직접 확인 불가 — 데이터를 실제 쿼리해서 빈 결과인지로 추론해야 한다 (Phase B 에서 처리).
     func requestAuthorization() async throws {
         guard isHealthDataAvailable else { throw HealthKitError.notAvailable }
-        try await store.requestAuthorization(toShare: [], read: Self.readTypes)
+        try await store.requestAuthorization(toShare: Self.writeTypes, read: Self.readTypes)
     }
 
     // 한 번이라도 권한 화면을 표시했는지 (NotDetermined 가 아닌지) 추론.

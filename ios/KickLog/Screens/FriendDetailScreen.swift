@@ -287,7 +287,7 @@ struct FriendDetailScreen: View {
 
     private func compactMatchRow(_ match: MatchSummaryResponse, isLast: Bool) -> some View {
         let result = MatchResult.from(matchResultCode(from: match.result))
-        let score = Match.formatScore(userGoals: match.goals, opponentGoals: match.opponentGoals)
+        let score = Match.formatScore(teamGoals: match.teamGoals, opponentGoals: match.opponentGoals, fallbackUserGoals: match.goals)
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(Self.dateNumFormatter.string(from: match.playedAt))

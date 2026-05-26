@@ -39,7 +39,8 @@ extension Match {
             opponent: opponentName ?? "—",
             venue: venueName ?? "—",
             result: MatchResult.from(result),
-            score: Self.formatScore(userGoals: userGoals, opponentGoals: opponentGoals),
+            // 스코어 표시는 팀골:상대골 — teamGoals nil 인 legacy 데이터는 userGoals fallback.
+            score: Self.formatScore(teamGoals: teamGoals, opponentGoals: opponentGoals, fallbackUserGoals: userGoals),
             distanceKm: Double(totalDistanceM) / 1000.0,
             avgSpeedKmh: maxSpeedKmh,           // 헤드라인은 max — 평균은 quarter 단위
             sprintCount: sprintCount,
@@ -60,11 +61,12 @@ extension Match {
         return f
     }()
 
-    // userGoals + opponentGoals → "N-M" / "N점" / "—"
-    static func formatScore(userGoals: Int?, opponentGoals: Int?) -> String {
-        switch (userGoals, opponentGoals) {
-        case let (u?, o?): return "\(u)-\(o)"
-        case let (u?, nil): return "\(u)점"
+    // teamGoals + opponentGoals → "N-M" / "N점" / "—". teamGoals nil 시 fallback (legacy 데이터 호환).
+    static func formatScore(teamGoals: Int?, opponentGoals: Int?, fallbackUserGoals: Int? = nil) -> String {
+        let team = teamGoals ?? fallbackUserGoals
+        switch (team, opponentGoals) {
+        case let (t?, o?): return "\(t)-\(o)"
+        case let (t?, nil): return "\(t)점"
         default: return "—"
         }
     }
@@ -88,68 +90,65 @@ extension MatchResult {
 struct KLMatchRow: View {
     let data: MatchRowData
     var isLast: Bool = false
-    var onTap: () -> Void = {}
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 14) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(data.dateNum)
-                            .font(KLFont.numeric(22, weight: .bold))
-                            .tracking(-0.6)
-                            .foregroundStyle(KLTokens.text)
-                        Text(data.dow)
-                            .font(.system(size: 12))
-                            .foregroundStyle(KLTokens.textSec)
-                    }
-                    .frame(minWidth: 38, alignment: .leading)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(data.dateNum)
+                        .font(KLFont.numeric(22, weight: .bold))
+                        .tracking(-0.6)
+                        .foregroundStyle(KLTokens.text)
+                    Text(data.dow)
+                        .font(.system(size: 12))
+                        .foregroundStyle(KLTokens.textSec)
+                }
+                .frame(minWidth: 38, alignment: .leading)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(data.opponent)
-                            .font(.system(size: 17, weight: .semibold))
-                            .tracking(-0.4)
-                            .foregroundStyle(KLTokens.text)
-                        Text(data.venue)
-                            .font(.system(size: 13))
-                            .foregroundStyle(KLTokens.textSec)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(data.opponent)
+                        .font(.system(size: 17, weight: .semibold))
+                        .tracking(-0.4)
+                        .foregroundStyle(KLTokens.text)
+                    Text(data.venue)
+                        .font(.system(size: 13))
+                        .foregroundStyle(KLTokens.textSec)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                    KLChip(bg: resultBg, fg: resultFg, size: .md) {
-                        Text(data.score).monospacedDigit()
-                        Text(data.result.rawValue).padding(.leading, 2)
-                    }
-
-                    KLIcon(name: "chevron.right", size: 14, color: KLTokens.textTer)
+                KLChip(bg: resultBg, fg: resultFg, size: .md) {
+                    Text(data.score).monospacedDigit()
+                    Text(data.result.rawValue).padding(.leading, 2)
                 }
 
-                HStack(spacing: 0) {
-                    StatPiece(text: "\(formatted(data.distanceKm))km")
-                    StatDot()
-                    StatPiece(text: "\(formatted(data.avgSpeedKmh))km/h")
-                    StatDot()
-                    StatPiece(text: "\(data.sprintCount)회")
-                    StatDot()
-                    StatPiece(text: "\(data.avgHeartRateBpm)bpm")
-                }
-                .font(.system(size: 12).monospacedDigit())
-                .foregroundStyle(KLTokens.textSec)
-                .padding(.leading, 52)
+                KLIcon(name: "chevron.right", size: 14, color: KLTokens.textTer)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 16)
-            .overlay(alignment: .bottom) {
-                if !isLast {
-                    Rectangle()
-                        .fill(KLTokens.sep)
-                        .frame(height: 0.5)
-                        .padding(.leading, 20)
-                }
+
+            HStack(spacing: 0) {
+                StatPiece(text: "\(formatted(data.distanceKm))km")
+                StatDot()
+                StatPiece(text: "\(formatted(data.avgSpeedKmh))km/h")
+                StatDot()
+                StatPiece(text: "\(data.sprintCount)회")
+                StatDot()
+                StatPiece(text: "\(data.avgHeartRateBpm)bpm")
+            }
+            .font(.system(size: 12).monospacedDigit())
+            .foregroundStyle(KLTokens.textSec)
+            .padding(.leading, 52)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
+        .padding(.bottom, 16)
+        .contentShape(Rectangle())
+        .overlay(alignment: .bottom) {
+            if !isLast {
+                Rectangle()
+                    .fill(KLTokens.sep)
+                    .frame(height: 0.5)
+                    .padding(.leading, 20)
             }
         }
-        .buttonStyle(.plain)
     }
 
     private var resultBg: Color {
