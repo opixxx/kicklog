@@ -19,6 +19,14 @@ import jakarta.persistence.Table
 import java.time.Instant
 import java.util.UUID
 
+/**
+ * 매치 Aggregate Root.
+ *
+ * **Invariant**: `result == MatchResultType.derive(teamGoals, opponentGoals)`.
+ * - 결과는 (teamGoals, opponentGoals) 에서 derive 된 종속 필드다.
+ * - 외부에서 `result` 를 직접 set 하지 말 것 — JPA reflection 을 제외하면 `replaceWith` 가 유일한 갱신 경로.
+ * - 둘 중 하나라도 NULL 이면 result 도 NULL — "점수 모름" 상태에서 라벨링을 재저장하면 기존 W/D/L 결과는 의도적으로 리셋된다 (ADR-0003 D3).
+ */
 @Entity
 @Table(name = "matches")
 class Match(
@@ -59,6 +67,10 @@ class Match(
     @Column(name = "opponent_goals")
     var opponentGoals: Int?,
 
+    // 팀 전체 득점. null = 사용자가 미입력. result 는 teamGoals vs opponentGoals 로 자동 derive.
+    @Column(name = "team_goals")
+    var teamGoals: Int? = null,
+
     @Column(name = "total_distance_m", nullable = false)
     var totalDistanceM: Int = 0,
 
@@ -88,17 +100,24 @@ class Match(
         venueId = command.venueId
         playedAt = command.playedAt
         opponent = command.opponent?.trim()?.takeIf { it.isNotBlank() }
-        result = command.result
         position = command.position
         goals = command.goals
         assists = command.assists
         opponentGoals = command.opponentGoals
+        teamGoals = command.teamGoals
+        recomputeResult()
         totalDistanceM = command.totalDistanceM
         maxSpeedKmh = command.maxSpeedKmh
         sprintCount = command.sprintCount
         avgHeartRate = command.avgHeartRate
         updatedAt = Instant.now()
         replaceQuarters(command)
+    }
+
+    // result 는 (teamGoals, opponentGoals) 의 derived field — 둘 중 하나라도 null 이면 null.
+    // 호출은 replaceWith 안에서만 — 외부에서 result 를 직접 set 하지 않게 invariant 응집.
+    private fun recomputeResult() {
+        result = MatchResultType.derive(teamGoals, opponentGoals)
     }
 
     private fun validateQuarters(command: UpsertMatchCommand) {

@@ -32,7 +32,9 @@ class GlobalExceptionHandler {
         exception: MethodArgumentNotValidException,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorResponse> {
+        // @AssertTrue 등 클래스 레벨 cross-field 검증은 globalErrors 로 분류된다 — fieldErrors 만 보면 메시지가 누락된다.
         val message = exception.bindingResult.fieldErrors.firstOrNull()?.defaultMessage
+            ?: exception.bindingResult.globalErrors.firstOrNull()?.defaultMessage
             ?: ErrorCode.VALIDATION_FAILED.message
         return ResponseEntity
             .status(ErrorCode.VALIDATION_FAILED.status)

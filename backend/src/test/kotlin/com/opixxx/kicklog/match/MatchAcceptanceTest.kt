@@ -255,6 +255,127 @@ class MatchAcceptanceTest {
     }
 
     @Test
+    fun `teamGoals 가 opponentGoals 보다 크면 result 는 WIN 으로 자동 derive 된다`() {
+        val accessToken = jwtTokenProvider.createAccessToken(userId = 101L)
+        val venueId = createVenue(accessToken, name = "팀골WIN운동장")
+
+        mockMvc.put("/matches/aaaaaaa1-0000-0000-0000-000000000001") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = matchJsonWithTeamGoals(venueId = venueId, goals = 1, teamGoals = 3, opponentGoals = 2)
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.result") { value("WIN") }
+            jsonPath("$.teamGoals") { value(3) }
+            jsonPath("$.opponentGoals") { value(2) }
+        }
+    }
+
+    @Test
+    fun `teamGoals 와 opponentGoals 가 같으면 result 는 DRAW 로 derive 된다`() {
+        val accessToken = jwtTokenProvider.createAccessToken(userId = 102L)
+        val venueId = createVenue(accessToken, name = "팀골DRAW운동장")
+
+        mockMvc.put("/matches/aaaaaaa2-0000-0000-0000-000000000002") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = matchJsonWithTeamGoals(venueId = venueId, goals = 0, teamGoals = 1, opponentGoals = 1)
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.result") { value("DRAW") }
+            jsonPath("$.teamGoals") { value(1) }
+            jsonPath("$.opponentGoals") { value(1) }
+        }
+    }
+
+    @Test
+    fun `teamGoals 가 opponentGoals 보다 작으면 result 는 LOSS 로 derive 된다`() {
+        val accessToken = jwtTokenProvider.createAccessToken(userId = 103L)
+        val venueId = createVenue(accessToken, name = "팀골LOSS운동장")
+
+        mockMvc.put("/matches/aaaaaaa3-0000-0000-0000-000000000003") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = matchJsonWithTeamGoals(venueId = venueId, goals = 0, teamGoals = 0, opponentGoals = 2)
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.result") { value("LOSS") }
+            jsonPath("$.teamGoals") { value(0) }
+            jsonPath("$.opponentGoals") { value(2) }
+        }
+    }
+
+    @Test
+    fun `teamGoals 와 opponentGoals 모두 null 이면 result 도 null 로 저장된다`() {
+        val accessToken = jwtTokenProvider.createAccessToken(userId = 104L)
+        val venueId = createVenue(accessToken, name = "팀골NULL운동장")
+
+        mockMvc.put("/matches/aaaaaaa4-0000-0000-0000-000000000004") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = matchJsonWithTeamGoals(venueId = venueId, goals = 0, teamGoals = null, opponentGoals = null)
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.result") { value(null) }
+            jsonPath("$.teamGoals") { value(null) }
+            jsonPath("$.opponentGoals") { value(null) }
+        }
+    }
+
+    @Test
+    fun `teamGoals 가 goals 보다 작으면 400 으로 거부한다`() {
+        val accessToken = jwtTokenProvider.createAccessToken(userId = 105L)
+        val venueId = createVenue(accessToken, name = "팀골검증운동장")
+
+        mockMvc.put("/matches/aaaaaaa5-0000-0000-0000-000000000005") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = matchJsonWithTeamGoals(venueId = venueId, goals = 2, teamGoals = 1, opponentGoals = 0)
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.message") { value(org.hamcrest.Matchers.containsString("팀 전체 골")) }
+        }
+    }
+
+    @Test
+    fun `client 가 result 필드를 보내도 백엔드는 무시하고 derive 값으로 저장한다`() {
+        val accessToken = jwtTokenProvider.createAccessToken(userId = 106L)
+        val venueId = createVenue(accessToken, name = "result무시운동장")
+        // 명시적으로 result=LOSS 를 보냈지만 teamGoals(3) > opponentGoals(2) 이므로 derive WIN 이 우선
+        val body = """
+            {
+              "venueId": $venueId,
+              "playedAt": "2026-05-27T09:00:00Z",
+              "opponent": "OO FC",
+              "result": "LOSS",
+              "position": "MF",
+              "goals": 1,
+              "assists": 0,
+              "teamGoals": 3,
+              "opponentGoals": 2,
+              "quarters": [
+                {
+                  "quarterNumber": 1,
+                  "healthKitWorkoutId": "hk-uuid-1",
+                  "startedAt": "2026-05-27T09:00:00Z",
+                  "endedAt": "2026-05-27T09:15:00Z"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        mockMvc.put("/matches/aaaaaaa6-0000-0000-0000-000000000006") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.result") { value("WIN") }
+            jsonPath("$.teamGoals") { value(3) }
+        }
+    }
+
+    @Test
     fun `친구가 심박 숨김이면 친구 경기 상세의 심박 필드를 null로 마스킹한다`() {
         val viewer = createUser("심박조회자")
         val friend = createUser("심박숨김친구").also {
@@ -330,21 +451,57 @@ class MatchAcceptanceTest {
         return Regex(""""id":(\d+)""").find(response)!!.groupValues[1].toLong()
     }
 
+    private fun matchJsonWithTeamGoals(
+        venueId: Long,
+        goals: Int,
+        teamGoals: Int?,
+        opponentGoals: Int?,
+        playedAt: String = "2026-05-27T09:00:00Z",
+        quarterWorkoutId: String = "hk-uuid-1",
+    ): String {
+        val teamGoalsField = teamGoals?.toString() ?: "null"
+        val opponentGoalsField = opponentGoals?.toString() ?: "null"
+        return """
+            {
+              "venueId": $venueId,
+              "playedAt": "$playedAt",
+              "opponent": "OO FC",
+              "position": "MF",
+              "goals": $goals,
+              "assists": 0,
+              "teamGoals": $teamGoalsField,
+              "opponentGoals": $opponentGoalsField,
+              "quarters": [
+                {
+                  "quarterNumber": 1,
+                  "healthKitWorkoutId": "$quarterWorkoutId",
+                  "startedAt": "$playedAt",
+                  "endedAt": "2026-05-27T09:15:00Z"
+                }
+              ]
+            }
+        """.trimIndent()
+    }
+
+    // result 는 백엔드가 teamGoals vs opponentGoals 로 derive — JSON 에 직접 보내지 않는다.
+    // 기존 기대값 result=WIN 을 유지하기 위해 teamGoals=goals 이상, opponentGoals=0 으로 매핑.
     private fun matchJson(
         venueId: Long,
         playedAt: String = "2026-05-23T09:00:00Z",
         goals: Int = 1,
         quarterWorkoutId: String = "hk-uuid-1",
     ): String {
+        val teamGoals = maxOf(goals, 1)
         return """
             {
               "venueId": $venueId,
               "playedAt": "$playedAt",
               "opponent": "OO FC",
-              "result": "WIN",
               "position": "MF",
               "goals": $goals,
               "assists": 0,
+              "teamGoals": $teamGoals,
+              "opponentGoals": 0,
               "quarters": [
                 {
                   "quarterNumber": 1,
