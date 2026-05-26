@@ -9,11 +9,13 @@ struct PutMatchRequest: Encodable {
     let venueId: Int64
     let playedAt: Date
     let opponent: String?
-    let result: String?           // "WIN" | "DRAW" | "LOSS"
+    // V10+ : result 는 백엔드가 teamGoals vs opponentGoals 로 자동 derive 한다.
+    // 클라이언트는 result 를 보내지 않으며, 보내도 백엔드가 무시.
     let position: String?         // "GK" | "DF" | "MF" | "FW"
     let goals: Int
     let assists: Int
     let opponentGoals: Int?       // null = 미입력, 0 = 명시적 무실점 (api-spec §5.1)
+    let teamGoals: Int?           // V10+ : 팀 전체 골. null = 미입력. teamGoals >= goals 강제.
     let totalDistanceM: Int
     let maxSpeedKmh: Double
     let sprintCount: Int
@@ -50,11 +52,12 @@ struct MatchDetailResponse: Decodable {
     let venueId: Int64?
     let playedAt: Date
     let opponent: String?
-    let result: String?
+    let result: String?           // "WIN" | "DRAW" | "LOSS" | null — V10+ 백엔드 derive
     let position: String?
     let goals: Int
     let assists: Int
     let opponentGoals: Int?
+    let teamGoals: Int?           // V10+
     let totalDistanceM: Int
     let maxSpeedKmh: Double
     let sprintCount: Int
@@ -89,6 +92,7 @@ struct MatchSummaryResponse: Decodable, Hashable {
     let goals: Int
     let assists: Int
     let opponentGoals: Int?
+    let teamGoals: Int?           // V10+
     let totalDistanceM: Int
     let maxSpeedKmh: Double
     let sprintCount: Int
@@ -113,7 +117,7 @@ extension MatchSummaryResponse {
             opponent: opponent ?? "—",
             venue: "—",                               // 친구 경기는 venue 이름이 응답에 없음 (venueId 만 노출)
             result: MatchResult.from(Self.resultToCode(result)),
-            score: Match.formatScore(userGoals: goals, opponentGoals: opponentGoals),
+            score: Match.formatScore(teamGoals: teamGoals, opponentGoals: opponentGoals, fallbackUserGoals: goals),
             distanceKm: Double(totalDistanceM) / 1000.0,
             avgSpeedKmh: maxSpeedKmh,
             sprintCount: sprintCount,
@@ -162,27 +166,17 @@ extension Match {
             venueId: venueId,
             playedAt: playedAt,
             opponent: opponentName,
-            result: Self.resultToWire(result),
             position: position,
             goals: userGoals ?? 0,
             assists: userAssists ?? 0,
             opponentGoals: opponentGoals,
+            teamGoals: teamGoals,
             totalDistanceM: totalDistanceM,
             maxSpeedKmh: maxSpeedKmh,
             sprintCount: sprintCount,
             avgHeartRate: avgHeartRate,
             quarters: sortedQuarters.map { $0.toPutRequest() }
         )
-    }
-
-    // "W"/"D"/"L" → "WIN"/"DRAW"/"LOSS"
-    private static func resultToWire(_ code: String?) -> String? {
-        switch code {
-        case "W": return "WIN"
-        case "D": return "DRAW"
-        case "L": return "LOSS"
-        default: return nil
-        }
     }
 }
 
@@ -247,6 +241,7 @@ extension Match {
             goals: dto.goals,
             assists: dto.assists,
             opponentGoals: dto.opponentGoals,
+            teamGoals: dto.teamGoals,
             totalDistanceM: dto.totalDistanceM,
             maxSpeedKmh: dto.maxSpeedKmh,
             sprintCount: dto.sprintCount,
@@ -268,6 +263,7 @@ extension Match {
             goals: dto.goals,
             assists: dto.assists,
             opponentGoals: dto.opponentGoals,
+            teamGoals: dto.teamGoals,
             totalDistanceM: dto.totalDistanceM,
             maxSpeedKmh: dto.maxSpeedKmh,
             sprintCount: dto.sprintCount,
@@ -289,6 +285,7 @@ extension Match {
         goals: Int,
         assists: Int,
         opponentGoals: Int?,
+        teamGoals: Int?,
         totalDistanceM: Int,
         maxSpeedKmh: Double,
         sprintCount: Int,
@@ -306,6 +303,7 @@ extension Match {
         userGoals = goals
         userAssists = assists
         self.opponentGoals = opponentGoals
+        self.teamGoals = teamGoals
         self.totalDistanceM = totalDistanceM
         self.maxSpeedKmh = maxSpeedKmh
         self.sprintCount = sprintCount

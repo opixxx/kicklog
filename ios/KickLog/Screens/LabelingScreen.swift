@@ -17,9 +17,9 @@ struct LabelingScreen: View {
     // 폼 상태
     @State private var selectedQuarterIDs: Set<PersistentIdentifier> = []
     @State private var opponent: String = ""
-    @State private var result: MatchResult = .draw
     @State private var position: String = "MF"
     @State private var userGoals: Int = 0
+    @State private var teamGoals: Int = 0     // V10+ : 팀 전체 골 — result 는 백엔드가 자동 derive.
     @State private var opponentGoals: Int = 0
     @State private var userAssists: Int = 0
     @State private var selectedVenue: Venue?
@@ -99,9 +99,10 @@ struct LabelingScreen: View {
         // 라벨링 화면 진입 시 모든 감지 쿼터 default 선택
         selectedQuarterIDs = Set(detectedQuarters.map(\.persistentModelID))
         opponent = match.opponentName ?? ""
-        result = MatchResult.from(match.result)
         position = match.position ?? "MF"
         userGoals = match.userGoals ?? 0
+        // teamGoals 가 미입력(nil) 이면 본인 골 수와 동일하게 초기화 — cross-field 검증 통과 + 자연스러운 default.
+        teamGoals = match.teamGoals ?? (match.userGoals ?? 0)
         opponentGoals = match.opponentGoals ?? 0
         userAssists = match.userAssists ?? 0
         // venueId 로 기존 Venue 조회
@@ -286,17 +287,27 @@ struct LabelingScreen: View {
                         .autocorrectionDisabled()
                         .frame(maxWidth: 180)
                 }
-                KLFormRow(label: "결과") {
-                    KLSegmented(
-                        options: [MatchResult.win, .draw, .lose],
-                        selection: $result
-                    )
-                }
                 KLFormRow(label: "포지션") {
                     KLPositionChips(selection: $position)
                 }
                 KLFormRow(label: "본인 골") {
-                    KLStepper(value: $userGoals)
+                    KLStepper(value: Binding(
+                        get: { userGoals },
+                        set: { newValue in
+                            userGoals = newValue
+                            // 본인 골이 팀 전체 골을 초과하면 팀 골 자동 보정 — 백엔드 cross-field 검증 사전 충족.
+                            if teamGoals < userGoals { teamGoals = userGoals }
+                        }
+                    ))
+                }
+                KLFormRow(label: "팀 전체 골") {
+                    KLStepper(value: Binding(
+                        get: { teamGoals },
+                        set: { newValue in
+                            // 팀 골은 본인 골 이상이어야 한다 — 사용자가 본인 골보다 낮추려 하면 본인 골에서 멈춤.
+                            teamGoals = max(newValue, userGoals)
+                        }
+                    ))
                 }
                 KLFormRow(label: "상대 골") {
                     KLStepper(value: $opponentGoals)
@@ -336,25 +347,27 @@ struct LabelingScreen: View {
             .padding(.horizontal, 16)
             .klCardShadow(scheme)
 
-            // 결과 자동 추정 안내 — 사용자가 score 와 result 불일치하는 경우 시각 힌트
-            if let suggested = suggestedResult, suggested != result {
-                HStack(spacing: 6) {
-                    KLIcon(name: "exclamationmark.triangle.fill", size: 12, color: KLTokens.amber)
-                    Text("점수로는 \(suggested.rawValue) — 결과와 다릅니다")
-                        .font(.system(size: 12))
-                        .foregroundStyle(KLTokens.textSec)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+            // 결과 자동 표시 — 팀골/상대골 조합으로 derive.
+            HStack(spacing: 6) {
+                KLIcon(name: "checkmark.seal.fill", size: 12, color: KLTokens.pitch)
+                Text("결과: \(derivedResultLabel)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(KLTokens.textSec)
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
         }
     }
 
-    private var suggestedResult: MatchResult? {
-        guard userGoals != 0 || opponentGoals != 0 else { return nil }
-        if userGoals > opponentGoals { return .win }
-        if userGoals < opponentGoals { return .lose }
+    private var derivedResult: MatchResult {
+        if teamGoals > opponentGoals { return .win }
+        if teamGoals < opponentGoals { return .lose }
         return .draw
+    }
+
+    private var derivedResultLabel: String {
+        // 매치 카드 표시용 — 0:0 도 무승부로 노출 (백엔드 derive 와 일치).
+        "\(teamGoals)-\(opponentGoals) \(derivedResult.rawValue)"
     }
 
     // MARK: - 저장 가능 조건
@@ -383,11 +396,14 @@ struct LabelingScreen: View {
             quarter.match = nil
         }
 
-        // 2. Match 메타 업데이트
+        // 2. Match 메타 업데이트.
+        //    result 는 로컬에서도 teamGoals vs opponentGoals 로 derive — 백엔드와 동일 규칙.
+        //    백엔드 PUT 응답이 권위지만, 동기화 전까지 카드 표시를 위해 미리 계산해둔다.
         match.opponentName = opponent.trimmingCharacters(in: .whitespaces)
-        match.result = result.code
+        match.result = derivedResult.code
         match.position = position
         match.userGoals = userGoals
+        match.teamGoals = teamGoals
         match.opponentGoals = opponentGoals
         match.userAssists = userAssists
         match.venueId = selectedVenue?.serverId

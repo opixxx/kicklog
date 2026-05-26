@@ -77,7 +77,8 @@ final class Match {
     var position: String?      // "GK" | "DF" | "MF" | "FW"
     var userGoals: Int?
     var userAssists: Int?
-    var opponentGoals: Int?       // 와이어프레임 "4-2" 표시용. ADR-0003 schema 추가 TODO.
+    var opponentGoals: Int?       // 상대팀 골 (V9 백엔드 동기화). null = 미입력.
+    var teamGoals: Int?           // 팀 전체 골 (V10 백엔드). result 는 teamGoals vs opponentGoals 로 백엔드 자동 derive.
 
     // ADR-0004 D8 헤드라인 4지표 (집계 캐시)
     var totalDistanceM: Int
@@ -105,6 +106,7 @@ final class Match {
         userGoals: Int? = nil,
         userAssists: Int? = nil,
         opponentGoals: Int? = nil,
+        teamGoals: Int? = nil,
         totalDistanceM: Int = 0,
         maxSpeedKmh: Double = 0,
         sprintCount: Int = 0,
@@ -121,6 +123,7 @@ final class Match {
         self.userGoals = userGoals
         self.userAssists = userAssists
         self.opponentGoals = opponentGoals
+        self.teamGoals = teamGoals
         self.totalDistanceM = totalDistanceM
         self.maxSpeedKmh = maxSpeedKmh
         self.sprintCount = sprintCount

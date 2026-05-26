@@ -332,7 +332,7 @@ struct FriendMatchDetailScreen: View {
     // MARK: - Derived
 
     private func scoreDisplay(_ match: MatchDetailResponse) -> String {
-        Match.formatScore(userGoals: match.goals, opponentGoals: match.opponentGoals)
+        Match.formatScore(teamGoals: match.teamGoals, opponentGoals: match.opponentGoals, fallbackUserGoals: match.goals)
     }
 
     private func positionLong(_ pos: String?) -> String {

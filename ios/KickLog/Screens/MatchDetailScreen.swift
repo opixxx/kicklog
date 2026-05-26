@@ -302,7 +302,7 @@ struct MatchDetailScreen: View {
     }
 
     private var scoreDisplay: String {
-        Match.formatScore(userGoals: match.userGoals, opponentGoals: match.opponentGoals)
+        Match.formatScore(teamGoals: match.teamGoals, opponentGoals: match.opponentGoals, fallbackUserGoals: match.userGoals)
     }
 
     private var positionLong: String {
