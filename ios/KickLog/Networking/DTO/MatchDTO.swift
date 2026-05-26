@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 // api-spec.md §5 Matches — Request/Response DTO.
 
@@ -35,6 +36,31 @@ struct PutQuarterRequest: Encodable {
 }
 
 // MARK: - Response
+
+struct MatchListResponse: Decodable {
+    let content: [MatchSummaryResponse]
+    let size: Int
+    let nextCursor: String?
+    let hasNext: Bool
+}
+
+struct MatchSummaryResponse: Decodable {
+    let id: Int64
+    let clientMatchId: UUID
+    let venueId: Int64?
+    let playedAt: Date
+    let opponent: String?
+    let result: String?
+    let position: String?
+    let goals: Int
+    let assists: Int
+    let opponentGoals: Int?
+    let totalDistanceM: Int
+    let maxSpeedKmh: Double
+    let sprintCount: Int
+    let avgHeartRate: Int?
+    let quarterCount: Int
+}
 
 struct MatchDetailResponse: Decodable {
     let id: Int64
@@ -104,6 +130,181 @@ extension Match {
         case "W": return "WIN"
         case "D": return "DRAW"
         case "L": return "LOSS"
+        default: return nil
+        }
+    }
+}
+
+// MARK: - Response DTO → SwiftData Match
+
+extension Match {
+    @discardableResult
+    @MainActor
+    static func upsertSummary(from dto: MatchSummaryResponse, into context: ModelContext) -> Match {
+        let match: Match
+        if let existing = find(serverId: dto.id, clientMatchId: dto.clientMatchId, in: context) {
+            match = existing
+        } else {
+            match = Match(playedAt: dto.playedAt)
+            context.insert(match)
+        }
+        match.applySummary(dto, in: context)
+        try? context.save()
+        return match
+    }
+
+    @discardableResult
+    @MainActor
+    static func upsertDetail(from dto: MatchDetailResponse, into context: ModelContext) -> Match {
+        let match: Match
+        if let existing = find(serverId: dto.id, clientMatchId: dto.clientMatchId, in: context) {
+            match = existing
+        } else {
+            match = Match(playedAt: dto.playedAt)
+            context.insert(match)
+        }
+        match.applyDetail(dto, in: context)
+        try? context.save()
+        return match
+    }
+
+    @MainActor
+    private static func find(serverId: Int64, clientMatchId: UUID, in context: ModelContext) -> Match? {
+        let byClientId = FetchDescriptor<Match>(
+            predicate: #Predicate { $0.clientMatchId == clientMatchId }
+        )
+        if let match = try? context.fetch(byClientId).first {
+            return match
+        }
+
+        let byServerId = FetchDescriptor<Match>(
+            predicate: #Predicate { $0.serverId == serverId }
+        )
+        return try? context.fetch(byServerId).first
+    }
+
+    @MainActor
+    private func applySummary(_ dto: MatchSummaryResponse, in context: ModelContext) {
+        applyCommon(
+            serverId: dto.id,
+            clientMatchId: dto.clientMatchId,
+            venueId: dto.venueId,
+            playedAt: dto.playedAt,
+            opponent: dto.opponent,
+            result: dto.result,
+            position: dto.position,
+            goals: dto.goals,
+            assists: dto.assists,
+            opponentGoals: dto.opponentGoals,
+            totalDistanceM: dto.totalDistanceM,
+            maxSpeedKmh: dto.maxSpeedKmh,
+            sprintCount: dto.sprintCount,
+            avgHeartRate: dto.avgHeartRate,
+            in: context
+        )
+    }
+
+    @MainActor
+    private func applyDetail(_ dto: MatchDetailResponse, in context: ModelContext) {
+        applyCommon(
+            serverId: dto.id,
+            clientMatchId: dto.clientMatchId,
+            venueId: dto.venueId,
+            playedAt: dto.playedAt,
+            opponent: dto.opponent,
+            result: dto.result,
+            position: dto.position,
+            goals: dto.goals,
+            assists: dto.assists,
+            opponentGoals: dto.opponentGoals,
+            totalDistanceM: dto.totalDistanceM,
+            maxSpeedKmh: dto.maxSpeedKmh,
+            sprintCount: dto.sprintCount,
+            avgHeartRate: dto.avgHeartRate,
+            in: context
+        )
+        replaceQuarters(with: dto.quarters, in: context)
+    }
+
+    @MainActor
+    private func applyCommon(
+        serverId: Int64,
+        clientMatchId: UUID,
+        venueId: Int64?,
+        playedAt: Date,
+        opponent: String?,
+        result: String?,
+        position: String?,
+        goals: Int,
+        assists: Int,
+        opponentGoals: Int?,
+        totalDistanceM: Int,
+        maxSpeedKmh: Double,
+        sprintCount: Int,
+        avgHeartRate: Int?,
+        in context: ModelContext
+    ) {
+        self.serverId = serverId
+        self.clientMatchId = clientMatchId
+        self.venueId = venueId
+        self.venueName = venueName(for: venueId, in: context) ?? self.venueName
+        self.playedAt = playedAt
+        opponentName = opponent
+        self.result = Self.resultFromWire(result)
+        self.position = position
+        userGoals = goals
+        userAssists = assists
+        self.opponentGoals = opponentGoals
+        self.totalDistanceM = totalDistanceM
+        self.maxSpeedKmh = maxSpeedKmh
+        self.sprintCount = sprintCount
+        self.avgHeartRate = avgHeartRate ?? 0
+        labeledAt = labeledAt ?? playedAt
+        syncedAt = .now
+        lastSyncAttemptAt = .now
+        syncErrorMessage = nil
+    }
+
+    @MainActor
+    private func replaceQuarters(with dtos: [QuarterDetailResponse], in context: ModelContext) {
+        for quarter in quarters {
+            context.delete(quarter)
+        }
+        quarters = dtos
+            .sorted { $0.quarterNumber < $1.quarterNumber }
+            .map { dto in
+                QuarterWorkout(
+                    sourceWorkoutUUID: dto.healthKitWorkoutId ?? "server-\(serverId ?? 0)-q\(dto.quarterNumber)",
+                    quarterNo: dto.quarterNumber,
+                    startedAt: dto.startedAt,
+                    endedAt: dto.endedAt,
+                    durationSeconds: dto.durationSeconds,
+                    distanceM: dto.distanceM,
+                    avgSpeedKmh: dto.avgSpeedKmh,
+                    avgHeartRate: dto.avgHeartRate ?? 0,
+                    maxHeartRate: dto.maxHeartRate ?? 0,
+                    sprintCount: dto.sprintCount,
+                    activeEnergyKcal: dto.activeEnergyKcal,
+                    trimmed: true,
+                    match: self
+                )
+            }
+    }
+
+    @MainActor
+    private func venueName(for venueId: Int64?, in context: ModelContext) -> String? {
+        guard let venueId else { return nil }
+        let descriptor = FetchDescriptor<Venue>(
+            predicate: #Predicate { $0.serverId == venueId }
+        )
+        return (try? context.fetch(descriptor).first)?.name
+    }
+
+    private static func resultFromWire(_ code: String?) -> String? {
+        switch code {
+        case "WIN": return "W"
+        case "DRAW": return "D"
+        case "LOSS": return "L"
         default: return nil
         }
     }

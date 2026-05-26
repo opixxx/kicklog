@@ -9,6 +9,51 @@ final class MatchSyncService {
 
     private let apiClient: any APIClient = URLSessionAPIClient()
 
+    // MARK: - 조회
+
+    func fetchMatches(cursor: String? = nil, size: Int = 20, into context: ModelContext) async throws -> MatchListResponse {
+        guard AuthTokenStore.shared.isAuthenticated else {
+            return MatchListResponse(content: [], size: size, nextCursor: nil, hasNext: false)
+        }
+
+        var query = [URLQueryItem(name: "size", value: String(size))]
+        if let cursor {
+            query.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+
+        let response: MatchListResponse = try await apiClient.get("/matches", query: query)
+        response.content.forEach { Match.upsertSummary(from: $0, into: context) }
+        return response
+    }
+
+    @discardableResult
+    func fetchMatch(serverId: Int64, into context: ModelContext) async throws -> Match {
+        let response: MatchDetailResponse = try await apiClient.get("/matches/\(serverId)", query: nil)
+        return Match.upsertDetail(from: response, into: context)
+    }
+
+    @discardableResult
+    func fetchMatch(clientMatchId: UUID, into context: ModelContext) async throws -> Match {
+        let response: MatchDetailResponse = try await apiClient.get(
+            "/matches/by-client-id/\(clientMatchId.uuidString)",
+            query: nil
+        )
+        return Match.upsertDetail(from: response, into: context)
+    }
+
+    // MARK: - 삭제
+
+    func delete(_ match: Match, in context: ModelContext) async throws {
+        if let serverId = match.serverId {
+            guard AuthTokenStore.shared.isAuthenticated else {
+                throw APIError.unauthorized(body: nil)
+            }
+            let _: EmptyResponse = try await apiClient.delete("/matches/\(serverId)")
+        }
+        context.delete(match)
+        try context.save()
+    }
+
     // MARK: - 단건 동기화
 
     func sync(_ match: Match, in context: ModelContext) async {
@@ -27,10 +72,7 @@ final class MatchSyncService {
         let path = "/matches/\(match.clientMatchId.uuidString)"
         do {
             let response: MatchDetailResponse = try await apiClient.put(path, body: request)
-            match.serverId = response.id
-            match.syncedAt = .now
-            match.lastSyncAttemptAt = .now
-            match.syncErrorMessage = nil
+            Match.upsertDetail(from: response, into: context)
             try? context.save()
         } catch {
             match.lastSyncAttemptAt = .now

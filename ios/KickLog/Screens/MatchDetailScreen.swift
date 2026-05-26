@@ -7,6 +7,10 @@ struct MatchDetailScreen: View {
     let match: Match
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.modelContext) private var modelContext
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var errorMessage: String?
 
     // 라벨링된 쿼터만, quarterNo 오름차순
     private var sortedQuarters: [QuarterWorkout] {
@@ -23,6 +27,25 @@ struct MatchDetailScreen: View {
         .background(KLTokens.bg)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .ignoresSafeArea(edges: .top)
+        .task {
+            await refreshRemoteDetail()
+        }
+        .confirmationDialog("경기를 삭제할까요?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("삭제", role: .destructive) {
+                Task { await deleteMatch() }
+            }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("삭제한 경기는 되돌릴 수 없습니다.")
+        }
+        .alert("오류", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
+        }
     }
 
     // MARK: - Hero
@@ -47,9 +70,25 @@ struct MatchDetailScreen: View {
                     }
                     .buttonStyle(.plain)
                     Spacer()
-                    Text("···")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.85))
+                    Menu {
+                        Button(role: .destructive) {
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("삭제", systemImage: "trash")
+                        }
+                        .disabled(isDeleting)
+                    } label: {
+                        if isDeleting {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.85))
+                                .frame(width: 36, height: 36)
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
                 .frame(minHeight: 36)
                 .padding(.bottom, 18)
@@ -284,6 +323,51 @@ struct MatchDetailScreen: View {
         f.dateFormat = "yyyy-MM-dd (E) HH:mm"
         return f
     }()
+
+    // MARK: - 서버 상세 동기화 / 삭제
+
+    private func refreshRemoteDetail() async {
+        guard AuthTokenStore.shared.isAuthenticated else { return }
+        do {
+            if let serverId = match.serverId {
+                try await MatchSyncService.shared.fetchMatch(serverId: serverId, into: modelContext)
+            } else {
+                try await MatchSyncService.shared.fetchMatch(clientMatchId: match.clientMatchId, into: modelContext)
+            }
+        } catch let error as APIError {
+            if case .server(404, _, _) = error {
+                return
+            }
+            errorMessage = friendlyMessage(error)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteMatch() async {
+        guard !isDeleting else { return }
+        isDeleting = true
+        defer { isDeleting = false }
+        do {
+            try await MatchSyncService.shared.delete(match, in: modelContext)
+            dismiss()
+        } catch {
+            errorMessage = friendlyMessage(error)
+        }
+    }
+
+    private func friendlyMessage(_ error: Error) -> String {
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .noConnection: return "네트워크 연결을 확인해 주세요"
+            case .unauthorized: return "로그인이 만료되었습니다"
+            case .server(_, let body, _): return body?.message ?? "서버 오류가 발생했습니다"
+            case .decodingFailed: return "응답을 처리하지 못했습니다"
+            case .unknown: return "알 수 없는 오류가 발생했습니다"
+            }
+        }
+        return error.localizedDescription
+    }
 }
 
 // MARK: - Hero 의 큰 축구장 데코
