@@ -5,6 +5,7 @@ import SwiftData
 // 라벨링 대기 = labeledAt == nil, 최근 경기 = labeledAt != nil 정렬 by playedAt desc.
 struct MatchesScreen: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.modelContext) private var modelContext
 
     // ADR-0004 — 라벨링 대기 큐: labeledAt 이 nil 인 Match (최신순)
     @Query(
@@ -21,14 +22,23 @@ struct MatchesScreen: View {
     private var labeledMatches: [Match]
 
     @State private var labelingTarget: Match?
+    @State private var isLoadingRemote = false
+    @State private var loadErrorMessage: String?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 navBar
-                if pendingMatches.isEmpty && labeledMatches.isEmpty {
+                if isLoadingRemote && pendingMatches.isEmpty && labeledMatches.isEmpty {
+                    loadingState
+                } else if let loadErrorMessage, pendingMatches.isEmpty && labeledMatches.isEmpty {
+                    errorState(loadErrorMessage)
+                } else if pendingMatches.isEmpty && labeledMatches.isEmpty {
                     emptyState
                 } else {
+                    if let loadErrorMessage {
+                        inlineError(loadErrorMessage)
+                    }
                     if !pendingMatches.isEmpty {
                         pendingSection
                     }
@@ -46,6 +56,12 @@ struct MatchesScreen: View {
         }
         .sheet(item: $labelingTarget) { match in
             LabelingScreen(match: match)
+        }
+        .task {
+            await loadRemoteMatches()
+        }
+        .refreshable {
+            await loadRemoteMatches()
         }
     }
 
@@ -100,6 +116,56 @@ struct MatchesScreen: View {
         .padding(.horizontal, 36)
     }
 
+    private var loadingState: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+            Text("경기 목록 불러오는 중…")
+                .font(.system(size: 13))
+                .foregroundStyle(KLTokens.textSec)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 60)
+        .padding(.bottom, 80)
+    }
+
+    private func errorState(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            KLIcon(name: "exclamationmark.triangle.fill", size: 36, color: KLTokens.amber)
+            Text("경기 목록을 불러올 수 없어요")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(KLTokens.text)
+            Text(message)
+                .font(.system(size: 13))
+                .foregroundStyle(KLTokens.textSec)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            Button("다시 시도") {
+                Task { await loadRemoteMatches() }
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(KLTokens.pitch)
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 60)
+        .padding(.bottom, 80)
+    }
+
+    private func inlineError(_ message: String) -> some View {
+        HStack(spacing: 8) {
+            KLIcon(name: "exclamationmark.triangle.fill", size: 16, color: KLTokens.amber)
+            Text(message)
+                .font(.system(size: 13))
+                .foregroundStyle(KLTokens.textSec)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(KLTokens.bgElev, in: RoundedRectangle(cornerRadius: KLTokens.radiusCard))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+    }
+
     // MARK: - 라벨링 대기 (가로 스크롤 큐)
 
     private var pendingSection: some View {
@@ -141,6 +207,33 @@ struct MatchesScreen: View {
             .padding(.horizontal, 16)
             .klCardShadow(scheme)
         }
+    }
+
+    // MARK: - 서버 목록 동기화
+
+    private func loadRemoteMatches() async {
+        guard AuthTokenStore.shared.isAuthenticated else { return }
+        isLoadingRemote = true
+        loadErrorMessage = nil
+        defer { isLoadingRemote = false }
+        do {
+            _ = try await MatchSyncService.shared.fetchMatches(size: 50, into: modelContext)
+        } catch {
+            loadErrorMessage = friendlyMessage(error)
+        }
+    }
+
+    private func friendlyMessage(_ error: Error) -> String {
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .noConnection: return "네트워크 연결을 확인해 주세요"
+            case .unauthorized: return "로그인이 만료되었습니다"
+            case .server(_, let body, _): return body?.message ?? "서버 오류가 발생했습니다"
+            case .decodingFailed: return "응답을 처리하지 못했습니다"
+            case .unknown: return "알 수 없는 오류가 발생했습니다"
+            }
+        }
+        return error.localizedDescription
     }
 }
 
