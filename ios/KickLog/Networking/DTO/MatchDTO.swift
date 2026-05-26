@@ -44,24 +44,6 @@ struct MatchListResponse: Decodable {
     let hasNext: Bool
 }
 
-struct MatchSummaryResponse: Decodable {
-    let id: Int64
-    let clientMatchId: UUID
-    let venueId: Int64?
-    let playedAt: Date
-    let opponent: String?
-    let result: String?
-    let position: String?
-    let goals: Int
-    let assists: Int
-    let opponentGoals: Int?
-    let totalDistanceM: Int
-    let maxSpeedKmh: Double
-    let sprintCount: Int
-    let avgHeartRate: Int?
-    let quarterCount: Int
-}
-
 struct MatchDetailResponse: Decodable {
     let id: Int64
     let clientMatchId: UUID
