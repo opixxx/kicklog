@@ -12,6 +12,10 @@ struct CreateVenueRequest: Encodable {
     let providerPlaceId: String?
 }
 
+struct UpdateVenueRequest: Encodable {
+    let name: String
+}
+
 struct VenueListResponse: Decodable {
     let venues: [VenueResponse]
 }
