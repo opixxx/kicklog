@@ -23,12 +23,17 @@ class JpaMatchStore(
     }
 
     override fun findAllByUserId(userId: Long, cursor: MatchCursorCondition?, limit: Int): List<Match> {
-        return matchRepository.findAllByUserIdAfterCursor(
-            userId = userId,
-            cursorPlayedAt = cursor?.playedAt,
-            cursorId = cursor?.id,
-            pageable = PageRequest.of(0, limit),
-        )
+        val pageable = PageRequest.of(0, limit)
+        return if (cursor == null) {
+            matchRepository.findFirstPageByUserId(userId = userId, pageable = pageable)
+        } else {
+            matchRepository.findAllByUserIdAfterCursor(
+                userId = userId,
+                cursorPlayedAt = cursor.playedAt,
+                cursorId = cursor.id,
+                pageable = pageable,
+            )
+        }
     }
 
     override fun findAllByUserIdAndPlayedAtBetween(
