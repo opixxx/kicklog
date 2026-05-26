@@ -26,6 +26,10 @@ struct SettingsScreen: View {
     @State private var isDeletingAccount: Bool = false
     @State private var showDeleteConfirmation: Bool = false
     @State private var settingsErrorMessage: String?
+    #if DEBUG
+    @State private var isSeedingWorkout: Bool = false
+    @State private var debugInfoMessage: String?
+    #endif
 
     var body: some View {
         ScrollView {
@@ -36,6 +40,9 @@ struct SettingsScreen: View {
                 visibilitySection
                 venueSection
                 dataSection
+                #if DEBUG
+                debugSection
+                #endif
                 accountSection
                 infoSection
                 footer
@@ -63,6 +70,16 @@ struct SettingsScreen: View {
         } message: {
             Text(settingsErrorMessage ?? "")
         }
+        #if DEBUG
+        .alert("디버그", isPresented: Binding(
+            get: { debugInfoMessage != nil },
+            set: { if !$0 { debugInfoMessage = nil } }
+        )) {
+            Button("확인", role: .cancel) { debugInfoMessage = nil }
+        } message: {
+            Text(debugInfoMessage ?? "")
+        }
+        #endif
         .alert("계정을 삭제할까요?", isPresented: $showDeleteConfirmation) {
             Button("취소", role: .cancel) {}
             Button("삭제", role: .destructive) { handleDeleteAccount() }
@@ -200,6 +217,57 @@ struct SettingsScreen: View {
             }
         }
     }
+
+    // MARK: - DEBUG 섹션 (개발 빌드 전용)
+
+    #if DEBUG
+    private var debugSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            KLSettingsHeader(text: "디버그 (개발 빌드)")
+            KLSettingsGroup {
+                Button(action: handleSeedTestWorkout) {
+                    KLSettingsRow(
+                        labelOnly: isSeedingWorkout ? "시드 중..." : "테스트 워크아웃 시드",
+                        sub: "동일 GPS 근방 4쿼터 (≈75분) 임의 데이터 생성",
+                        chevron: false,
+                        isLast: true
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isSeedingWorkout)
+            }
+        }
+    }
+
+    private func handleSeedTestWorkout() {
+        guard !isSeedingWorkout else { return }
+        Task { @MainActor in
+            isSeedingWorkout = true
+            defer { isSeedingWorkout = false }
+            do {
+                // 권한 — 이전에 read 만 요청했더라도 write 까지 한 번 더 묻는다.
+                try await HealthKitService.shared.requestAuthorization()
+
+                let seeder = DebugWorkoutSeeder()
+                let result = try await seeder.seedSingleMatch()
+
+                // 새 워크아웃을 즉시 import → SwiftData 반영.
+                await HealthKitService.shared.startObserver(modelContext: modelContext)
+
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "ko_KR")
+                formatter.dateFormat = "HH:mm"
+                debugInfoMessage = """
+                \(result.quarterCount)쿼터 시드 완료
+                \(formatter.string(from: result.matchStart)) ~ \(formatter.string(from: result.matchEnd))
+                매치 탭에서 확인하세요.
+                """
+            } catch {
+                settingsErrorMessage = "시드 실패: \(error.localizedDescription)"
+            }
+        }
+    }
+    #endif
 
     private var accountSection: some View {
         VStack(alignment: .leading, spacing: 0) {
