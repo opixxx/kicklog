@@ -217,7 +217,7 @@ struct FriendDetailScreen: View {
                     .font(.system(size: 13))
                     .foregroundStyle(KLTokens.textSec)
                     .multilineTextAlignment(.center)
-                Button("다시 시도") { Task { await loadMatches() } }
+                Button("다시 시도") { Task { await loadInitial() } }
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(KLTokens.pitch)
             }
