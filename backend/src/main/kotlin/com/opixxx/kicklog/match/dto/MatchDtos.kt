@@ -1,5 +1,6 @@
 package com.opixxx.kicklog.match.dto
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.opixxx.kicklog.match.entity.Match
 import com.opixxx.kicklog.match.entity.QuarterWorkout
 import com.opixxx.kicklog.match.service.MatchPosition
@@ -7,6 +8,7 @@ import com.opixxx.kicklog.match.service.MatchResultType
 import com.opixxx.kicklog.match.service.UpsertMatchCommand
 import com.opixxx.kicklog.match.service.UpsertQuarterCommand
 import jakarta.validation.Valid
+import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Min
@@ -17,6 +19,9 @@ import jakarta.validation.constraints.Size
 import java.time.Instant
 import java.util.UUID
 
+// 구버전 iOS 가 보내던 'result' 필드 등 미사용 키를 무시한다 — Breaking Change 안전망.
+// (Spring Boot 기본도 ignore 지만 미래 ObjectMapper 재구성에 영향받지 않도록 명시.)
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class UpsertMatchRequest(
     @field:NotNull(message = "운동장 id를 입력해주세요")
     val venueId: Long,
@@ -26,8 +31,6 @@ data class UpsertMatchRequest(
 
     @field:Size(max = 100, message = "상대 팀 이름은 100자 이하로 입력해주세요")
     val opponent: String? = null,
-
-    val result: MatchResultType? = null,
 
     val position: MatchPosition? = null,
 
@@ -39,6 +42,10 @@ data class UpsertMatchRequest(
 
     @field:Min(value = 0, message = "상대팀 득점은 0 이상이어야 합니다")
     val opponentGoals: Int? = null,
+
+    // 팀 전체 득점. null = 미입력 — result 도 null 로 derive.
+    @field:Min(value = 0, message = "팀 전체 골은 0 이상이어야 합니다")
+    val teamGoals: Int? = null,
 
     @field:Min(value = 0, message = "총 이동거리는 0 이상이어야 합니다")
     val totalDistanceM: Int = 0,
@@ -57,16 +64,24 @@ data class UpsertMatchRequest(
     @field:Size(max = 4, message = "쿼터는 최대 4개까지 입력할 수 있습니다")
     val quarters: List<UpsertQuarterRequest>,
 ) {
+    // cross-field: 본인이 넣은 골은 팀 전체 골을 초과할 수 없다.
+    // teamGoals 미입력(null)이면 검증 통과 — 점수 모름 상태 허용.
+    @AssertTrue(message = "팀 전체 골은 본인 골 이상이어야 합니다")
+    fun isTeamGoalsConsistent(): Boolean {
+        val tg = teamGoals ?: return true
+        return tg >= goals
+    }
+
     fun toCommand(): UpsertMatchCommand {
         return UpsertMatchCommand(
             venueId = venueId,
             playedAt = playedAt,
             opponent = opponent,
-            result = result,
             position = position,
             goals = goals,
             assists = assists,
             opponentGoals = opponentGoals,
+            teamGoals = teamGoals,
             quarters = quarters.map { it.toCommand() },
             totalDistanceM = totalDistanceM,
             maxSpeedKmh = maxSpeedKmh,
@@ -139,6 +154,7 @@ data class MatchDetailResponse(
     val goals: Int,
     val assists: Int,
     val opponentGoals: Int?,
+    val teamGoals: Int?,
     val totalDistanceM: Int,
     val maxSpeedKmh: Double,
     val sprintCount: Int,
@@ -158,6 +174,7 @@ data class MatchDetailResponse(
                 goals = match.goals,
                 assists = match.assists,
                 opponentGoals = match.opponentGoals,
+                teamGoals = match.teamGoals,
                 totalDistanceM = match.totalDistanceM,
                 maxSpeedKmh = match.maxSpeedKmh,
                 sprintCount = match.sprintCount,
@@ -179,6 +196,7 @@ data class MatchSummaryResponse(
     val goals: Int,
     val assists: Int,
     val opponentGoals: Int?,
+    val teamGoals: Int?,
     val totalDistanceM: Int,
     val maxSpeedKmh: Double,
     val sprintCount: Int,
@@ -198,6 +216,7 @@ data class MatchSummaryResponse(
                 goals = match.goals,
                 assists = match.assists,
                 opponentGoals = match.opponentGoals,
+                teamGoals = match.teamGoals,
                 totalDistanceM = match.totalDistanceM,
                 maxSpeedKmh = match.maxSpeedKmh,
                 sprintCount = match.sprintCount,

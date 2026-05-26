@@ -178,6 +178,12 @@ class SeasonStatServiceTest {
 
     private fun saveMatchWithResult(userId: Long, venueId: Long, playedAt: String, result: MatchResultType) {
         val instant = Instant.parse(playedAt)
+        // result 는 백엔드에서 teamGoals vs opponentGoals 로 derive — 외부 result 인자에 매핑되는 점수 쌍을 만들어준다.
+        val (teamGoals, opponentGoals) = when (result) {
+            MatchResultType.WIN -> 1 to 0
+            MatchResultType.DRAW -> 0 to 0
+            MatchResultType.LOSS -> 0 to 1
+        }
         matchService.saveMatch(
             userId,
             UUID.randomUUID(),
@@ -185,10 +191,11 @@ class SeasonStatServiceTest {
                 venueId = venueId,
                 playedAt = instant,
                 opponent = "TestFC",
-                result = result,
                 position = MatchPosition.MF,
                 goals = 0,
                 assists = 0,
+                opponentGoals = opponentGoals,
+                teamGoals = teamGoals,
                 totalDistanceM = 1000,
                 maxSpeedKmh = 0.0,
                 sprintCount = 0,
@@ -207,10 +214,11 @@ class SeasonStatServiceTest {
                 venueId = venueId,
                 playedAt = instant,
                 opponent = "TestFC",
-                result = MatchResultType.WIN,
                 position = MatchPosition.MF,
                 goals = 0,
                 assists = 0,
+                opponentGoals = 0,
+                teamGoals = 1,
                 totalDistanceM = quarters.sumOf { it.distanceM },
                 maxSpeedKmh = 0.0,
                 sprintCount = 0,

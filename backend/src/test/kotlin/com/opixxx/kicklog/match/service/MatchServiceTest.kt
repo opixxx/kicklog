@@ -84,6 +84,67 @@ class MatchServiceTest {
     }
 
     @Test
+    fun `teamGoals 가 opponentGoals 보다 크면 result 는 자동으로 WIN 으로 derive 된다`() {
+        val venue = saveVenue(userId = 1L)
+        // command.result 는 LOSS 로 보내도 — entity 가 teamGoals vs opponentGoals 로 덮어쓴다
+        val cmd = command(venue.id, goals = 1)
+            .copy(teamGoals = 3, opponentGoals = 2)
+
+        val result = service.saveMatch(1L, CLIENT_MATCH_ID, cmd)
+
+        assertEquals(3, result.match.teamGoals)
+        assertEquals(2, result.match.opponentGoals)
+        assertEquals(MatchResultType.WIN, result.match.result)
+    }
+
+    @Test
+    fun `teamGoals 가 opponentGoals 와 같으면 result 는 DRAW 로 derive 된다`() {
+        val venue = saveVenue(userId = 1L)
+        val cmd = command(venue.id, goals = 0)
+            .copy(teamGoals = 1, opponentGoals = 1)
+
+        val result = service.saveMatch(1L, CLIENT_MATCH_ID, cmd)
+
+        assertEquals(MatchResultType.DRAW, result.match.result)
+    }
+
+    @Test
+    fun `teamGoals 가 opponentGoals 보다 작으면 result 는 LOSS 로 derive 된다`() {
+        val venue = saveVenue(userId = 1L)
+        val cmd = command(venue.id, goals = 0)
+            .copy(teamGoals = 0, opponentGoals = 2)
+
+        val result = service.saveMatch(1L, CLIENT_MATCH_ID, cmd)
+
+        assertEquals(MatchResultType.LOSS, result.match.result)
+    }
+
+    @Test
+    fun `teamGoals 가 null 이면 result 도 null 로 저장된다`() {
+        val venue = saveVenue(userId = 1L)
+        val cmd = command(venue.id)
+            .copy(teamGoals = null, opponentGoals = null)
+
+        val result = service.saveMatch(1L, CLIENT_MATCH_ID, cmd)
+
+        assertEquals(null, result.match.teamGoals)
+        assertEquals(null, result.match.result)
+    }
+
+    @Test
+    fun `teamGoals 가 set 되어도 opponentGoals 가 null 이면 result 는 null 이다`() {
+        val venue = saveVenue(userId = 1L)
+        val cmd = command(venue.id)
+            .copy(teamGoals = 3, opponentGoals = null)
+
+        val result = service.saveMatch(1L, CLIENT_MATCH_ID, cmd)
+
+        assertEquals(3, result.match.teamGoals)
+        assertEquals(null, result.match.opponentGoals)
+        assertEquals(null, result.match.result)
+    }
+
+    @Test
     fun `같은 사용자와 clientMatchId면 기존 경기를 덮어쓴다`() {
         val venue = saveVenue(userId = 1L)
         service.saveMatch(1L, CLIENT_MATCH_ID, command(venue.id, goals = 1, workoutId = "hk-old"))
@@ -242,7 +303,6 @@ class MatchServiceTest {
             venueId = venueId,
             playedAt = Instant.parse(playedAt),
             opponent = "OO FC",
-            result = MatchResultType.WIN,
             position = MatchPosition.MF,
             goals = goals,
             assists = 0,

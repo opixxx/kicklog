@@ -3,7 +3,6 @@ package com.opixxx.kicklog.testsupport
 import com.opixxx.kicklog.friend.entity.Friendship
 import com.opixxx.kicklog.friend.repository.FriendshipStore
 import com.opixxx.kicklog.match.service.MatchPosition
-import com.opixxx.kicklog.match.service.MatchResultType
 import com.opixxx.kicklog.match.service.UpsertMatchCommand
 import com.opixxx.kicklog.match.service.UpsertQuarterCommand
 import com.opixxx.kicklog.user.entity.User
@@ -56,10 +55,12 @@ object ServiceTestFixtures {
             venueId = venueId,
             playedAt = instant,
             opponent = "OO FC",
-            result = MatchResultType.WIN,
             position = MatchPosition.MF,
             goals = goals,
             assists = assists,
+            // teamGoals 가 set 되면 Entity 가 result = WIN 으로 derive 한다. 기존 테스트가 result=WIN 을 기대했으므로 teamGoals=1, opponentGoals=0 으로 그 동작 유지.
+            opponentGoals = 0,
+            teamGoals = maxOf(goals, 1),
             totalDistanceM = distanceM,
             maxSpeedKmh = maxSpeedKmh,
             sprintCount = sprintCount,
