@@ -15,6 +15,10 @@ struct SettingsScreen: View {
     @Query(filter: #Predicate<Match> { $0.labeledAt != nil && $0.syncedAt == nil })
     private var pendingSyncMatches: [Match]
 
+    // 내 운동장 — Settings "내 운동장 관리" 행 카운트 (서버 동기화된 venue 만, 로컬 임시 venue 제외)
+    @Query(filter: #Predicate<Venue> { $0.serverId > 0 })
+    private var myVenues: [Venue]
+
     @State private var hideHeartRate: Bool = false
     @State private var displayNameDraft: String = ""
     @State private var isShowingNameEditor: Bool = false
@@ -39,6 +43,11 @@ struct SettingsScreen: View {
         }
         .background(KLTokens.bg)
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .navigationDestination(for: VenueRoute.self) { route in
+            switch route {
+            case .list: VenueListScreen()
+            }
+        }
         .onAppear {
             hideHeartRate = me?.hideHeartRate ?? false
         }
@@ -155,10 +164,18 @@ struct SettingsScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             KLSettingsHeader(text: "운동장")
             KLSettingsGroup {
-                KLSettingsRow(label: "내 운동장 관리", isLast: true, value: "3")
+                NavigationLink(value: VenueRoute.list) {
+                    KLSettingsRow(label: "내 운동장 관리", isLast: true,
+                                  value: "\(myVenues.count)")
+                }
+                .buttonStyle(.plain)
             }
         }
     }
+
+    // SettingsScreen 내부 NavigationStack 의 destination 라우트 식별자.
+    // 운동장 목록만이라 단일 case지만, 향후 다른 진입점도 같은 방식으로 확장한다.
+    enum VenueRoute: Hashable { case list }
 
     private var dataSection: some View {
         let pendingCount = pendingSyncMatches.count
