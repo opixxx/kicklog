@@ -17,16 +17,6 @@ data class SaveMatchResult(
     val updated: Boolean,
 )
 
-data class FriendMatchPage(
-    val page: CursorResponse<Match>,
-    val hideHeartRate: Boolean,
-)
-
-data class FriendMatchDetail(
-    val match: Match,
-    val hideHeartRate: Boolean,
-)
-
 @Service
 class MatchService(
     private val matchRepository: MatchStore,
@@ -81,20 +71,20 @@ class MatchService(
     }
 
     @Transactional(readOnly = true)
-    fun listFriendMatches(viewerId: Long, friendUserId: Long, cursor: String?, size: Int): FriendMatchPage {
-        val friend = friendshipAuthorizer.assertCanView(viewerId, friendUserId)
-        return FriendMatchPage(listMatchesByUser(friendUserId, cursor, size), friend.hideHeartRate)
+    fun listFriendMatches(viewerId: Long, friendUserId: Long, cursor: String?, size: Int): CursorResponse<Match> {
+        friendshipAuthorizer.assertCanView(viewerId, friendUserId)
+        return listMatchesByUser(friendUserId, cursor, size)
     }
 
     @Transactional(readOnly = true)
-    fun getFriendMatch(viewerId: Long, friendUserId: Long, matchId: Long): FriendMatchDetail {
-        val friend = friendshipAuthorizer.assertCanView(viewerId, friendUserId)
+    fun getFriendMatch(viewerId: Long, friendUserId: Long, matchId: Long): Match {
+        friendshipAuthorizer.assertCanView(viewerId, friendUserId)
         val match = matchRepository.findById(matchId)
             ?: throw KickLogException(ErrorCode.MATCH_NOT_FOUND)
         if (match.userId != friendUserId) {
             throw KickLogException(ErrorCode.MATCH_NOT_FOUND)
         }
-        return FriendMatchDetail(initialize(match), friend.hideHeartRate)
+        return initialize(match)
     }
 
     private fun listMatchesByUser(userId: Long, cursor: String?, size: Int): CursorResponse<Match> {

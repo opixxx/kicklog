@@ -30,30 +30,17 @@ class UserServiceTest {
     )
 
     @Test
-    fun `updateMe 는 hideHeartRate 만 갱신하고 displayName 은 보존한다`() {
-        val user = userRepository.save(User.create(displayName = "김조축", email = null))
+    fun `updateMe 단일 인자 시그니처 - displayName 만 받아 갱신한다 (p0-cleanup)`() {
+        // EXEC_PLAN 2026-05-28 p0-cleanup — updateMe(userId, displayName) 시그니처로 축소.
+        // 반환된 UserResponse 에 hideHeartRate 필드가 없어야 한다.
+        val user = userRepository.save(User.create(displayName = "축구왕", email = null))
 
-        val response = service.updateMe(
-            userId = user.id,
-            displayName = null,
-            hideHeartRate = true,
-        )
+        val response = service.updateMe(userId = user.id, displayName = "축구왕2")
 
-        assertEquals("김조축", response.displayName)
-        assertTrue(response.hideHeartRate)
-        // 영속화된 사용자도 동일한 상태인지 확인
+        assertEquals("축구왕2", response.displayName)
+        // 영속화 확인
         val saved = userRepository.findById(user.id)!!
-        assertTrue(saved.hideHeartRate)
-    }
-
-    @Test
-    fun `updateMe 는 두 필드 모두 null 이면 VALIDATION_FAILED 를 던진다`() {
-        val user = userRepository.save(User.create(displayName = "김조축", email = null))
-
-        val exception = assertFailsWith<KickLogException> {
-            service.updateMe(userId = user.id, displayName = null, hideHeartRate = null)
-        }
-        assertEquals(ErrorCode.VALIDATION_FAILED, exception.errorCode)
+        assertEquals("축구왕2", saved.displayName)
     }
 
     @Test

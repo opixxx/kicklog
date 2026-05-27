@@ -18,23 +18,21 @@ class FriendshipAuthorizerTest {
     private val authorizer = FriendshipAuthorizer(friendshipRepository, userRepository)
 
     @Test
-    fun `accepted 친구이면 대상 사용자를 반환한다`() {
+    fun `accepted 친구이면 통과한다`() {
         val viewer = saveUser("조회자")
         val friend = saveUser("친구")
         saveAcceptedFriendship(viewer.id, friend.id)
 
-        val result = authorizer.assertCanView(viewer.id, friend.id)
-
-        assertEquals(friend.id, result.id)
+        // throw 없이 정상 종료 — 사이드이펙트만.
+        authorizer.assertCanView(viewer.id, friend.id)
     }
 
     @Test
     fun `자기 자신 조회는 허용한다`() {
         val viewer = saveUser("본인")
 
-        val result = authorizer.assertCanView(viewer.id, viewer.id)
-
-        assertEquals(viewer.id, result.id)
+        // 본인 조회는 friendship 검사 우회 + 활성 사용자 검증만 통과.
+        authorizer.assertCanView(viewer.id, viewer.id)
     }
 
     @Test

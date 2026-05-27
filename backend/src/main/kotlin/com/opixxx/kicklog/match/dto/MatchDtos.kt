@@ -162,7 +162,7 @@ data class MatchDetailResponse(
     val quarters: List<QuarterWorkoutResponse>,
 ) {
     companion object {
-        fun from(match: Match, hideHeartRate: Boolean = false): MatchDetailResponse {
+        fun from(match: Match): MatchDetailResponse {
             return MatchDetailResponse(
                 id = match.id,
                 clientMatchId = match.clientMatchId,
@@ -178,8 +178,8 @@ data class MatchDetailResponse(
                 totalDistanceM = match.totalDistanceM,
                 maxSpeedKmh = match.maxSpeedKmh,
                 sprintCount = match.sprintCount,
-                avgHeartRate = match.avgHeartRate.takeUnless { hideHeartRate },
-                quarters = match.quarters.map { QuarterWorkoutResponse.from(it, hideHeartRate) },
+                avgHeartRate = match.avgHeartRate,
+                quarters = match.quarters.map { QuarterWorkoutResponse.from(it) },
             )
         }
     }
@@ -204,7 +204,7 @@ data class MatchSummaryResponse(
     val quarterCount: Int,
 ) {
     companion object {
-        fun from(match: Match, hideHeartRate: Boolean = false): MatchSummaryResponse {
+        fun from(match: Match): MatchSummaryResponse {
             return MatchSummaryResponse(
                 id = match.id,
                 clientMatchId = match.clientMatchId,
@@ -220,7 +220,7 @@ data class MatchSummaryResponse(
                 totalDistanceM = match.totalDistanceM,
                 maxSpeedKmh = match.maxSpeedKmh,
                 sprintCount = match.sprintCount,
-                avgHeartRate = match.avgHeartRate.takeUnless { hideHeartRate },
+                avgHeartRate = match.avgHeartRate,
                 quarterCount = match.quarters.size,
             )
         }
@@ -241,7 +241,7 @@ data class QuarterWorkoutResponse(
     val activeEnergyKcal: Int,
 ) {
     companion object {
-        fun from(quarter: QuarterWorkout, hideHeartRate: Boolean = false): QuarterWorkoutResponse {
+        fun from(quarter: QuarterWorkout): QuarterWorkoutResponse {
             return QuarterWorkoutResponse(
                 quarterNumber = quarter.quarterNumber,
                 healthKitWorkoutId = quarter.healthKitWorkoutId,
@@ -250,8 +250,8 @@ data class QuarterWorkoutResponse(
                 durationSeconds = quarter.durationSeconds,
                 distanceM = quarter.distanceM,
                 avgSpeedKmh = quarter.avgSpeedKmh,
-                avgHeartRate = quarter.avgHeartRate.takeUnless { hideHeartRate },
-                maxHeartRate = quarter.maxHeartRate.takeUnless { hideHeartRate },
+                avgHeartRate = quarter.avgHeartRate,
+                maxHeartRate = quarter.maxHeartRate,
                 sprintCount = quarter.sprintCount,
                 activeEnergyKcal = quarter.activeEnergyKcal,
             )

@@ -45,10 +45,10 @@ class UserController(
         @AuthenticationPrincipal principal: KickLogPrincipal,
         @Valid @RequestBody request: UpdateMeRequest,
     ): UserResponse {
+        // displayName 은 `@NotBlank` 통과 시점에 non-null 보장.
         return userService.updateMe(
             userId = principal.userId,
-            displayName = request.displayName,
-            hideHeartRate = request.hideHeartRate,
+            displayName = request.displayName!!,
         )
     }
 

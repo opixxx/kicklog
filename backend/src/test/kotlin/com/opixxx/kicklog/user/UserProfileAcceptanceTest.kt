@@ -50,28 +50,48 @@ class UserProfileAcceptanceTest {
             status { isOk() }
             jsonPath("$.id") { value(user.id) }
             jsonPath("$.displayName") { value("김캡틴") }
-            jsonPath("$.hideHeartRate") { value(false) }
+            // hideHeartRate 폐기 (p0-cleanup): 응답에서 키 자체가 사라져야 한다.
+            jsonPath("$.hideHeartRate") { doesNotExist() }
         }
     }
 
     @Test
-    fun `로그인 사용자는 hideHeartRate 만 부분 수정한다`() {
-        val user = createUser(displayName = "김조축")
+    fun `PATCH 응답에 hideHeartRate 필드가 더 이상 노출되지 않는다`() {
+        // EXEC_PLAN 2026-05-28 p0-cleanup — UserResponse 에서 hideHeartRate 필드 제거.
+        val user = createUser(displayName = "필드폐기")
         val accessToken = jwtTokenProvider.createAccessToken(user.id)
 
         mockMvc.patch("/users/me") {
             header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
             contentType = MediaType.APPLICATION_JSON
-            content = """{"hideHeartRate":true}"""
+            content = """{"displayName":"필드폐기2"}"""
         }.andExpect {
             status { isOk() }
-            jsonPath("$.displayName") { value("김조축") }
-            jsonPath("$.hideHeartRate") { value(true) }
+            jsonPath("$.displayName") { value("필드폐기2") }
+            jsonPath("$.hideHeartRate") { doesNotExist() }
         }
     }
 
     @Test
-    fun `PATCH 요청에 두 필드 모두 누락되면 400 VALIDATION_FAILED 를 반환한다`() {
+    fun `옛 클라이언트가 hideHeartRate 필드를 보내도 200 + displayName 만 반영한다`() {
+        // 옛 iOS 빌드 호환 — UpdateMeRequest 가 hideHeartRate 키를 알 수 없어도 ignoreUnknown 으로 통과.
+        val user = createUser(displayName = "옛클라")
+        val accessToken = jwtTokenProvider.createAccessToken(user.id)
+
+        mockMvc.patch("/users/me") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"displayName":"옛클라2","hideHeartRate":true}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.displayName") { value("옛클라2") }
+            jsonPath("$.hideHeartRate") { doesNotExist() }
+        }
+    }
+
+    @Test
+    fun `PATCH 요청에 displayName 이 누락되면 400 VALIDATION_FAILED 를 반환한다`() {
+        // p0-cleanup — UpdateMeRequest 가 displayName 단일 @NotBlank 필수 필드로 변경됨.
         val user = createUser()
         val accessToken = jwtTokenProvider.createAccessToken(user.id)
 

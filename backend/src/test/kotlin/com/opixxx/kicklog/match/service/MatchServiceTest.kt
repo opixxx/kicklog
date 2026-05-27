@@ -230,7 +230,7 @@ class MatchServiceTest {
 
         val page = service.listFriendMatches(viewer.id, friend.id, cursor = null, size = 20)
 
-        assertEquals(listOf(friend.id), page.page.content.map { it.userId })
+        assertEquals(listOf(friend.id), page.content.map { it.userId })
     }
 
     @Test

@@ -14,11 +14,10 @@ final class UserService {
     }
 
     func updateMe(
-        displayName: String? = nil,
-        hideHeartRate: Bool? = nil,
+        displayName: String,
         into context: ModelContext
     ) async throws -> User {
-        let request = UpdateMeRequest(displayName: displayName, hideHeartRate: hideHeartRate)
+        let request = UpdateMeRequest(displayName: displayName)
         let dto: UserDTO = try await apiClient.patch("/users/me", body: request)
         return User.upsert(from: dto, into: context)
     }

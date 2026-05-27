@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 // 매치 상세 — SwiftData Match 기반.
-// Hero (pitch 그라디언트) → 2×2 통계 → 쿼터별 막대 차트 3개 → 메타 정보 → 카카오 공유.
+// Hero (pitch 그라디언트) → 2×2 통계 → 쿼터별 막대 차트 3개 → 메타 정보.
 struct MatchDetailScreen: View {
     let match: Match
     @Environment(\.dismiss) private var dismiss
@@ -261,21 +261,7 @@ struct MatchDetailScreen: View {
             .clipShape(RoundedRectangle(cornerRadius: KLTokens.radiusCard))
             .klCardShadow(scheme)
 
-            Button(action: {}) {
-                HStack(spacing: 8) {
-                    KLIcon(name: "kakao.bubble", size: 20, color: Color(hex: 0x3C1E1E))
-                    Text("카카오톡으로 공유")
-                        .font(.system(size: 16, weight: .bold))
-                        .tracking(-0.3)
-                        .foregroundStyle(Color(hex: 0x3C1E1E))
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(Color(hex: 0xFEE500), in: RoundedRectangle(cornerRadius: KLTokens.radiusBtn))
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 22)
-            .padding(.bottom, 14)
+            Color.clear.frame(height: 14)
         }
         .padding(.horizontal, 16)
         .padding(.top, 20)

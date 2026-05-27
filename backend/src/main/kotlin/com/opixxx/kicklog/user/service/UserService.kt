@@ -20,12 +20,9 @@ class UserService(
 ) {
 
     @Transactional
-    fun updateMe(userId: Long, displayName: String?, hideHeartRate: Boolean?): UserResponse {
-        if (displayName == null && hideHeartRate == null) {
-            throw KickLogException(ErrorCode.VALIDATION_FAILED)
-        }
+    fun updateMe(userId: Long, displayName: String): UserResponse {
         val user = requireActiveUser(userId)
-        user.updateProfile(displayName = displayName, hideHeartRate = hideHeartRate, now = Instant.now(clock))
+        user.updateProfile(displayName = displayName, now = Instant.now(clock))
         return UserResponse.from(userStore.save(user))
     }
 

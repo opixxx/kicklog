@@ -55,7 +55,7 @@ Apple identityToken 으로 로그인/가입. 첫 가입 시 `name` 으로 `displ
 {
   "accessToken": "eyJ...",
   "refreshToken": "eyJ...",
-  "user": { "id": 1, "displayName": "김조축", "email": "abc@privaterelay.appleid.com", "hideHeartRate": false }
+  "user": { "id": 1, "displayName": "김조축", "email": "abc@privaterelay.appleid.com" }
 }
 ```
 
@@ -148,7 +148,7 @@ Refresh token 으로 새 access token 과 새 refresh token 을 발급한다. �
 
 **Response** `200` — [`UserResponse`](#userresponse)
 ```json
-{ "id": 1, "displayName": "김조축", "email": "abc@example.com", "hideHeartRate": false, "createdAt": "2026-01-02T03:00:00Z" }
+{ "id": 1, "displayName": "김조축", "email": "abc@example.com", "createdAt": "2026-01-02T03:00:00Z" }
 ```
 > 토큰·apple sub·kakao id 절대 미포함 (auth.md 보안 체크리스트).
 
@@ -156,20 +156,21 @@ Refresh token 으로 새 access token 과 새 refresh token 을 발급한다. �
 
 ### 2.2 `PATCH /users/me` 🔒
 
-`display_name` / `hide_heart_rate` 부분 수정. 보낸 필드만 갱신.
+`display_name` 수정 (단일 필드).
 
-**Request** (둘 다 optional, 최소 1개)
+**Request**
 ```json
-{ "displayName": "김캡틴", "hideHeartRate": true }
+{ "displayName": "김캡틴" }
 ```
 | 필드 | 타입 | 검증 |
 |---|---|---|
-| `displayName` | string? | `@Size(min=1, max=50)` |
-| `hideHeartRate` | boolean? | — |
+| `displayName` | string | `@NotBlank` + `@Size(min=1, max=50)` |
 
 **Response** `200` — [`UserResponse`](#userresponse)
 
-**에러**: `400 VALIDATION_FAILED` (빈 문자열·50자 초과)
+**에러**: `400 VALIDATION_FAILED` (필드 누락·빈 문자열·50자 초과)
+
+> 옛 클라이언트가 `hideHeartRate` 등 미사용 필드를 보내도 무시(`@JsonIgnoreProperties(ignoreUnknown=true)`).
 
 ---
 
@@ -510,7 +511,7 @@ Soft delete 취소. `deleted_at = NULL`.
 | 403 | `FRIEND_UNAUTHORIZED` | accepted 친구 아님 (IDOR 방지) |
 | 404 | `USER_NOT_FOUND` | 대상 없음/탈퇴 |
 
-> `hideHeartRate=true` 인 친구의 데이터는 심박 필드를 `null` 로 마스킹.
+> 친구 데이터는 심박 포함 모든 지표 평문 노출 (마스킹 정책 폐기 — V11 마이그레이션).
 
 ---
 
@@ -518,7 +519,7 @@ Soft delete 취소. `deleted_at = NULL`.
 
 친구 경기 상세. 위와 동일 인가. **에러** 동일 + `404 MATCH_NOT_FOUND`.
 
-> 응답은 [`MatchDetailResponse`](#matchdetailresponse) 이되, 친구의 `hideHeartRate` 면 `avgHeartRate`/`maxHeartRate` `null`.
+> 응답은 [`MatchDetailResponse`](#matchdetailresponse) — 친구의 `avgHeartRate` / quarter 의 `avgHeartRate` / `maxHeartRate` 도 평문.
 
 ---
 
@@ -765,11 +766,11 @@ Soft delete 취소. `deleted_at = NULL`.
 ```json
 { "accessToken": "string", "refreshToken": "string", "user": "UserResponse(축약)" }
 ```
-`user` 는 `{ id, displayName, email, hideHeartRate }` (createdAt 제외 축약형).
+`user` 는 `{ id, displayName, email }` (createdAt 제외 축약형).
 
 ### UserResponse
 ```json
-{ "id": 1, "displayName": "string", "email": "string|null", "hideHeartRate": false, "createdAt": "Instant" }
+{ "id": 1, "displayName": "string", "email": "string|null", "createdAt": "Instant" }
 ```
 
 ### PutMatchRequest
@@ -810,7 +811,6 @@ Soft delete 취소. `deleted_at = NULL`.
 }
 ```
 > `venueId` 는 운동장이 삭제된 과거 경기에서 `null` 가능.
-> 친구 조회 시 `hideHeartRate=true` 면 `avgHeartRate` 및 각 quarter 의 `avgHeartRate`/`maxHeartRate` 가 `null`.
 
 ### SeasonStatResponse
 8.1 참조.

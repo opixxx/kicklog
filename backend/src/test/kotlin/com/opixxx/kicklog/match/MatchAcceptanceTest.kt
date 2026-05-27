@@ -376,25 +376,43 @@ class MatchAcceptanceTest {
     }
 
     @Test
-    fun `친구가 심박 숨김이면 친구 경기 상세의 심박 필드를 null로 마스킹한다`() {
-        val viewer = createUser("심박조회자")
-        val friend = createUser("심박숨김친구").also {
-            it.hideHeartRate = true
-            userRepository.save(it)
-        }
+    fun `친구 경기 상세의 avgHeartRate 와 quarter 심박은 마스킹 없이 평문으로 노출된다`() {
+        // EXEC_PLAN 2026-05-28 p0-cleanup — hideHeartRate 정책 폐기 후 친구는 모든 지표를 본다.
+        val viewer = createUser("심박평문조회자")
+        val friend = createUser("심박평문친구")
         val viewerToken = jwtTokenProvider.createAccessToken(viewer.id)
         val friendToken = jwtTokenProvider.createAccessToken(friend.id)
         saveAcceptedFriendship(viewer.id, friend.id)
-        val venueId = createVenue(friendToken, name = "심박숨김경기장")
-        val matchId = saveMatchAndReturnId(friendToken, "99999999-9999-9999-9999-999999999993", venueId)
+        val venueId = createVenue(friendToken, name = "심박평문경기장")
+        val matchId = saveMatchAndReturnId(friendToken, "99999999-9999-9999-9999-999999999994", venueId)
 
         mockMvc.get("/users/${friend.id}/matches/$matchId") {
             header(HttpHeaders.AUTHORIZATION, "Bearer $viewerToken")
         }.andExpect {
             status { isOk() }
-            jsonPath("$.avgHeartRate") { value(null) }
-            jsonPath("$.quarters[0].avgHeartRate") { value(null) }
-            jsonPath("$.quarters[0].maxHeartRate") { value(null) }
+            // matchJson 기본값은 avgHeartRate 미입력(=0). 평문 노출이므로 0 (≠ null).
+            jsonPath("$.avgHeartRate") { value(0) }
+            jsonPath("$.quarters[0].avgHeartRate") { value(0) }
+            jsonPath("$.quarters[0].maxHeartRate") { value(0) }
+        }
+    }
+
+    @Test
+    fun `친구 경기 목록의 avgHeartRate 도 마스킹 없이 평문 노출된다`() {
+        // 친구 경기 목록 endpoint 역시 hideHeartRate 정책 폐기 적용.
+        val viewer = createUser("목록심박조회자")
+        val friend = createUser("목록심박친구")
+        val viewerToken = jwtTokenProvider.createAccessToken(viewer.id)
+        val friendToken = jwtTokenProvider.createAccessToken(friend.id)
+        saveAcceptedFriendship(viewer.id, friend.id)
+        val venueId = createVenue(friendToken, name = "목록심박경기장")
+        saveMatchAndReturnId(friendToken, "99999999-9999-9999-9999-999999999995", venueId)
+
+        mockMvc.get("/users/${friend.id}/matches") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $viewerToken")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.content[0].avgHeartRate") { value(0) }
         }
     }
 
