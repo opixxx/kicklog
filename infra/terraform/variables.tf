@@ -66,10 +66,18 @@ variable "ssh_key_name" {
 }
 
 variable "allowed_ssh_cidr" {
-  description = "SSH 22번 허용 IP CIDR (본인 IP만, /32 필수). curl ifconfig.me 로 확인."
+  description = "SSH 22번 허용 IP CIDR (본인 IP만, /32 필수). curl ifconfig.me 로 확인. enable_ssh_inbound=false 면 무시됨."
   type        = string
-  # 예: "121.140.xxx.xxx/32"
-  sensitive = true
+  default     = "127.0.0.1/32" # ADR-0009: enable_ssh_inbound=false 가 기본이라 미사용 — placeholder.
+  sensitive   = true
+}
+
+# ADR-0009: SSH 22 ingress 토글. true 이면 본인 IP/32 break-glass 룰 유지,
+# false 이면 SG ingress 자체 생성 안 함 (SSM Session Manager 만 사용).
+variable "enable_ssh_inbound" {
+  description = "EC2 SG 의 SSH(22) ingress 룰 생성 여부. SSM Session Manager 가 안정 운영되면 false 유지."
+  type        = bool
+  default     = false
 }
 
 # ─── RDS ──────────────────────────────────────────────
@@ -134,4 +142,17 @@ variable "github_repo_name" {
   description = "GitHub 저장소 이름 (OIDC trust condition)"
   type        = string
   default     = "kicklog"
+}
+
+# ─── Observability / Budget (ADR-0009) ────────────────
+variable "alert_email" {
+  description = "운영 알림 수신 이메일. 빈 문자열이면 SNS email subscription 을 생성하지 않는다."
+  type        = string
+  default     = ""
+}
+
+variable "budget_monthly_usd" {
+  description = "AWS Budgets 월 한도 (USD). Free Tier 운영 가정 — 실수 감지용."
+  type        = number
+  default     = 5
 }

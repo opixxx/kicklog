@@ -162,16 +162,36 @@ aws secretsmanager get-secret-value \
 
 ---
 
-## 비용 모니터링
+## 비용 모니터링 (ADR-0009 — 자동화됨)
 
 ### AWS Cost Explorer
 - AWS Console > Billing > Cost Explorer
-- 매일 체크 권장 (실수로 NAT/ALB 생성 시 즉시 발견)
+- 매주 1회 체크 권장 (실수로 NAT/ALB 생성 시 즉시 발견)
 
-### Budget Alarm 설정 (강력 권장)
-```
-Budgets > Create budget > Monthly $5 → 이메일 알림
-```
+### Budget Alarm (terraform 자동 생성)
+- `aws_budgets_budget.monthly` — 기본 한도 $5/m, `var.budget_monthly_usd` 로 조정
+- 80% / 100% actual + 100% forecast 알림 → SNS topic `kicklog-alerts`
+
+### CloudWatch Alarms (terraform 자동 생성, observability.tf)
+- EC2 StatusCheckFailed (인스턴스 장애)
+- EC2 CPUUtilization ≥ 90% (t3 burstable 고갈)
+- RDS CPUUtilization ≥ 85%
+- RDS FreeStorageSpace ≤ 4 GiB (20GB 한도 접근)
+
+### 알림 채널 활성화
+1. `terraform.tfvars` 에 `alert_email = "you@example.com"` 추가
+2. `terraform apply`
+3. AWS SNS 가 확인 메일 발송 → confirm 클릭 시 활성화
+
+### SSH 토글 (ADR-0009 D4)
+- `enable_ssh_inbound = false` 가 기본 — 평시 SSM Session Manager 만 사용
+- 비상 시: `terraform apply -var enable_ssh_inbound=true -var allowed_ssh_cidr=$(curl -s ifconfig.me)/32`
+- 작업 후 다시 `terraform apply -var enable_ssh_inbound=false` 로 닫기
+
+### Free Tier 함정 / 사고 대응 (별도 runbook)
+- `docs/runbook/free-tier-cost-traps.md` (인벤토리 + 대응 시나리오)
+- `docs/runbook/rds-restore-rehearsal.md` (분기 1회 백업 복원 리허설)
+- `docs/runbook/terraform-s3-backend-migration.md` (state S3 이전 체크리스트)
 
 ---
 
@@ -237,14 +257,16 @@ terraform destroy
 
 ## v1.1 예정 마이그레이션
 
-| 영역 | MVP | v1.1 |
+| 영역 | 현재 (ADR-0006 ~ 0009) | v1.1 |
 |---|---|---|
-| State backend | 로컬 `terraform.tfstate` | S3 + DynamoDB lock |
-| HTTPS | nginx + Let's Encrypt | ALB + ACM |
-| 도메인 | EIP 직접 | Route 53 + 도메인 |
-| 배포 | 수동 SSH + docker compose | GitHub Actions + ECR |
-| 모니터링 | 기본 CloudWatch | CloudWatch Synthetics + Alarms |
-| 네트워크 | 단일 Public Subnet | Public + Private + NAT |
+| State backend | 로컬 `terraform.tfstate` (runbook 작성 완료) | S3 + native lockfile (별도 PR) |
+| HTTPS | nginx + Let's Encrypt | ALB + ACM (정식 출시 시) |
+| 도메인 | api.kicklog.org (ADR-0007) | 동일 + CloudFront 검토 |
+| 배포 | GitHub Actions OIDC + SSM (ADR-0008) + SHA immutable (ADR-0009) | Synthetics canary 추가 |
+| 모니터링 | CloudWatch Alarms 4종 + SNS + Budget (ADR-0009) | + Synthetics canary, Container Insights |
+| 네트워크 | 단일 Public Subnet | Public + Private + NAT (정식 출시 시) |
+| SSH | toggle 기본 false, SSM only | 동일 |
+| 백업 | RDS retention=1 + 분기 리허설 runbook | Free Tier 졸업 후 retention=7 |
 
 ---
 

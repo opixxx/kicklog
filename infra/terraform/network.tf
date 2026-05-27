@@ -76,9 +76,11 @@ resource "aws_route_table_association" "public_c" {
 }
 
 # ─── Security Group: EC2 ──────────────────────────────
+# ADR-0009: SSH(22) ingress 는 분리된 rule + count 토글. SG 본체에는 HTTP/HTTPS 만.
 resource "aws_security_group" "ec2" {
-  name        = "kicklog-ec2-sg"
-  description = "EC2: HTTP(80), HTTPS(443), SSH(admin only)"
+  name = "kicklog-ec2-sg"
+  # AWS API 가 ASCII 만 허용. SSH(22) 는 enable_ssh_inbound 토글 (ADR-0009).
+  description = "EC2: HTTP(80), HTTPS(443). SSH(22) gated by enable_ssh_inbound (ADR-0009)."
   vpc_id      = aws_vpc.main.id
 
   # HTTP — Let's Encrypt 인증서 갱신용 + HTTPS 리다이렉트
@@ -99,15 +101,6 @@ resource "aws_security_group" "ec2" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # SSH — 본인 IP만 (ADR-0006 보안 정책)
-  ingress {
-    description = "SSH (admin only)"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
-  }
-
   # 모든 outbound 허용 (카카오 API, apt, docker pull 등)
   egress {
     from_port   = 0
@@ -121,22 +114,39 @@ resource "aws_security_group" "ec2" {
   }
 }
 
+# ADR-0009: SSH(22) break-glass — enable_ssh_inbound=true 일 때만 본인 IP/32 ingress 추가.
+# 평시는 SSM Session Manager 만 사용한다 (SSH 키 분실/유출 표면 제거).
+resource "aws_security_group_rule" "ec2_ssh_break_glass" {
+  count = var.enable_ssh_inbound ? 1 : 0
+
+  type              = "ingress"
+  security_group_id = aws_security_group.ec2.id
+  # AWS API 가 ASCII 만 허용 (한글/em-dash 사용 불가). 한글 사유는 본 리소스 위 주석 참조.
+  description = "SSH break-glass: admin IP only. Prefer SSM Session Manager."
+  from_port   = 22
+  to_port     = 22
+  protocol    = "tcp"
+  cidr_blocks = [var.allowed_ssh_cidr]
+}
+
 # ─── Security Group: RDS ──────────────────────────────
+# ADR-0009 검증: ingress 는 EC2 SG 5432 단일 출처만, egress 는 명시 안 해
+# 기본 deny (terraform 은 SG egress 미지정 시 빈 set 적용) — 외부 통신 없음.
+# publicly_accessible=false 와 함께 이중 방어.
 resource "aws_security_group" "rds" {
   name        = "kicklog-rds-sg"
-  description = "RDS: 5432 from EC2 SG only"
+  description = "RDS: 5432 from EC2 SG only (no other source, no egress)"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "PostgreSQL from EC2"
+    description     = "PostgreSQL from EC2 SG only"
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.ec2.id]
   }
 
-  # RDS는 outbound 불필요 (백업 등은 AWS 내부)
-  # 보안상 명시적으로 제거
+  # RDS 는 outbound 불필요 (백업 등은 AWS 내부). 명시적으로 비워둠.
 
   tags = {
     Name = "kicklog-rds-sg"

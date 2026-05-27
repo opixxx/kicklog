@@ -16,8 +16,13 @@ environment  = "prod"
 # (PEM 파일은 ~/.ssh/<name>.pem에 저장 + chmod 400)
 ssh_key_name = "kicklog-keypair"
 
-# 본인 IP만 SSH 허용 (curl ifconfig.me 로 확인 후 /32 추가)
-allowed_ssh_cidr = "121.140.xxx.xxx/32"
+# ADR-0009: SSH(22) ingress 토글. 기본 false (SSM Session Manager 만 사용).
+# 키 분실/유출 등 fallback 이 필요할 때만 true 로 전환 → terraform apply.
+# enable_ssh_inbound = false
+
+# 본인 IP만 SSH 허용 (curl ifconfig.me 로 확인 후 /32 추가).
+# enable_ssh_inbound=false 면 이 값은 사용되지 않음.
+# allowed_ssh_cidr = "121.140.xxx.xxx/32"
 
 # ─── RDS ──────────────────────────────────────────────
 # 16자 이상 강한 비밀번호 (특수문자 일부 제한 — / @ " 사용 불가)
@@ -33,3 +38,10 @@ jwt_secret = "REPLACE_ME_jwt_secret_32chars_or_more"
 # GHCR private package pull 용 PAT (read:packages 권한, ADR-0008 — CD via SSM)
 # GitHub > Settings > Developer settings > PAT (classic) > Generate
 ghcr_pat = "REPLACE_ME_ghcr_personal_access_token"
+
+# ─── Observability / Budget (ADR-0009) ────────────────
+# 운영 알림 수신 이메일. 빈 값으로 두면 SNS email subscription 안 만듦 (SNS topic 자체는 생성됨).
+# alert_email = "you@example.com"
+
+# 월 예산 한도 (USD). Free Tier 운영 가정 — 실수 감지용.
+# budget_monthly_usd = 5
