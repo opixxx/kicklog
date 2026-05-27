@@ -31,15 +31,14 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>KAKAO_NATIVE_APP_KEY</key>
+	<string>23a1a73d29eab91b76c6c0a587542598</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>kakaokompassauth</string>
 	</array>
-	<key>KAKAO_NATIVE_APP_KEY</key>
-	<string>23a1a73d29eab91b76c6c0a587542598</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<!-- 로컬 개발 서버(http://localhost:8080) 호출 허용. 외부 HTTP 는 여전히 차단됨. -->
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
@@ -55,10 +54,7 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
-	<array>
-		<string>fetch</string>
-		<string>processing</string>
-	</array>
+	<array/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

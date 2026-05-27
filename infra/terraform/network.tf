@@ -78,12 +78,12 @@ resource "aws_route_table_association" "public_c" {
 # ─── Security Group: EC2 ──────────────────────────────
 resource "aws_security_group" "ec2" {
   name        = "kicklog-ec2-sg"
-  description = "EC2: HTTP(80), HTTPS(443), SSH(본인 IP만)"
+  description = "EC2: HTTP(80), HTTPS(443), SSH(admin only)"
   vpc_id      = aws_vpc.main.id
 
   # HTTP — Let's Encrypt 인증서 갱신용 + HTTPS 리다이렉트
   ingress {
-    description = "HTTP (Let's Encrypt + redirect to HTTPS)"
+    description = "HTTP (LetsEncrypt + redirect to HTTPS)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
