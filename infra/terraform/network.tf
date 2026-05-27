@@ -76,11 +76,12 @@ resource "aws_route_table_association" "public_c" {
 }
 
 # ─── Security Group: EC2 ──────────────────────────────
-# ADR-0009: SSH(22) ingress 는 분리된 rule + count 토글. SG 본체에는 HTTP/HTTPS 만.
+# ADR-0009: SSH(22) ingress 는 분리된 aws_security_group_rule + count 토글.
+# SG 본체에는 HTTP/HTTPS 만. description 필드는 immutable 이라 ADR-0006 원본 그대로 유지
+# (변경하면 SG replace → RDS-attached ENI detach 권한 부재로 apply 실패함).
 resource "aws_security_group" "ec2" {
-  name = "kicklog-ec2-sg"
-  # AWS API 가 ASCII 만 허용. SSH(22) 는 enable_ssh_inbound 토글 (ADR-0009).
-  description = "EC2: HTTP(80), HTTPS(443). SSH(22) gated by enable_ssh_inbound (ADR-0009)."
+  name        = "kicklog-ec2-sg"
+  description = "EC2: HTTP(80), HTTPS(443), SSH(admin only)"
   vpc_id      = aws_vpc.main.id
 
   # HTTP — Let's Encrypt 인증서 갱신용 + HTTPS 리다이렉트
@@ -133,20 +134,22 @@ resource "aws_security_group_rule" "ec2_ssh_break_glass" {
 # ADR-0009 검증: ingress 는 EC2 SG 5432 단일 출처만, egress 는 명시 안 해
 # 기본 deny (terraform 은 SG egress 미지정 시 빈 set 적용) — 외부 통신 없음.
 # publicly_accessible=false 와 함께 이중 방어.
+# description 필드는 immutable + RDS-attached ENI 라 변경 불가 — ADR-0006 원본 그대로 유지.
 resource "aws_security_group" "rds" {
   name        = "kicklog-rds-sg"
-  description = "RDS: 5432 from EC2 SG only (no other source, no egress)"
+  description = "RDS: 5432 from EC2 SG only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "PostgreSQL from EC2 SG only"
+    description     = "PostgreSQL from EC2"
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.ec2.id]
   }
 
-  # RDS 는 outbound 불필요 (백업 등은 AWS 내부). 명시적으로 비워둠.
+  # RDS는 outbound 불필요 (백업 등은 AWS 내부)
+  # 보안상 명시적으로 제거
 
   tags = {
     Name = "kicklog-rds-sg"

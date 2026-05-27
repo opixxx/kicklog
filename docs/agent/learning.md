@@ -50,3 +50,22 @@
 ## Learned Patterns
 
 <!-- Add promoted learnings below. Keep entries short and actionable. -->
+
+### 2026-05-27 — AWS Security Group description/name 은 immutable, RDS-attached 일 때 변경 불가
+
+- Trigger: production-risk
+- Task/PR: PR #50 (free-tier-prod-hardening), 1차 apply 실패
+- Failure: `terraform apply` 가 RDS SG 를 destroy 시도 → `AuthFailure: detaching RDS ENI` 로 중단
+- Root cause: SG `description` 변경을 정책 명문화 목적으로 추가했는데, AWS SG description 은 immutable → terraform 이 SG replace 시도 → RDS-managed ENI 는 RDS service 가 관리해 사용자(admin 포함)가 detach 불가
+- Fix applied: SG description/name 을 ADR-0006 원본 그대로 복원. 정책 추가 정보는 HCL 주석으로만 남김
+- Prevention:
+  - 운영 중인 `aws_security_group` 의 `description` 과 `name` 은 한 번 정한 뒤 손대지 않는다 (정책 변경 시 ingress/egress rule 만 수정)
+  - 표현 개선 / 정책 메모는 HCL 주석으로
+  - `terraform plan` 출력에 `# forces replacement` 가 SG/EBS/IAM 등 stateful 리소스에 보이면 즉시 정지하고 사용자 확인
+- Updated:
+  - [x] architecture/ADR — ADR-0009 D5 에 함정 노트 추가
+  - [x] code-reviewer (백엔드 전용이라 본 항목은 infra reviewer 가 생기면 이전)
+  - [ ] EXEC_PLAN template
+  - [ ] backend-test-writer (N/A — infra)
+  - [ ] test strategy (N/A — infra)
+- Skip reason if not promoted: N/A

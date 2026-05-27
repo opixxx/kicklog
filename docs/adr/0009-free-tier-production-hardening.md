@@ -92,6 +92,9 @@ PR #47/#49 머지 후 자동 배포 (SSM + S3 staging + OIDC) 가 동작 중이�
   - 코드 리뷰 시 "혹시 cidr_blocks 가 추가되어 있나?" 의문이 즉시 사라지도록 주석 강화
   - 실질 변경은 없음 — 정책 명문화
 
+> **함정 (학습)**: AWS Security Group 의 `description` 필드는 **immutable**.
+> 변경하려면 SG replace 가 필요하고, RDS-attached SG 의 ENI 는 RDS service 가 관리해서 사용자가 admin 이어도 detach 불가 (`AuthFailure`). 따라서 운영 중인 SG 의 description / name 은 손대지 않는다. 정책 추가 정보는 **HCL 주석** 으로만 남긴다. (1차 apply 실패 → 본 ADR 머지 전 보정)
+
 ### D6. Terraform state — **S3 backend 이전은 본 PR 미적용**
 
 - **선택**: 본 PR 은 `docs/runbook/terraform-s3-backend-migration.md` 체크리스트만 작성. 실제 마이그레이션은 별도 PR.
