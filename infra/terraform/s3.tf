@@ -18,9 +18,11 @@
 resource "aws_s3_bucket" "deploy_staging" { # NOSONAR: access logging 미적용 사유는 파일 헤더 참조
   bucket = "kicklog-deploy-staging-${data.aws_caller_identity.current.account_id}"
 
+  # AWS S3 tag value 는 ASCII letters/numbers/spaces + +-=._:/@ 만 허용.
+  # 한글/화살표/괄호 사용 불가 — 상세 설명은 본 파일 헤더 + ADR-0008 참조.
   tags = {
     Name    = "kicklog-deploy-staging"
-    Purpose = "GitHub Actions → EC2 배포 산출물 스테이징 (ADR-0008)"
+    Purpose = "cd-via-ssm-adr-0008"
   }
 }
 
