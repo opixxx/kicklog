@@ -3,6 +3,7 @@ package com.opixxx.kicklog.user.controller
 import com.opixxx.kicklog.common.exception.ErrorCode
 import com.opixxx.kicklog.common.exception.KickLogException
 import com.opixxx.kicklog.common.security.KickLogPrincipal
+import com.opixxx.kicklog.user.dto.DisplayNameCheckResponse
 import com.opixxx.kicklog.user.dto.UpdateMeRequest
 import com.opixxx.kicklog.user.dto.UserResponse
 import com.opixxx.kicklog.user.dto.UserSearchResponse
@@ -73,5 +74,17 @@ class UserController(
         @RequestParam(name = "limit", defaultValue = "20") limit: Int,
     ): UserSearchResponse {
         return userService.search(selfId = principal.userId, query = query, limit = limit)
+    }
+
+    // 닉네임 가용 확인 — 본인 현재 닉네임은 항상 available=true (false positive 방지).
+    @GetMapping("/check-display-name")
+    fun checkDisplayName(
+        @AuthenticationPrincipal principal: KickLogPrincipal,
+        @RequestParam("displayName")
+        @NotBlank(message = "displayName 은 필수입니다")
+        @Size(min = 1, max = 50, message = "displayName 은 1~50자여야 합니다")
+        displayName: String,
+    ): DisplayNameCheckResponse {
+        return userService.checkDisplayName(userId = principal.userId, displayName = displayName)
     }
 }

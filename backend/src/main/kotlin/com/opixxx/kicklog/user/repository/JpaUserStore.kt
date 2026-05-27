@@ -32,4 +32,8 @@ class JpaUserStore(
     override fun findAllActiveByIds(ids: Collection<Long>): List<User> {
         return if (ids.isEmpty()) emptyList() else userRepository.findAllByIdInAndDeletedAtIsNull(ids)
     }
+
+    override fun findActiveByDisplayName(displayName: String): User? {
+        return userRepository.findFirstByDisplayNameAndDeletedAtIsNull(displayName)
+    }
 }

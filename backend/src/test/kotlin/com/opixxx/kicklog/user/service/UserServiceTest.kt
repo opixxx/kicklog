@@ -43,6 +43,83 @@ class UserServiceTest {
         assertEquals("축구왕2", saved.displayName)
     }
 
+    // -------------------------------------------------------------
+    // EXEC_PLAN 2026-05-28 p1-display-name-unique — #5 닉네임 unique
+    // -------------------------------------------------------------
+
+    @Test
+    fun `updateMe 는 본인 현재 닉네임과 동일 입력이면 중복 검사 없이 통과한다`() {
+        val me = userRepository.save(User.create(displayName = "홍길동", email = null))
+        // 같은 닉네임이 다른 활성 사용자에게도 점유돼 있다 가정해도, 본인 동일이면 unique 검사 skip 이어야 함
+        // (정상 흐름에선 UNIQUE INDEX 로 두 사용자 공존 불가하나, 검사 skip 검증 단위로 InMemory 사용)
+        val response = service.updateMe(userId = me.id, displayName = "홍길동")
+
+        assertEquals("홍길동", response.displayName)
+    }
+
+    @Test
+    fun `updateMe 는 다른 활성 사용자가 쓰는 닉네임으로 변경 시 DISPLAY_NAME_DUPLICATE 를 던진다`() {
+        val me = userRepository.save(User.create(displayName = "홍길동", email = null))
+        userRepository.save(User.create(displayName = "박수비", email = null))
+
+        val exception = assertFailsWith<KickLogException> {
+            service.updateMe(userId = me.id, displayName = "박수비")
+        }
+        assertEquals(ErrorCode.DISPLAY_NAME_DUPLICATE, exception.errorCode)
+    }
+
+    @Test
+    fun `updateMe 는 탈퇴자 닉네임은 재사용 허용한다`() {
+        val me = userRepository.save(User.create(displayName = "홍길동", email = null))
+        val gone = userRepository.save(User.create(displayName = "박수비", email = null))
+        gone.deletedAt = Instant.parse("2026-05-01T00:00:00Z")
+        userRepository.save(gone)
+
+        val response = service.updateMe(userId = me.id, displayName = "박수비")
+
+        assertEquals("박수비", response.displayName)
+    }
+
+    @Test
+    fun `checkDisplayName 미사용 닉네임은 available=true`() {
+        val me = userRepository.save(User.create(displayName = "검사자", email = null))
+
+        val result = service.checkDisplayName(userId = me.id, displayName = "축구왕")
+
+        assertTrue(result.available)
+    }
+
+    @Test
+    fun `checkDisplayName 본인 현재 닉네임은 available=true (false positive 방지)`() {
+        val me = userRepository.save(User.create(displayName = "홍길동", email = null))
+
+        val result = service.checkDisplayName(userId = me.id, displayName = "홍길동")
+
+        assertTrue(result.available)
+    }
+
+    @Test
+    fun `checkDisplayName 다른 활성 사용자가 쓰는 닉네임은 available=false`() {
+        val me = userRepository.save(User.create(displayName = "검사자", email = null))
+        userRepository.save(User.create(displayName = "박수비", email = null))
+
+        val result = service.checkDisplayName(userId = me.id, displayName = "박수비")
+
+        assertFalse(result.available)
+    }
+
+    @Test
+    fun `checkDisplayName 탈퇴자 닉네임은 available=true (재사용 허용)`() {
+        val me = userRepository.save(User.create(displayName = "검사자", email = null))
+        val gone = userRepository.save(User.create(displayName = "탈퇴자닉", email = null))
+        gone.deletedAt = Instant.parse("2026-05-01T00:00:00Z")
+        userRepository.save(gone)
+
+        val result = service.checkDisplayName(userId = me.id, displayName = "탈퇴자닉")
+
+        assertTrue(result.available)
+    }
+
     @Test
     fun `softDelete 는 deletedAt 을 설정하고 활성 refresh token 을 모두 폐기한다`() {
         val user = userRepository.save(User.create(displayName = "삭제대상", email = null))

@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 // ADR-0004 D2 — SwiftData @Model 정의.
-// 본인(편집 가능): User, Match, QuarterWorkout, Venue, FriendInvitation
+// 본인(편집 가능): User, Match, QuarterWorkout, Venue
 // 친구(read-only 캐시): Friend, FriendMatch, FriendQuarterWorkout
 // HealthKit state (Observer anchor 영속화): HealthKitState
 
@@ -336,21 +336,6 @@ final class FriendQuarterWorkout {
     }
 }
 
-@Model
-final class FriendInvitation {
-    @Attribute(.unique) var token: String
-    var expiresAt: Date
-    var useCount: Int
-    var createdAt: Date
-
-    init(token: String, expiresAt: Date, useCount: Int = 0, createdAt: Date = .now) {
-        self.token = token
-        self.expiresAt = expiresAt
-        self.useCount = useCount
-        self.createdAt = createdAt
-    }
-}
-
 // MARK: - HealthKit anchor 영속화 (ADR-0004 D4)
 
 @Model
@@ -400,7 +385,6 @@ enum KickLogSchema {
         Friend.self,
         FriendMatch.self,
         FriendQuarterWorkout.self,
-        FriendInvitation.self,
         HealthKitState.self,
     ]
 }

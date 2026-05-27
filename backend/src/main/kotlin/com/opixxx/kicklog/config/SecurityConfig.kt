@@ -6,7 +6,6 @@ import com.opixxx.kicklog.common.security.JwtProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
@@ -30,7 +29,6 @@ class SecurityConfig(
                 auth
                     .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                     .requestMatchers("/auth/apple/signin", "/auth/kakao/signin", "/auth/refresh").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/invitations/*").permitAll()
                     .anyRequest().authenticated()
             }
             .httpBasic { it.disable() }

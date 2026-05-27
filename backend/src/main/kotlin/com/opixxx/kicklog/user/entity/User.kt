@@ -49,7 +49,9 @@ class User(
 
     companion object {
         fun create(displayName: String, email: String?): User {
-            return User(displayName = displayName.takeIf { it.isNotBlank() } ?: "사용자", email = email)
+            // 앞뒤 공백 trim + 빈 문자열 fallback ("사용자" 기본값).
+            val trimmed = displayName.trim()
+            return User(displayName = trimmed.takeIf { it.isNotEmpty() } ?: "사용자", email = email)
         }
     }
 }

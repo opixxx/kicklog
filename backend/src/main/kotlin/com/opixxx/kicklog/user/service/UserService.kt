@@ -3,9 +3,11 @@ package com.opixxx.kicklog.user.service
 import com.opixxx.kicklog.auth.repository.RefreshTokenStore
 import com.opixxx.kicklog.common.exception.ErrorCode
 import com.opixxx.kicklog.common.exception.KickLogException
+import com.opixxx.kicklog.user.dto.DisplayNameCheckResponse
 import com.opixxx.kicklog.user.dto.UserResponse
 import com.opixxx.kicklog.user.dto.UserSearchResponse
 import com.opixxx.kicklog.user.repository.UserStore
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -22,8 +24,36 @@ class UserService(
     @Transactional
     fun updateMe(userId: Long, displayName: String): UserResponse {
         val user = requireActiveUser(userId)
-        user.updateProfile(displayName = displayName, now = Instant.now(clock))
-        return UserResponse.from(userStore.save(user))
+        val normalized = displayName.trim()
+        // 본인 현재 닉네임과 동일하면 중복 검사 skip (false positive 방지).
+        if (normalized != user.displayName) {
+            assertDisplayNameAvailable(normalized)
+        }
+        user.updateProfile(displayName = normalized, now = Instant.now(clock))
+        return try {
+            UserResponse.from(userStore.save(user))
+        } catch (exception: DataIntegrityViolationException) {
+            // DB 레벨 race — 응용 검사 통과 후 동시에 다른 트랜잭션이 같은 닉네임 점유.
+            throw KickLogException(ErrorCode.DISPLAY_NAME_DUPLICATE, cause = exception)
+        }
+    }
+
+    @Transactional(readOnly = true)
+    fun checkDisplayName(userId: Long, displayName: String): DisplayNameCheckResponse {
+        val user = requireActiveUser(userId)
+        val normalized = displayName.trim()
+        // 본인 현재 닉네임이면 항상 사용 가능 (false positive 방지).
+        if (normalized == user.displayName) {
+            return DisplayNameCheckResponse(available = true)
+        }
+        val existing = userStore.findActiveByDisplayName(normalized)
+        return DisplayNameCheckResponse(available = existing == null)
+    }
+
+    private fun assertDisplayNameAvailable(displayName: String) {
+        if (userStore.findActiveByDisplayName(displayName) != null) {
+            throw KickLogException(ErrorCode.DISPLAY_NAME_DUPLICATE)
+        }
     }
 
     @Transactional

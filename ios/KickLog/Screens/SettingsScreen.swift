@@ -25,6 +25,11 @@ struct SettingsScreen: View {
     @State private var isDeletingAccount: Bool = false
     @State private var showDeleteConfirmation: Bool = false
     @State private var settingsErrorMessage: String?
+
+    // 닉네임 수정 시 debounce 중복 확인 (P1 V12 unique 정책).
+    // idle: 입력 없음 / checking: API 호출 중 / available: 사용 가능 / duplicate: 이미 사용 중 / error: 네트워크 등 실패.
+    @State private var checkState: DisplayNameCheckState = .idle
+    @State private var checkTask: Task<Void, Never>?
     #if DEBUG
     @State private var isSeedingWorkout: Bool = false
     @State private var debugInfoMessage: String?
@@ -278,9 +283,16 @@ struct SettingsScreen: View {
     private var displayNameEditor: some View {
         NavigationStack {
             Form {
-                TextField("이름", text: $displayNameDraft)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                Section {
+                    TextField("이름", text: $displayNameDraft)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onChange(of: displayNameDraft) { _, newValue in
+                            scheduleDisplayNameCheck(newValue)
+                        }
+                } footer: {
+                    displayNameCheckLabel
+                }
             }
             .navigationTitle("이름 수정")
             .navigationBarTitleDisplayMode(.inline)
@@ -294,12 +306,79 @@ struct SettingsScreen: View {
                 }
             }
         }
-        .presentationDetents([.height(180)])
+        .presentationDetents([.height(220)])
     }
 
+    // 저장 가능 조건: trim 결과 유효 + 본인 현재 닉네임과 다름 + 중복 확인 통과(available 또는 idle 인데 본인 그대로).
     private var canSaveDisplayName: Bool {
         let trimmed = displayNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !trimmed.isEmpty && trimmed.count <= 50 && trimmed != me?.displayName
+        guard !trimmed.isEmpty, trimmed.count <= 50, trimmed != me?.displayName else { return false }
+        switch checkState {
+        case .available: return true
+        case .idle, .checking, .duplicate, .error: return false
+        }
+    }
+
+    @ViewBuilder
+    private var displayNameCheckLabel: some View {
+        switch checkState {
+        case .idle:
+            EmptyView()
+        case .checking:
+            HStack(spacing: 6) {
+                ProgressView().scaleEffect(0.7)
+                Text("확인 중…").font(.system(size: 12))
+            }
+            .foregroundStyle(KLTokens.textSec)
+        case .available:
+            HStack(spacing: 4) {
+                KLIcon(name: "checkmark.circle.fill", size: 12, color: KLTokens.winFg)
+                Text("사용 가능한 닉네임").font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(KLTokens.winFg)
+            }
+        case .duplicate:
+            HStack(spacing: 4) {
+                KLIcon(name: "exclamationmark.circle.fill", size: 12, color: KLTokens.loseFg)
+                Text("이미 사용 중인 닉네임이에요").font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(KLTokens.loseFg)
+            }
+        case .error(let message):
+            HStack(spacing: 4) {
+                KLIcon(name: "wifi.exclamationmark", size: 12, color: KLTokens.textTer)
+                Text(message).font(.system(size: 12)).foregroundStyle(KLTokens.textSec)
+            }
+        }
+    }
+
+    // 300ms debounce — 입력 중단 후 호출. 본인 현재 닉네임이거나 빈 입력은 idle.
+    private func scheduleDisplayNameCheck(_ raw: String) {
+        checkTask?.cancel()
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 50, trimmed != me?.displayName else {
+            checkState = .idle
+            return
+        }
+        checkState = .checking
+        checkTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            if Task.isCancelled { return }
+            do {
+                let response = try await UserService.shared.checkDisplayName(trimmed)
+                if Task.isCancelled { return }
+                checkState = response.available ? .available : .duplicate
+            } catch {
+                if Task.isCancelled { return }
+                checkState = .error("확인 실패 — 네트워크를 확인해 주세요")
+            }
+        }
+    }
+
+    enum DisplayNameCheckState: Equatable {
+        case idle
+        case checking
+        case available
+        case duplicate
+        case error(String)
     }
 
     private func refreshMe() async {
@@ -312,6 +391,9 @@ struct SettingsScreen: View {
 
     private func showDisplayNameEditor() {
         displayNameDraft = me?.displayName ?? ""
+        // 본인 현재 닉네임 그대로 시작 — 중복 확인 idle.
+        checkState = .idle
+        checkTask?.cancel()
         isShowingNameEditor = true
     }
 
@@ -328,6 +410,13 @@ struct SettingsScreen: View {
                     into: modelContext
                 )
                 isShowingNameEditor = false
+            } catch let apiError as APIError {
+                // DB-level race — 동시에 다른 트랜잭션이 같은 닉네임 점유한 경우.
+                if case .server(_, let body, _) = apiError, body?.code == "DISPLAY_NAME_DUPLICATE" {
+                    checkState = .duplicate
+                } else {
+                    settingsErrorMessage = apiError.localizedDescription
+                }
             } catch {
                 settingsErrorMessage = error.localizedDescription
             }

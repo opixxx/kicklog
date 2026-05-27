@@ -1,5 +1,6 @@
 package com.opixxx.kicklog.friend.dto
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.opixxx.kicklog.friend.entity.FriendshipStatus
 import com.opixxx.kicklog.friend.service.AcceptFriendshipResult
 import com.opixxx.kicklog.friend.service.CreateFriendshipCommand
@@ -7,20 +8,20 @@ import com.opixxx.kicklog.friend.service.CreateFriendshipResult
 import com.opixxx.kicklog.friend.service.FriendshipSummary
 import com.opixxx.kicklog.friend.service.PendingFriendshipSummary
 import com.opixxx.kicklog.friend.service.UserSummary
+import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
 import java.time.Instant
 
+// 초대 링크 도메인 폐기 (P1 #4) — token 필드 제거. 옛 iOS 가 token 키를 보내도 무시.
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class CreateFriendshipRequest(
-    @field:Pattern(regexp = "^[A-Za-z0-9]{8}$", message = "초대 토큰은 8자 영문/숫자여야 합니다")
-    val token: String? = null,
-
+    @field:NotNull(message = "targetUserId 는 필수입니다")
     @field:Positive(message = "대상 사용자 ID는 양수여야 합니다")
     val targetUserId: Long? = null,
 ) {
-    fun toCommand(): CreateFriendshipCommand {
-        return CreateFriendshipCommand(token = token, targetUserId = targetUserId)
-    }
+    // @NotNull 통과 시점에 non-null 보장.
+    fun toCommand(): CreateFriendshipCommand = CreateFriendshipCommand(targetUserId = targetUserId!!)
 }
 
 data class AcceptFriendshipRequest(

@@ -2,14 +2,10 @@ package com.opixxx.kicklog.friend.service
 
 import com.opixxx.kicklog.common.exception.ErrorCode
 import com.opixxx.kicklog.common.exception.KickLogException
-import com.opixxx.kicklog.friend.entity.FriendInvitation
 import com.opixxx.kicklog.friend.entity.FriendshipStatus
-import com.opixxx.kicklog.friend.repository.InMemoryFriendInvitationRepository
 import com.opixxx.kicklog.friend.repository.InMemoryFriendshipRepository
 import com.opixxx.kicklog.user.entity.User
 import com.opixxx.kicklog.user.repository.InMemoryUserRepository
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -19,8 +15,7 @@ class FriendshipServiceTest {
 
     private val userRepository = InMemoryUserRepository()
     private val friendshipRepository = InMemoryFriendshipRepository()
-    private val invitationRepository = InMemoryFriendInvitationRepository()
-    private val service = FriendshipService(friendshipRepository, userRepository, invitationRepository)
+    private val service = FriendshipService(friendshipRepository, userRepository)
 
     @Test
     fun `targetUserId로 친구 요청을 생성한다`() {
@@ -90,27 +85,18 @@ class FriendshipServiceTest {
         assertEquals(ErrorCode.FRIEND_SELF_REQUEST, exception.errorCode)
     }
 
+    // EXEC_PLAN 2026-05-28 p1-display-name-unique — token 분기 폐기 후 회귀 단위.
+    // CreateFriendshipCommand 가 targetUserId 단독 필드 (token 필드 제거) 인 상태에서도 정상 동작해야 한다.
     @Test
-    fun `token과 targetUserId가 둘 다 없으면 친구 요청을 거부한다`() {
-        val requester = saveUser("요청자")
+    fun `targetUserId 단독 호출 - token 분기 제거 후 회귀`() {
+        val requester = saveUser("회귀요청자")
+        val recipient = saveUser("회귀수신자")
 
-        val exception = assertFailsWith<KickLogException> {
-            service.request(requester.id, CreateFriendshipCommand())
-        }
+        val result = service.request(requester.id, CreateFriendshipCommand(targetUserId = recipient.id))
 
-        assertEquals(ErrorCode.FRIEND_INVALID_REQUEST, exception.errorCode)
-    }
-
-    @Test
-    fun `token과 targetUserId가 둘 다 있으면 친구 요청을 거부한다`() {
-        val requester = saveUser("요청자")
-        val recipient = saveUser("상대")
-
-        val exception = assertFailsWith<KickLogException> {
-            service.request(requester.id, CreateFriendshipCommand(token = "xY9k2Lp4", targetUserId = recipient.id))
-        }
-
-        assertEquals(ErrorCode.FRIEND_INVALID_REQUEST, exception.errorCode)
+        assertEquals(FriendshipStatus.PENDING, result.status)
+        assertTrue(result.initiatedByMe)
+        assertEquals(1, friendshipRepository.count())
     }
 
     @Test
@@ -135,44 +121,6 @@ class FriendshipServiceTest {
         val result = service.request(recipient.id, CreateFriendshipCommand(targetUserId = requester.id))
 
         assertEquals(FriendshipStatus.ACCEPTED, result.status)
-    }
-
-    @Test
-    fun `초대 토큰으로 친구 요청을 생성한다`() {
-        val requester = saveUser("요청자")
-        val inviter = saveUser("초대자")
-        invitationRepository.save(invitation(inviter.id, token = "Abc12345"))
-
-        val result = service.request(requester.id, CreateFriendshipCommand(token = "Abc12345"))
-
-        assertEquals(FriendshipStatus.PENDING, result.status)
-        assertEquals(1, invitationRepository.findByToken("Abc12345")!!.useCount)
-    }
-
-    @Test
-    fun `만료된 초대 토큰은 거부한다`() {
-        val requester = saveUser("요청자")
-        val inviter = saveUser("초대자")
-        invitationRepository.save(invitation(inviter.id, token = "Expired1", expiresAt = Instant.now().minusSeconds(1)))
-
-        val exception = assertFailsWith<KickLogException> {
-            service.request(requester.id, CreateFriendshipCommand(token = "Expired1"))
-        }
-
-        assertEquals(ErrorCode.INVITATION_EXPIRED, exception.errorCode)
-    }
-
-    @Test
-    fun `취소된 초대 토큰은 거부한다`() {
-        val requester = saveUser("요청자")
-        val inviter = saveUser("초대자")
-        invitationRepository.save(invitation(inviter.id, token = "Revoked1", revokedAt = Instant.now()))
-
-        val exception = assertFailsWith<KickLogException> {
-            service.request(requester.id, CreateFriendshipCommand(token = "Revoked1"))
-        }
-
-        assertEquals(ErrorCode.INVITATION_REVOKED, exception.errorCode)
     }
 
     @Test
@@ -219,19 +167,5 @@ class FriendshipServiceTest {
 
     private fun saveUser(displayName: String): User {
         return userRepository.save(User.create(displayName = displayName, email = "$displayName@example.com"))
-    }
-
-    private fun invitation(
-        inviterId: Long,
-        token: String,
-        expiresAt: Instant = Instant.now().plus(15, ChronoUnit.DAYS),
-        revokedAt: Instant? = null,
-    ): FriendInvitation {
-        return FriendInvitation(
-            inviterId = inviterId,
-            token = token,
-            expiresAt = expiresAt,
-            revokedAt = revokedAt,
-        )
     }
 }

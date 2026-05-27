@@ -4,7 +4,6 @@ import com.opixxx.kicklog.common.exception.ErrorCode
 import com.opixxx.kicklog.common.exception.KickLogException
 import com.opixxx.kicklog.friend.entity.Friendship
 import com.opixxx.kicklog.friend.entity.FriendshipStatus
-import com.opixxx.kicklog.friend.repository.FriendInvitationStore
 import com.opixxx.kicklog.friend.repository.FriendshipStore
 import com.opixxx.kicklog.user.entity.User
 import com.opixxx.kicklog.user.repository.UserStore
@@ -17,9 +16,9 @@ import java.time.Instant
 import kotlin.math.max
 import kotlin.math.min
 
+// 초대 링크 도메인 폐기 (P1 #4) — token 분기 제거. targetUserId 단독.
 data class CreateFriendshipCommand(
-    val token: String? = null,
-    val targetUserId: Long? = null,
+    val targetUserId: Long,
 )
 
 data class UserSummary(
@@ -56,7 +55,6 @@ data class AcceptFriendshipResult(
 class FriendshipService(
     private val friendshipRepository: FriendshipStore,
     private val userRepository: UserStore,
-    private val invitationRepository: FriendInvitationStore? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val transactionTemplate: TransactionTemplate? = null,
 ) {
@@ -105,17 +103,8 @@ class FriendshipService(
         friendshipRepository.delete(friendship)
     }
 
-    private fun resolveTargetUserId(command: CreateFriendshipCommand): Long {
-        val hasToken = !command.token.isNullOrBlank()
-        val hasTarget = command.targetUserId != null
-        if (hasToken == hasTarget) {
-            throw KickLogException(ErrorCode.FRIEND_INVALID_REQUEST)
-        }
-        return command.targetUserId ?: resolveInvitation(command.token!!)
-    }
-
     private fun requestInTransaction(userId: Long, command: CreateFriendshipCommand): CreateFriendshipResult {
-        val targetUserId = resolveTargetUserId(command)
+        val targetUserId = command.targetUserId
         validateRequestUsers(userId, targetUserId)
         val existing = findExisting(userId, targetUserId)
         if (existing != null) {
@@ -130,24 +119,9 @@ class FriendshipService(
         command: CreateFriendshipCommand,
         cause: DataIntegrityViolationException,
     ): CreateFriendshipResult {
-        val targetUserId = resolveTargetUserId(command)
-        val conflicted = findExisting(userId, targetUserId)
+        val conflicted = findExisting(userId, command.targetUserId)
             ?: throw KickLogException(ErrorCode.FRIEND_ALREADY_EXISTS, cause = cause)
         return handleExistingRequest(conflicted, userId)
-    }
-
-    private fun resolveInvitation(token: String): Long {
-        val invitation = invitationRepository?.findByToken(token)
-            ?: throw KickLogException(ErrorCode.INVITATION_REVOKED)
-        if (invitation.isRevoked()) {
-            throw KickLogException(ErrorCode.INVITATION_REVOKED)
-        }
-        if (invitation.isExpired(now())) {
-            throw KickLogException(ErrorCode.INVITATION_EXPIRED)
-        }
-        invitation.use()
-        invitationRepository.save(invitation)
-        return invitation.inviterId
     }
 
     private fun validateRequestUsers(userId: Long, targetUserId: Long) {

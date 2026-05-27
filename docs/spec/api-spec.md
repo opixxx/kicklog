@@ -18,13 +18,14 @@
 | # | 도메인 | endpoint 수 | 인증 |
 |---|---|---|---|
 | 1 | [Auth](#1-auth) | 5 | 🌐 (logout 계열만 🔒) |
-| 2 | [Users](#2-users) | 5 | 🔒 |
-| 3 | [Friends](#3-friends) | 5 | 🔒 |
-| 4 | [Invitations](#4-invitations) | 4 | 🔒 (token 조회만 🌐) |
+| 2 | [Users](#2-users) | 6 | 🔒 |
+| 3 | [Friends](#3-friends) | 4 | 🔒 |
 | 5 | [Matches](#5-matches) | 6 | 🔒 |
 | 6 | [Venues](#6-venues) | 5 | 🔒 |
 | 7 | [Places](#7-places) | 1 | 🔒 |
 | 8 | [Statistics](#8-statistics) | 2 | 🔒 |
+
+> P1 (V12/V13): 초대 링크 도메인 폐기 + 닉네임 unique 도입 → §4 Invitations 섹션 제거 + §2 에 `/users/check-display-name` 추가.
 
 공통 에러 코드는 [부록 A](#부록-a-공통-errorcode)에, 공통 DTO 는 [부록 B](#부록-b-공통-dto)에.
 
@@ -217,9 +218,29 @@ Soft delete 취소. `deleted_at = NULL`.
 
 ---
 
+### 2.6 `GET /users/check-display-name?displayName=...` 🔒
+
+닉네임 가용 확인 (V12 unique index). iOS 이름 수정 화면이 debounce 자동 호출.
+
+| 쿼리 | 타입 | 비고 |
+|---|---|---|
+| `displayName` | string | 필수, `@NotBlank @Size(1, 50)` |
+
+**Response** `200`
+```json
+{ "available": true }
+```
+> 본인 현재 닉네임을 보내면 항상 `available=true` (false positive 방지).
+> 미사용 또는 탈퇴자 닉네임이면 `available=true` (재사용 허용).
+> 다른 활성 사용자가 사용 중이면 `available=false`.
+
+**에러**: `400 VALIDATION_FAILED` (필드 누락·공백·50자 초과)
+
+---
+
 ## 3. Friends
 
-정렬 pair 모델 (`user_low_id < user_high_id`, 1 row per 관계). 친구 추가는 token(초대링크) 또는 userId(검색).
+정렬 pair 모델 (`user_low_id < user_high_id`, 1 row per 관계). 친구 추가는 닉네임 검색 → targetUserId 경로만 (P1 V12/V13 으로 초대 링크 폐기).
 
 ### 3.1 `GET /friendships` 🔒
 
@@ -253,22 +274,17 @@ Soft delete 취소. `deleted_at = NULL`.
 
 ### 3.3 `POST /friendships` 🔒
 
-친구 요청 생성. `token`(초대 링크 경유) **또는** `targetUserId`(검색 경유) 중 정확히 하나.
+친구 요청 생성. `targetUserId` 단독 (P1 V12/V13 으로 초대 링크 폐기 후 검색 경로만 남음).
 
 **Request**
-```json
-{ "token": "xY9k2Lp4" }
-```
-또는
 ```json
 { "targetUserId": 7 }
 ```
 | 필드 | 타입 | 비고 |
 |---|---|---|
-| `token` | string? | base62 8자. 초대 링크 |
-| `targetUserId` | long? | 검색으로 찾은 사용자 |
+| `targetUserId` | long | 검색으로 찾은 사용자 (필수, 양수) |
 
-> 둘 다 있거나 둘 다 없으면 `400 FRIEND_INVALID_REQUEST`.
+> 옛 클라이언트가 `token` 등 미사용 필드를 보내도 무시 (`@JsonIgnoreProperties(ignoreUnknown=true)`).
 
 **Response** `201`
 ```json
@@ -280,10 +296,10 @@ Soft delete 취소. `deleted_at = NULL`.
 
 | status | code | 조건 |
 |---|---|---|
+| 400 | `VALIDATION_FAILED` | targetUserId 누락 또는 0/음수 |
 | 409 | `FRIEND_ALREADY_EXISTS` | 이미 친구이거나 요청 대기 중 |
 | 400 | `FRIEND_SELF_REQUEST` | 자기 자신에게 요청 |
 | 404 | `USER_NOT_FOUND` | targetUserId 없음/탈퇴 |
-| 410 | `INVITATION_EXPIRED` / `INVITATION_REVOKED` | token 무효 |
 
 ---
 
@@ -317,72 +333,6 @@ Soft delete 취소. `deleted_at = NULL`.
 **Response** `204`
 
 **에러**: `403 FRIEND_NOT_PARTICIPANT` (당사자 아님), `404 FRIEND_NOT_FOUND`
-
----
-
-## 4. Invitations
-
-8자 base62 토큰, N회용, 15일 만료 (ADR-0003 D4). 링크 형태: `kicklog.org/i/{token}` (ADR-0007).
-
-### 4.1 `POST /invitations` 🔒
-
-내 초대 링크 생성. 만료 15일 default.
-
-**Request** 없음 (또는 `{}`)
-
-**Response** `201`
-```json
-{
-  "id": 3,
-  "token": "xY9k2Lp4",
-  "url": "https://kicklog.org/i/xY9k2Lp4",
-  "expiresAt": "2026-06-06T09:00:00Z",
-  "useCount": 0
-}
-```
-
----
-
-### 4.2 `GET /invitations/{token}` 🌐
-
-토큰 정보 조회 (수락 화면에서 발신자 미리보기). **인증 불필요** — 링크 클릭 시 비로그인 상태일 수 있음.
-
-**Response** `200`
-```json
-{
-  "token": "xY9k2Lp4",
-  "inviter": { "id": 1, "displayName": "김조축" },
-  "expiresAt": "2026-06-06T09:00:00Z",
-  "valid": true
-}
-```
-
-**에러**
-
-| status | code | 조건 |
-|---|---|---|
-| 410 | `INVITATION_EXPIRED` | `expires_at <= now` |
-| 410 | `INVITATION_REVOKED` | `revoked_at != null` |
-| 404 | `INVITATION_NOT_FOUND` | 존재하지 않는 token |
-
----
-
-### 4.3 `GET /invitations` 🔒
-
-내가 만든 **활성** 링크 목록 (`revoked_at IS NULL AND expires_at > now`).
-
-**Response** `200`
-```json
-{ "invitations": [ { "id": 3, "token": "xY9k2Lp4", "url": "...", "expiresAt": "...", "useCount": 2 } ] }
-```
-
----
-
-### 4.4 `DELETE /invitations/{id}` 🔒
-
-링크 폐기. `revoked_at = now`.
-
-**Response** `204` · **에러**: `403 INVITATION_NOT_OWNED`, `404 INVITATION_NOT_FOUND`
 
 ---
 
@@ -733,7 +683,8 @@ Soft delete 취소. `deleted_at = NULL`.
 | `USER_NOT_FOUND` | 404 | 사용자를 찾을 수 없습니다 |
 | `USER_DELETED` / `USER_PURGED` | 410 | 탈퇴한 사용자입니다 |
 | `USER_NOT_DELETING` | 409 | 삭제 대기 상태가 아닙니다 |
-| `FRIEND_INVALID_REQUEST` | 400 | token 또는 targetUserId 중 하나만 보내야 합니다 |
+| `DISPLAY_NAME_DUPLICATE` | 409 | 이미 사용 중인 닉네임입니다 |
+| `FRIEND_INVALID_REQUEST` | 400 | targetUserId 는 필수입니다 |
 | `FRIEND_SELF_REQUEST` | 400 | 자기 자신에게 요청할 수 없습니다 |
 | `FRIEND_UNAUTHORIZED` | 403 | 친구 관계가 아닙니다 |
 | `FRIEND_NOT_RECIPIENT` | 403 | 받은 요청이 아닙니다 |
@@ -741,10 +692,6 @@ Soft delete 취소. `deleted_at = NULL`.
 | `FRIEND_NOT_FOUND` | 404 | 친구 관계를 찾을 수 없습니다 |
 | `FRIEND_ALREADY_EXISTS` | 409 | 이미 친구이거나 요청 대기 중입니다 |
 | `FRIEND_ALREADY_ACCEPTED` | 409 | 이미 수락된 요청입니다 |
-| `INVITATION_NOT_FOUND` | 404 | 초대 링크를 찾을 수 없습니다 |
-| `INVITATION_NOT_OWNED` | 403 | 본인이 만든 링크가 아닙니다 |
-| `INVITATION_EXPIRED` | 410 | 초대 링크가 만료되었습니다 |
-| `INVITATION_REVOKED` | 410 | 폐기된 초대 링크입니다 |
 | `MATCH_NOT_FOUND` | 404 | 경기를 찾을 수 없습니다 |
 | `MATCH_NOT_OWNED` | 403 | 본인의 경기가 아닙니다 |
 | `MATCH_QUARTER_OVERFLOW` | 400 | 쿼터는 4개를 초과할 수 없습니다 |

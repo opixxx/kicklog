@@ -43,3 +43,8 @@ struct UserDTO: Decodable {
 struct UpdateMeRequest: Encodable {
     let displayName: String
 }
+
+// GET /users/check-display-name 응답 — P1 V12 닉네임 unique 정책 (true = 사용 가능).
+struct DisplayNameCheckResponse: Decodable {
+    let available: Bool
+}

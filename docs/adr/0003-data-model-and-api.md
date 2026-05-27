@@ -236,20 +236,8 @@ CREATE TABLE friendships (
 CREATE INDEX idx_friend_low  ON friendships(user_low_id, status);
 CREATE INDEX idx_friend_high ON friendships(user_high_id, status);
 
--- Friend Invitations (초대 링크)
-CREATE TABLE friend_invitations (
-  id              BIGSERIAL PRIMARY KEY,
-  inviter_id      BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token           VARCHAR(8)   UNIQUE NOT NULL,       -- base62
-  expires_at      TIMESTAMPTZ  NOT NULL,              -- 15일 default
-  use_count       INT          NOT NULL DEFAULT 0,
-  revoked_at      TIMESTAMPTZ,
-  created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-);
-CREATE INDEX idx_invitations_inviter ON friend_invitations(inviter_id)
-  WHERE revoked_at IS NULL;
-CREATE INDEX idx_invitations_token   ON friend_invitations(token)
-  WHERE revoked_at IS NULL AND expires_at > NOW();
+-- Friend Invitations 테이블은 V13 (P1) 에서 폐기됨 — friend_invitations DROP TABLE.
+-- V12 의 users.display_name UNIQUE 도입으로 닉네임 검색만으로 친구 식별 가능 → 초대 링크 불필요.
 
 -- Venues (개인 운동장)
 CREATE TABLE venues (
@@ -359,18 +347,18 @@ GET    /users/search?q=...&limit=20 친구 검색 (display_name 부분 일치)
 ```
 GET    /friendships                 내 친구 목록 (status=accepted)
 GET    /friendships/pending         받은 친구 요청 목록
-POST   /friendships                 친구 요청 (token 또는 user_id)
+POST   /friendships                 친구 요청 (targetUserId 단독 — P1 에서 token 경로 폐기)
 PATCH  /friendships/:id             수락
 DELETE /friendships/:id             친구 끊기 / 거절
 ```
 
-### Invitations
+### Users 추가 endpoint (P1)
 ```
-POST   /invitations                 초대 링크 생성
-GET    /invitations/:token          토큰 정보 조회 (발신자 미리보기)
-GET    /invitations                 내가 만든 활성 링크 목록
-DELETE /invitations/:id             링크 폐기
+GET    /users/check-display-name?displayName=... 닉네임 가용 확인 (V12 UNIQUE INDEX)
 ```
+
+### Invitations (폐기 — P1 V13)
+초대 링크 도메인은 V13 에서 폐기됨. V12 의 닉네임 unique 도입으로 검색만으로 친구 식별 가능.
 
 ### Matches
 ```
