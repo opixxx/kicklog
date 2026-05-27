@@ -87,6 +87,7 @@ resource "aws_iam_role_policy" "ec2_secrets_read" {
           aws_secretsmanager_secret.db_password.arn,
           aws_secretsmanager_secret.kakao_rest_api_key.arn,
           aws_secretsmanager_secret.jwt_secret.arn,
+          aws_secretsmanager_secret.ghcr_pat.arn,
         ]
       }
     ]
@@ -97,4 +98,26 @@ resource "aws_iam_role_policy" "ec2_secrets_read" {
 resource "aws_iam_role_policy_attachment" "ec2_cloudwatch" {
   role       = aws_iam_role.ec2.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+# SSM Run Command + Session Manager 권한 (ADR-0008).
+# AL2023 AMI 에 SSM Agent 가 기본 설치되어 있어 user-data 변경 불필요.
+resource "aws_iam_role_policy_attachment" "ec2_ssm_managed" {
+  role       = aws_iam_role.ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# 배포 스테이징 버킷에서 docker-compose.prod.yml 다운로드 권한 (ADR-0008).
+resource "aws_iam_role_policy" "ec2_deploy_bucket_read" {
+  name = "kicklog-ec2-deploy-bucket-read"
+  role = aws_iam_role.ec2.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "s3:GetObject"
+      Resource = "${aws_s3_bucket.deploy_staging.arn}/*"
+    }]
+  })
 }

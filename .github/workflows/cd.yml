@@ -5,10 +5,14 @@ name: CD
 #   2. Docker 이미지 빌드 + GHCR push (linux/amd64)
 #   3. EC2 에 SSH → docker compose pull + up + 헬스 체크
 #
-# 필요한 Secrets:
-#   - EC2_HOST              : 3.37.14.253
-#   - EC2_SSH_PRIVATE_KEY   : ~/.ssh/kicklog-keypair.pem 내용 (BEGIN/END 전체)
-#   - GHCR_PAT              : GitHub PAT (classic, read:packages 권한)
+# ADR-0008 — SSH/scp 의존을 제거하고 SSM Run Command + S3 staging + OIDC 로 배포한다.
+#
+# 필요한 GitHub repository Variables (Settings → Variables → Actions):
+#   - AWS_GITHUB_ROLE_ARN     : terraform output github_actions_role_arn
+#   - DEPLOY_STAGING_BUCKET   : terraform output deploy_staging_bucket_name
+#   - EC2_INSTANCE_ID         : terraform output ec2_instance_id
+#
+# 필요한 Secrets: 없음 (OIDC 로 IAM AssumeRole, GHCR_PAT 은 AWS Secrets Manager 로 이전)
 
 on:
   push:
@@ -108,60 +112,122 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
-    name: Deploy to EC2
+    name: Deploy to EC2 (via SSM)
     needs: build-and-push
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # ADR-0008: OIDC 로 AWS IAM Role AssumeRole — id-token write 필수
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: ap-northeast-2
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      DEPLOY_STAGING_BUCKET: ${{ vars.DEPLOY_STAGING_BUCKET }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Copy compose file to EC2
-        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          source: "infra/docker-compose.prod.yml"
-          target: "/opt/kicklog/"
-          strip_components: 1
+          role-to-assume: ${{ vars.AWS_GITHUB_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Pull image and restart container
-        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          command_timeout: 5m
-          script: |
-            set -e
-            cd /opt/kicklog
+      - name: Upload compose file to S3 staging
+        run: |
+          aws s3 cp infra/docker-compose.prod.yml \
+            "s3://${DEPLOY_STAGING_BUCKET}/docker-compose.prod.yml" \
+            --no-progress
 
-            # 새 compose 파일을 활성 이름으로 복사
-            cp docker-compose.prod.yml docker-compose.yml
+      - name: Send SSM Run Command — pull image + restart
+        id: ssm
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
 
-            # GHCR private 패키지 인증
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+          # EC2 에서 실행할 배포 스크립트. heredoc → jq 로 JSON 배열에 안전하게 임베드.
+          SCRIPT=$(cat <<EOF
+          set -euo pipefail
+          cd /opt/kicklog
 
-            # 새 이미지 받기 + 컨테이너 재시작
-            docker compose pull
-            docker compose up -d
+          # 새 compose 파일 가져오기 (S3 staging)
+          aws s3 cp s3://${DEPLOY_STAGING_BUCKET}/docker-compose.prod.yml ./docker-compose.yml --no-progress
 
-            # 헬스 체크 (최대 60초 대기)
-            for i in 1 2 3 4 5 6; do
-              sleep 10
-              if curl -fsS http://127.0.0.1:8080/actuator/health > /dev/null 2>&1; then
-                echo "✅ 헬스 체크 통과 (${i}0초 후)"
-                break
-              fi
-              if [ $i -eq 6 ]; then
-                echo "❌ 헬스 체크 실패 — 로그 확인"
-                docker compose logs --tail 50 backend
-                exit 1
-              fi
-            done
+          # GHCR 인증 (Secrets Manager 에서 PAT 가져오기)
+          GHCR_PAT=\$(aws secretsmanager get-secret-value \
+            --region ${AWS_REGION} \
+            --secret-id kicklog/ghcr-pat \
+            --query SecretString --output text)
+          echo "\$GHCR_PAT" | docker login ghcr.io -u ${REPO_OWNER} --password-stdin
+          unset GHCR_PAT
 
-            # 오래된 dangling 이미지 정리 (디스크 보호)
-            docker image prune -af --filter "until=24h" || true
+          # 새 이미지 받기 + 컨테이너 재시작
+          docker compose pull
+          docker compose up -d
 
-            echo "✅ Deploy 성공: $(date)"
+          # 헬스 체크 (최대 60초 대기)
+          for i in 1 2 3 4 5 6; do
+            sleep 10
+            if curl -fsS http://127.0.0.1:8080/actuator/health > /dev/null 2>&1; then
+              echo "헬스 체크 통과 (\${i}0초 후)"
+              break
+            fi
+            if [ \$i -eq 6 ]; then
+              echo "헬스 체크 실패 — 로그 확인"
+              docker compose logs --tail 50 backend
+              exit 1
+            fi
+          done
+
+          # 오래된 dangling 이미지 정리 (디스크 보호)
+          docker image prune -af --filter "until=24h" || true
+
+          echo "Deploy 성공: \$(date)"
+          EOF
+          )
+
+          PARAMS=$(jq -n --arg s "$SCRIPT" '{ commands: [$s] }')
+
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "${EC2_INSTANCE_ID}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy ${GITHUB_SHA:0:7}" \
+            --parameters "$PARAMS" \
+            --cloud-watch-output-config CloudWatchOutputEnabled=false \
+            --query "Command.CommandId" --output text)
+
+          echo "command_id=$CMD_ID" >> "$GITHUB_OUTPUT"
+          echo "SSM CommandId: $CMD_ID"
+
+      - name: Wait for SSM command and fetch result
+        env:
+          CMD_ID: ${{ steps.ssm.outputs.command_id }}
+        run: |
+          set -uo pipefail
+
+          # 최대 10분 대기 (wait 자체가 non-zero 여도 get-invocation 으로 최종 상태 판정)
+          aws ssm wait command-executed \
+            --command-id "$CMD_ID" \
+            --instance-id "$EC2_INSTANCE_ID" || true
+
+          INV=$(aws ssm get-command-invocation \
+            --command-id "$CMD_ID" \
+            --instance-id "$EC2_INSTANCE_ID" \
+            --output json)
+
+          STATUS=$(echo "$INV" | jq -r .Status)
+          echo "::group::SSM stdout"
+          echo "$INV" | jq -r .StandardOutputContent
+          echo "::endgroup::"
+          echo "::group::SSM stderr"
+          echo "$INV" | jq -r .StandardErrorContent
+          echo "::endgroup::"
+
+          echo "최종 상태: $STATUS"
+          if [ "$STATUS" != "Success" ]; then
+            echo "배포 실패"
+            exit 1
+          fi

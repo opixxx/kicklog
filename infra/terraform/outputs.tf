@@ -42,3 +42,24 @@ output "aws_account_id" {
   value       = data.aws_caller_identity.current.account_id
   sensitive   = true
 }
+
+# ─── CD (ADR-0008) — GitHub repository Variables 에 입력 ──
+output "github_actions_role_arn" {
+  description = "GitHub Actions OIDC AssumeRole 대상 ARN (Variable: AWS_GITHUB_ROLE_ARN)"
+  value       = aws_iam_role.github_actions_ci.arn
+}
+
+output "deploy_staging_bucket_name" {
+  description = "배포 산출물 스테이징 버킷 이름 (Variable: DEPLOY_STAGING_BUCKET)"
+  value       = aws_s3_bucket.deploy_staging.bucket
+}
+
+output "ec2_instance_id" {
+  description = "SSM 타겟 EC2 instance ID (Variable: EC2_INSTANCE_ID)"
+  value       = aws_instance.app.id
+}
+
+output "secrets_ghcr_pat_arn" {
+  description = "Secrets Manager ARN — GHCR PAT"
+  value       = aws_secretsmanager_secret.ghcr_pat.arn
+}

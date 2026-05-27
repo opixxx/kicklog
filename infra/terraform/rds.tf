@@ -30,32 +30,32 @@ resource "aws_db_parameter_group" "postgres16" {
 }
 
 resource "aws_db_instance" "main" {
-  identifier             = "kicklog-postgres"
-  engine                 = "postgres"
-  engine_version         = "16.14"
-  instance_class         = var.rds_instance_class
-  allocated_storage      = var.rds_storage_size_gb
-  storage_type           = "gp3"
-  storage_encrypted      = true
+  identifier        = "kicklog-postgres"
+  engine            = "postgres"
+  engine_version    = "16.14"
+  instance_class    = var.rds_instance_class
+  allocated_storage = var.rds_storage_size_gb
+  storage_type      = "gp3"
+  storage_encrypted = true
 
-  db_name                = var.rds_db_name
-  username               = var.rds_username
-  password               = var.rds_password # Secrets Manager에도 동기화됨
+  db_name  = var.rds_db_name
+  username = var.rds_username
+  password = var.rds_password # Secrets Manager에도 동기화됨
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
   parameter_group_name   = aws_db_parameter_group.postgres16.name
 
-  publicly_accessible    = false # MVP는 EC2에서만 접근
+  publicly_accessible = false # MVP는 EC2에서만 접근
 
   # 백업 — RDS Free Tier 는 backup_retention_period <= 1 만 허용 (서버가 거부).
   # ADR-0006: Free Tier 졸업 (12개월) 후 7일로 회복 검토.
   # 짧은 보존 기간으로 인한 데이터 손실 위험은 MVP 단계에서 명시적으로 수용 (N=20 규모).
-  backup_retention_period = 1 # NOSONAR: Free Tier 제약, ADR-0006 참조
+  backup_retention_period = 1             # NOSONAR: Free Tier 제약, ADR-0006 참조
   backup_window           = "17:00-18:00" # UTC = KST 02:00~03:00
 
   # 유지보수
-  maintenance_window      = "sun:18:00-sun:19:00" # UTC
+  maintenance_window = "sun:18:00-sun:19:00" # UTC
 
   # MVP는 multi-AZ X (비용 절감)
   multi_az = false

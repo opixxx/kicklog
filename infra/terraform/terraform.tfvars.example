@@ -29,3 +29,7 @@ kakao_rest_api_key = "REPLACE_ME_kakao_rest_api_key"
 
 # JWT 서명용 (32자 이상 랜덤). 예: openssl rand -base64 32
 jwt_secret = "REPLACE_ME_jwt_secret_32chars_or_more"
+
+# GHCR private package pull 용 PAT (read:packages 권한, ADR-0008 — CD via SSM)
+# GitHub > Settings > Developer settings > PAT (classic) > Generate
+ghcr_pat = "REPLACE_ME_ghcr_personal_access_token"
