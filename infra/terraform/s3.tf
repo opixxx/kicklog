@@ -6,15 +6,50 @@
 #
 # - SSE-S3 (AES256) 암호화
 # - Public 접근 전면 차단
+# - HTTPS-only bucket policy (aws:SecureTransport)
 # - 7 일 후 객체 자동 삭제 (배포 산출물만 보관)
+#
+# Access logging 미적용 사유 (SonarQube hotspot Acknowledged):
+#   - 단일 writer(GitHub Actions OIDC role) + 단일 reader(EC2 IAM role) 구조라 audit 가치 낮음
+#   - 별도 log bucket 운영비/복잡도 대비 효용 부족 (1인 MVP)
+#   - 감사 필요 시 CloudTrail S3 Data Events 로 충분 (Free Tier 100,000 events/m)
+#   - 산출물 자체도 docker-compose.yml(평문, 비밀 없음) 1개라 민감도 낮음
 
-resource "aws_s3_bucket" "deploy_staging" {
+resource "aws_s3_bucket" "deploy_staging" { # NOSONAR: access logging 미적용 사유는 파일 헤더 참조
   bucket = "kicklog-deploy-staging-${data.aws_caller_identity.current.account_id}"
 
   tags = {
     Name    = "kicklog-deploy-staging"
     Purpose = "GitHub Actions → EC2 배포 산출물 스테이징 (ADR-0008)"
   }
+}
+
+# HTTPS-only bucket policy (SonarQube hotspot — 정공법 반영).
+# aws:SecureTransport = false 인 요청을 전면 거부.
+resource "aws_s3_bucket_policy" "deploy_staging_https_only" {
+  bucket = aws_s3_bucket.deploy_staging.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "DenyInsecureTransport"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "s3:*"
+      Resource = [
+        aws_s3_bucket.deploy_staging.arn,
+        "${aws_s3_bucket.deploy_staging.arn}/*",
+      ]
+      Condition = {
+        Bool = {
+          "aws:SecureTransport" = "false"
+        }
+      }
+    }]
+  })
+
+  # public_access_block 가 먼저 적용된 후 정책 적용 (race 방지)
+  depends_on = [aws_s3_bucket_public_access_block.deploy_staging]
 }
 
 resource "aws_s3_bucket_public_access_block" "deploy_staging" {

@@ -50,7 +50,13 @@ dial tcp ***:22: i/o timeout
 - **버킷 정책**:
   - Public 접근 4축 모두 차단
   - SSE-S3 (AES256) 암호화
+  - **HTTPS-only bucket policy** — `aws:SecureTransport=false` 인 요청 전면 Deny (SonarQube hotspot 정공법 반영)
   - Lifecycle: 7일 후 만료 (배포 산출물만 보관)
+- **Access logging 미적용 (SonarQube hotspot Acknowledged)**:
+  - 단일 writer(GitHub Actions OIDC role) + 단일 reader(EC2 IAM role) 구조 → audit 가치 낮음
+  - 별도 log bucket 운영비/복잡도 대비 효용 부족 (1인 MVP)
+  - 감사 필요 시 CloudTrail S3 Data Events 로 충분 (Free Tier 100k events/m)
+  - 산출물 자체가 docker-compose.yml(평문, 비밀 없음) 1개라 민감도 낮음
 
 ### D3. 인증 — **GitHub OIDC + IAM AssumeRole**
 
