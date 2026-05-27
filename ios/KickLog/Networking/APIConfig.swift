@@ -1,12 +1,17 @@
 import Foundation
 
-// 백엔드 API 베이스 URL. 1차는 로컬 개발 서버 (시뮬레이터에서 http://localhost:8080 접근 가능).
-// 추후 ADR-0006 의 production EC2 URL 로 환경별 분기.
+// 백엔드 API 베이스 URL. DEBUG 빌드(시뮬레이터/실기기 Run)는 dev, Release/Archive(TestFlight) 는 prod.
 struct APIConfig {
     let baseURL: URL
 
     static let dev = APIConfig(baseURL: URL(string: "http://localhost:8080")!)
-    // static let prod = APIConfig(baseURL: URL(string: "https://api.kicklog.example.com")!)
+    static let prod = APIConfig(baseURL: URL(string: "https://kicklog.org")!)
 
-    static var current: APIConfig { .dev }
+    static var current: APIConfig {
+        #if DEBUG
+        return .dev
+        #else
+        return .prod
+        #endif
+    }
 }

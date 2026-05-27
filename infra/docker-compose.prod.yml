@@ -1,0 +1,52 @@
+# =============================================
+# KickLog Backend — EC2 운영 컴포즈
+# =============================================
+# 사용처: /opt/kicklog/docker-compose.yml 로 복사 (또는 심볼릭 링크)
+# 사전 조건: /opt/kicklog/.env 가 존재 (scripts/fetch-secrets.sh 가 생성)
+#
+# 실행:
+#   cd /opt/kicklog
+#   docker compose pull
+#   docker compose up -d
+#
+# 로그:
+#   docker compose logs -f backend
+#
+# 헬스 체크:
+#   curl http://127.0.0.1:8080/actuator/health
+#
+# nginx (호스트 OS) 가 127.0.0.1:8080 → 80/443 으로 reverse proxy.
+# 즉 backend 컨테이너는 외부 노출 X (localhost bind).
+
+services:
+  backend:
+    image: ghcr.io/opixxx/kicklog:latest
+    container_name: kicklog-backend
+    restart: unless-stopped
+
+    # localhost 만 bind — nginx 만 접근. 0.0.0.0 노출 X (SG 로 한 번 더 보호하지만 이중 안전).
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    # /opt/kicklog/.env 에서 환경변수 로드 (Secrets Manager → fetch-secrets.sh 가 생성)
+    env_file:
+      - .env
+
+    # Spring Boot prod profile + nginx 헤더 신뢰
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_FORWARDHEADERSSTRATEGY: NATIVE
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+
+    # 로그 회전 — t3.micro 디스크 30GB 보호
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

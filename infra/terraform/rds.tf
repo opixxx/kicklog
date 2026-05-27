@@ -32,7 +32,7 @@ resource "aws_db_parameter_group" "postgres16" {
 resource "aws_db_instance" "main" {
   identifier             = "kicklog-postgres"
   engine                 = "postgres"
-  engine_version         = "16.4"
+  engine_version         = "16.14"
   instance_class         = var.rds_instance_class
   allocated_storage      = var.rds_storage_size_gb
   storage_type           = "gp3"
@@ -48,8 +48,8 @@ resource "aws_db_instance" "main" {
 
   publicly_accessible    = false # MVP는 EC2에서만 접근
 
-  # 백업
-  backup_retention_period = 7
+  # 백업 — Free Tier 한도 1일 (Free Tier 졸업 후 7일로 회복 검토)
+  backup_retention_period = 1
   backup_window           = "17:00-18:00" # UTC = KST 02:00~03:00
 
   # 유지보수
