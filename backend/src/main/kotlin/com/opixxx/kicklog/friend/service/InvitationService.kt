@@ -6,6 +6,7 @@ import com.opixxx.kicklog.friend.entity.FriendInvitation
 import com.opixxx.kicklog.friend.repository.FriendInvitationStore
 import com.opixxx.kicklog.user.entity.User
 import com.opixxx.kicklog.user.repository.UserStore
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -30,10 +31,12 @@ data class InvitationPreview(
 )
 
 @Service
+@EnableConfigurationProperties(InvitationProperties::class)
 class InvitationService(
     private val invitationRepository: FriendInvitationStore,
     private val userRepository: UserStore,
     private val tokenGenerator: InvitationTokenGenerator,
+    private val properties: InvitationProperties,
     private val clock: Clock = Clock.systemUTC(),
     private val transactionTemplate: TransactionTemplate? = null,
 ) {
@@ -113,7 +116,7 @@ class InvitationService(
         return InvitationResult(
             id = invitation.id,
             token = invitation.token,
-            url = "$INVITATION_BASE_URL/${invitation.token}",
+            url = properties.urlFor(invitation.token),
             expiresAt = invitation.expiresAt,
             useCount = invitation.useCount,
         )
@@ -128,6 +131,5 @@ class InvitationService(
     companion object {
         private const val MAX_TOKEN_ATTEMPTS = 5
         private const val INVITATION_DAYS = 15L
-        private const val INVITATION_BASE_URL = "https://kicklog.app/i"
     }
 }

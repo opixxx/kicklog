@@ -19,7 +19,14 @@ class InvitationServiceTest {
     private val clock = Clock.fixed(Instant.parse("2026-05-23T09:00:00Z"), ZoneOffset.UTC)
     private val invitationRepository = InMemoryFriendInvitationRepository()
     private val userRepository = InMemoryUserRepository()
-    private val service = InvitationService(invitationRepository, userRepository, FixedInvitationTokenGenerator("Abc12345"), clock)
+    private val properties = InvitationProperties(baseUrl = "https://kicklog.org/i")
+    private val service = InvitationService(
+        invitationRepository,
+        userRepository,
+        FixedInvitationTokenGenerator("Abc12345"),
+        properties,
+        clock,
+    )
 
     @Test
     fun `8자 base62 토큰과 15일 만료 초대를 생성한다`() {
@@ -28,9 +35,41 @@ class InvitationServiceTest {
         val invitation = service.create(inviter.id)
 
         assertEquals("Abc12345", invitation.token)
-        assertEquals("https://kicklog.app/i/Abc12345", invitation.url)
+        assertEquals("https://kicklog.org/i/Abc12345", invitation.url)
         assertEquals(Instant.parse("2026-06-07T09:00:00Z"), invitation.expiresAt)
         assertEquals(0, invitation.useCount)
+    }
+
+    @Test
+    fun `주입된 baseUrl 을 그대로 사용해 초대 URL 을 만든다`() {
+        val customService = InvitationService(
+            invitationRepository,
+            userRepository,
+            FixedInvitationTokenGenerator("Custom01"),
+            InvitationProperties(baseUrl = "https://example.test/i"),
+            clock,
+        )
+        val inviter = saveUser("외부화검증")
+
+        val invitation = customService.create(inviter.id)
+
+        assertEquals("https://example.test/i/Custom01", invitation.url)
+    }
+
+    @Test
+    fun `baseUrl 끝의 슬래시는 정규화된다`() {
+        val trailingSlashService = InvitationService(
+            invitationRepository,
+            userRepository,
+            FixedInvitationTokenGenerator("Slash001"),
+            InvitationProperties(baseUrl = "https://kicklog.org/i/"),
+            clock,
+        )
+        val inviter = saveUser("슬래시검증")
+
+        val invitation = trailingSlashService.create(inviter.id)
+
+        assertEquals("https://kicklog.org/i/Slash001", invitation.url)
     }
 
     @Test

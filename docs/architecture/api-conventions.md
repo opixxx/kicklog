@@ -8,7 +8,7 @@
 ## URL 규칙
 
 ### Base
-- 운영: `https://api.kicklog.app/v1/...`
+- 운영: `https://api.kicklog.org/v1/...` (도메인 확정: ADR-0007)
 - 로컬: `http://localhost:8080/v1/...`
 
 ### 버저닝
@@ -305,7 +305,7 @@ GET /matches?cursor=eyJwbGF5ZWRBdCI6...&size=20
 ## CORS
 
 iOS 앱은 webview 가 아니라 native HTTP → 사실상 CORS 불필요.
-운영 환경에서는 `https://kicklog.app` (Universal Link 도메인) 만 화이트리스트.
+운영 환경에서는 `https://kicklog.org` (Universal Link 도메인, ADR-0007) 만 화이트리스트.
 
 ---
 
