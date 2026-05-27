@@ -2,12 +2,14 @@
 # KickLog Backend — EC2 운영 컴포즈
 # =============================================
 # 사용처: /opt/kicklog/docker-compose.yml 로 복사 (또는 심볼릭 링크)
-# 사전 조건: /opt/kicklog/.env 가 존재 (scripts/fetch-secrets.sh 가 생성)
+# 사전 조건:
+#   /opt/kicklog/.env           ← Secrets Manager → fetch-secrets.sh 가 생성
+#   /opt/kicklog/.env.deploy    ← KICKLOG_IMAGE_TAG=<git-sha> (배포 시 cd.yml 이 작성)
 #
-# 실행:
+# 실행 (CD 가 사용하는 정확한 명령):
 #   cd /opt/kicklog
-#   docker compose pull
-#   docker compose up -d
+#   docker compose --env-file .env --env-file .env.deploy pull
+#   docker compose --env-file .env --env-file .env.deploy up -d
 #
 # 로그:
 #   docker compose logs -f backend
@@ -17,10 +19,13 @@
 #
 # nginx (호스트 OS) 가 127.0.0.1:8080 → 80/443 으로 reverse proxy.
 # 즉 backend 컨테이너는 외부 노출 X (localhost bind).
+#
+# ADR-0009: image tag 는 git SHA 로 immutable. `latest` 의존 제거.
+#           KICKLOG_IMAGE_TAG 가 비어 있으면 compose 가 즉시 abort 한다.
 
 services:
   backend:
-    image: ghcr.io/opixxx/kicklog:latest
+    image: "ghcr.io/opixxx/kicklog:${KICKLOG_IMAGE_TAG:?KICKLOG_IMAGE_TAG 환경변수가 비어 있습니다 — .env.deploy 누락}"
     container_name: kicklog-backend
     restart: unless-stopped
 
