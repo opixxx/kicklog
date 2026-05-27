@@ -49,13 +49,13 @@ PR #47/#49 머지 후 자동 배포 (SSM + S3 staging + OIDC) 가 동작 중이�
 ### D3. 관측성 — **SNS + CloudWatch Alarms + Budget**
 
 - **선택**: `infra/terraform/observability.tf` + `budget.tf` 신규.
-  - SNS topic `kicklog-alerts` + (optional) email subscription
+  - SNS topic `kicklog-alerts` + **AWS managed KMS key (`alias/aws/sns`) 로 SSE 활성** + (optional) email subscription
   - Alarms 4종:
     - EC2 `StatusCheckFailed` (1분 ×2)
     - EC2 `CPUUtilization` ≥ 90% (5분 중 3분)
     - RDS `CPUUtilization` ≥ 85% (5분 중 3분)
     - RDS `FreeStorageSpace` ≤ 4 GiB (5분 ×2) — 20GB 한도의 20%
-  - `aws_cloudwatch_log_group /kicklog/userdata retention=7d` — 미래 로그 push 시 비용 폭증 방지
+  - `aws_cloudwatch_log_group /kicklog/userdata retention=30d` — 미래 로그 push 시 비용 폭증 방지 + 단기 audit
   - `aws_budgets_budget` monthly $5 (변수) + 80% actual / 100% actual / 100% forecast 알림 → SNS + email
 - **고려한 옵션**:
   - CloudWatch Synthetics (canary) — 월 $0.0012/run, 5분 주기면 ~$0.4/m. 후속 검토.
@@ -64,6 +64,8 @@ PR #47/#49 머지 후 자동 배포 (SSM + S3 staging + OIDC) 가 동작 중이�
   - CloudWatch 알람 10개까지 Free, 본 PR 4개 사용 → 추가 비용 0
   - Budget 리소스 무료, 알림 SNS 도 1,000 publication/m 까지 Free
   - email subscription 은 `alert_email = ""` 이면 생성 안 함 (1인 MVP 환경 친화)
+  - **SNS SSE**: AWS managed key `alias/aws/sns` 는 추가 비용 0 — 정공법 (SonarQube hotspot 해소). 본 토픽의 메시지는 알람 메타데이터뿐이라 PII/secret 없음, 고객 관리 CMK ($1/m + API 비용) 는 과잉
+  - **Log retention 30d**: SonarQube "short retention" hotspot 해소 + Free Tier 5GB storage 안에 들어옴
 - **비용 함정 주의**:
   - CloudWatch Logs ingestion 5GB/m 초과 시 GB 당 $0.50 → user-data 로그 1회 약 5KB 라 무시 가능
   - Alarm 개수 10개 초과 시 알람당 월 $0.10 — 본 PR 미사용

@@ -8,8 +8,12 @@
 # SNS 는 첫 1,000 publication/m 까지 Free Tier 안에 들어옴 (실제 알람 폭증 시에만 과금 가능성).
 
 # ─── SNS Topic: 운영 알림 ────────────────────────────
+# SonarQube hotspot 해소 — AWS managed KMS key 로 SSE 활성화.
+# `alias/aws/sns` 는 AWS 가 계정·region 별로 자동 생성·관리하며 추가 비용 없음.
+# (고객 관리 CMK 는 월 $1 + API 호출 과금 — 본 토픽의 메시지(알람 메타데이터)는 PII/secret 없어 과잉)
 resource "aws_sns_topic" "alerts" {
-  name = "kicklog-alerts"
+  name              = "kicklog-alerts"
+  kms_master_key_id = "alias/aws/sns"
 
   tags = {
     Name = "kicklog-alerts"
@@ -135,12 +139,12 @@ resource "aws_cloudwatch_metric_alarm" "rds_low_storage" {
 }
 
 # ─── CloudWatch Log Group — userdata / 배포 로그 ──────
-# 짧은 retention 으로 비용·노이즈 동시 억제. (Free Tier 5GB ingestion + 5GB storage/m)
-# 현재 user-data.sh 와 SSM 출력은 EC2 로컬 파일로 충분하므로, 본 그룹은
-# 수동 push 시점이 와도 비용 폭증을 막기 위한 미리 정의된 안전한 기본값이다.
+# 본 그룹은 미래에 CloudWatch agent 가 활성화될 때 default "Never expire" 로 비용 폭증되는 것을 막는 안전망.
+# 30 일 retention — Free Tier 5GB storage/m 안에 충분 (user-data 1회 ~5KB × 일1회 × 30일 ≈ 150KB).
+# audit/compliance 관점에서도 단기 incident 추적에 적절 (SonarQube hotspot 정공법 해소).
 resource "aws_cloudwatch_log_group" "userdata" {
   name              = "/kicklog/userdata"
-  retention_in_days = 7
+  retention_in_days = 30
 
   tags = {
     Name = "kicklog-userdata-logs"
