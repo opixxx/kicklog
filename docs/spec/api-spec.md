@@ -4,7 +4,7 @@
 > 본 문서는 그 둘을 바탕으로 **endpoint 별 request/response body·상태 코드·에러·예시**(구현 시 직접 참조하는 계약)를 정형화한다.
 > 충돌 시 우선순위: **ADR-0003 > api-conventions.md > 본 문서**. 본 문서가 어긋나면 갱신 PR 먼저.
 
-- **Base URL**: 운영 `https://api.kicklog.app/v1` · 로컬 `http://localhost:8080/v1`
+- **Base URL**: 운영 `https://api.kicklog.org/v1` · 로컬 `http://localhost:8080/v1` (도메인 확정: ADR-0007)
 - **인증 헤더**: `Authorization: Bearer <accessToken>` (보호 endpoint 전부)
 - **에러 응답**: 모든 에러는 `{ code, message, field?, traceId? }` (api-conventions.md)
 - **시간**: 모든 `Instant` 는 ISO-8601 UTC (`2026-05-21T10:00:00Z`)
@@ -321,7 +321,7 @@ Soft delete 취소. `deleted_at = NULL`.
 
 ## 4. Invitations
 
-8자 base62 토큰, N회용, 15일 만료 (ADR-0003 D4). 링크 형태: `kicklog.app/i/{token}`.
+8자 base62 토큰, N회용, 15일 만료 (ADR-0003 D4). 링크 형태: `kicklog.org/i/{token}` (ADR-0007).
 
 ### 4.1 `POST /invitations` 🔒
 
@@ -334,7 +334,7 @@ Soft delete 취소. `deleted_at = NULL`.
 {
   "id": 3,
   "token": "xY9k2Lp4",
-  "url": "https://kicklog.app/i/xY9k2Lp4",
+  "url": "https://kicklog.org/i/xY9k2Lp4",
   "expiresAt": "2026-06-06T09:00:00Z",
   "useCount": 0
 }

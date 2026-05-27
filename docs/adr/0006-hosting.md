@@ -85,7 +85,7 @@ ADR-0001에서 "Railway / Fly.io 후보"로 보류된 호스팅 결정. ADR-0003
 
 ### D7. 도메인 — **MVP는 IP 직접, 정식 출시 시 등록**
 
-- **선택**: MVP는 EC2 EIP로 접근 (`https://13.xxx.xxx.xxx`). 정식 출시 시점에 `kicklog.app` 또는 `.io`/`.com` 등록 (~$15/년)
+- **선택**: MVP는 EC2 EIP로 접근 (`https://13.xxx.xxx.xxx`). 정식 출시 시점에 `kicklog.org` (사용자 보유) 적용 — 도메인 확정: ADR-0007
 - **이유**:
   - 본인+팀원 TestFlight 단계 = IP 직접 접근 OK
   - Universal Link (친구 초대) 위해서는 도메인 필수 — 정식 출시 시 ADR-0005에서 결정

@@ -236,7 +236,7 @@ struct AddFriendSheet: View {
                 }
                 .buttonStyle(.plain)
 
-                ShareLink(item: URL(string: invitation.url) ?? URL(string: "https://kicklog.app")!) {
+                ShareLink(item: URL(string: invitation.url) ?? URL(string: "https://kicklog.org")!) {
                     invitationActionLabel(icon: "square.and.arrow.up", text: "공유")
                 }
                 .buttonStyle(.plain)

@@ -71,7 +71,7 @@ ADR-0001에서 백엔드 도입(Kotlin + Spring Boot + PostgreSQL)과 친구 기
 - **이유**:
   - 단톡방 시나리오 = 한 링크로 여러 명 클릭 — (A) 1회용은 부적합
   - 8자 base62 = 218조 조합, 추측 안전
-  - URL 짧음: `kicklog.app/i/xY9k2Lp4`
+  - URL 짧음: `kicklog.org/i/xY9k2Lp4` (도메인 확정: ADR-0007)
   - 15일은 본인+팀원이 시즌 중 새 멤버 들어올 때 재사용 가능 + 너무 오래 안 살게
 
 ### D5. Match + QuarterWorkout — **Client UUID + HealthKit UUID 부속**

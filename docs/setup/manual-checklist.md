@@ -158,12 +158,9 @@ curl ifconfig.me
 
 > ADR-0006 D7: MVP는 EC2 EIP 직접 접근, 정식 출시 시 도메인 등록.
 
-- [ ] 도메인 후보:
-  - `kicklog.app` (Google Domains 또는 Namecheap, ~$15/year)
-  - `kicklog.io`
-  - `kicklog.kr` (한국 .kr 도메인)
-- [ ] 등록 후 AWS Route 53 hosted zone 추가 (`$0.50/m`)
-- [ ] ADR-0005에서 Universal Link AASA 구조 결정 후 작성
+- [x] 도메인 확정: `kicklog.org` (사용자 보유, ADR-0007)
+- [ ] AWS Route 53 hosted zone 추가 (`$0.50/m`) — `kicklog.org` 와 `api.kicklog.org` 서브도메인
+- [ ] Universal Link AASA (`/.well-known/apple-app-site-association`) 호스팅 — iOS Associated Domains 작업과 함께
 
 ---
 
