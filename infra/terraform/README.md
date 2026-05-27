@@ -92,6 +92,29 @@ terraform apply
 
 약 5~10분 소요 (RDS 생성이 가장 오래 걸림).
 
+### 6. GitHub Actions CD 셋업 (ADR-0008)
+
+`terraform apply` 가 끝나면 SSM 기반 자동 배포에 필요한 값을 출력한다.
+
+```bash
+terraform output github_actions_role_arn
+terraform output deploy_staging_bucket_name
+terraform output ec2_instance_id
+```
+
+GitHub repo → Settings → Variables → Actions → **Repository variables** 에 3개 등록:
+
+| Name | Value (terraform output) |
+|---|---|
+| `AWS_GITHUB_ROLE_ARN` | `github_actions_role_arn` |
+| `DEPLOY_STAGING_BUCKET` | `deploy_staging_bucket_name` |
+| `EC2_INSTANCE_ID` | `ec2_instance_id` |
+
+같은 메뉴 → Secrets → 기존 3개 삭제 (더 이상 사용 안 함):
+- `EC2_HOST`
+- `EC2_SSH_PRIVATE_KEY`
+- `GHCR_PAT` (Secrets Manager `kicklog/ghcr-pat` 로 이전됨)
+
 ---
 
 ## 검증

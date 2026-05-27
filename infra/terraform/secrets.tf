@@ -57,3 +57,21 @@ resource "aws_secretsmanager_secret_version" "jwt_secret" {
   secret_id     = aws_secretsmanager_secret.jwt_secret.id
   secret_string = var.jwt_secret
 }
+
+# ─── GHCR Personal Access Token ───────────────────────
+# ADR-0008: GitHub Actions 가 SSM Run Command 로 docker login 시 사용.
+# EC2 가 IAM role 로 fetch (cd.yml 의 SSM script 안에서 호출).
+resource "aws_secretsmanager_secret" "ghcr_pat" {
+  name                    = "kicklog/ghcr-pat"
+  description             = "GHCR private package pull 용 PAT (docker login 시 사용)"
+  recovery_window_in_days = 7
+
+  tags = {
+    Name = "kicklog-ghcr-pat"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "ghcr_pat" {
+  secret_id     = aws_secretsmanager_secret.ghcr_pat.id
+  secret_string = var.ghcr_pat
+}

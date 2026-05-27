@@ -58,7 +58,7 @@ ADR-0001에서 "Railway / Fly.io 후보"로 보류된 호스팅 결정. ADR-0003
 ### D4. 배포 방식 — **Docker + docker-compose on EC2**
 
 - **선택**: Spring Boot multi-stage Dockerfile → Docker Hub or GHCR push → EC2에서 `docker compose pull && up -d`
-- **CI/CD**: MVP는 수동 (SSH 후 docker compose), v1.1+에서 GitHub Actions
+- **CI/CD**: 초기 ADR 작성 시점에는 MVP 수동(SSH+docker compose), v1.1 GitHub Actions 로 계획. PR #47 머지 후 SSH 보안 룰 충돌 발생 → **ADR-0008** 에서 SSM Run Command + S3 staging + OIDC 로 자동 배포 전환 (22 포트 의존 제거)
 - **이유**:
   - Docker = 표준 + 환경 재현성
   - 1인 사이드 MVP에 CI/CD over-engineering
@@ -197,7 +197,7 @@ ADR-0001에서 "Railway / Fly.io 후보"로 보류된 호스팅 결정. ADR-0003
 | **ec2-sg** | 80 (0.0.0.0/0), 443 (0.0.0.0/0), 22 (본인 IP/32) | All (카카오 API outbound) |
 | **rds-sg** | 5432 (ec2-sg) | None |
 
-SSH는 본인 IP 변경 시마다 `terraform apply`로 업데이트 — 약간 마찰이지만 보안 우선.
+SSH는 본인 IP 변경 시마다 `terraform apply`로 업데이트 — 약간 마찰이지만 보안 우선. 자동 CD 는 SSH 를 거치지 않고 SSM Run Command 로 동작 (ADR-0008). SSH 22 룰 자체의 완전 제거는 SSM 안정 운영 확인 후 별도 PR.
 
 ---
 

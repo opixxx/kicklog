@@ -69,7 +69,7 @@ variable "allowed_ssh_cidr" {
   description = "SSH 22번 허용 IP CIDR (본인 IP만, /32 필수). curl ifconfig.me 로 확인."
   type        = string
   # 예: "121.140.xxx.xxx/32"
-  sensitive   = true
+  sensitive = true
 }
 
 # ─── RDS ──────────────────────────────────────────────
@@ -115,4 +115,23 @@ variable "jwt_secret" {
   description = "JWT 서명용 시크릿 (32자 이상)"
   type        = string
   sensitive   = true
+}
+
+variable "ghcr_pat" {
+  description = "GHCR private package pull 용 PAT (Secrets Manager 저장용, ADR-0008)"
+  type        = string
+  sensitive   = true
+}
+
+# ─── GitHub Actions OIDC ──────────────────────────────
+variable "github_repo_owner" {
+  description = "GitHub 저장소 owner (OIDC trust condition)"
+  type        = string
+  default     = "opixxx"
+}
+
+variable "github_repo_name" {
+  description = "GitHub 저장소 이름 (OIDC trust condition)"
+  type        = string
+  default     = "kicklog"
 }
