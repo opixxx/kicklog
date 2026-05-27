@@ -19,9 +19,9 @@ on:
       - ".github/workflows/cd.yml"
   workflow_dispatch:
 
+# 최소 권한 원칙 — packages:write 는 build-and-push job 에만 부여 (SonarQube 권고).
 permissions:
   contents: read
-  packages: write
 
 # 동일 브랜치 동시 배포 방지 (이전 배포 끝날 때까지 대기)
 concurrency:
@@ -78,6 +78,9 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
