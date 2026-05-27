@@ -2,7 +2,7 @@ import SwiftUI
 
 // 친구 매치 상세 — GET /users/{userId}/matches/{matchId} (5.6) 실연동.
 // MatchDetailScreen 과 디자인은 동일하나 SwiftData Match 가 아닌 MatchDetailResponse 기반.
-// 친구가 hideHeartRate=true 면 avgHeartRate / 쿼터별 heart rate 가 null → 비공개 표시.
+// 친구의 모든 심박 지표는 평문 노출 (마스킹 정책 폐기 — V11 마이그레이션).
 struct FriendMatchDetailScreen: View {
     let userId: Int64
     let matchId: Int64

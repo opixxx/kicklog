@@ -46,7 +46,7 @@ final class FriendService {
     }
 
     // MARK: - 친구 경기 (5.5, 5.6) — FRIEND_UNAUTHORIZED / USER_NOT_FOUND 가능
-    // 친구가 hideHeartRate=true 면 응답의 avgHeartRate / quarter heart rate 가 null 로 마스킹됨.
+    // 친구는 본인의 모든 지표를 평문으로 본다 (심박 마스킹 정책 폐기 — V11 마이그레이션).
 
     func fetchFriendMatches(
         userId: Int64,

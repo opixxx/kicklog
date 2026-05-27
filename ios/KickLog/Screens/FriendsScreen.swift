@@ -11,6 +11,8 @@ struct FriendsScreen: View {
     @State private var errorMessage: String?
     @State private var showingAddSheet = false
     @State private var actioningRequestId: Int64?
+    // 친구 목록 클라이언트 필터 — 백엔드 검색 X (이미 받은 목록에서 displayName 부분 일치).
+    @State private var searchQuery: String = ""
 
     private static let relativeFormatter: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
@@ -24,7 +26,7 @@ struct FriendsScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 KLNavBar(title: "친구")
 
-                KLSearchBar(placeholder: "친구 검색 (이름)") {
+                KLSearchBar(placeholder: "친구 검색 (이름)", text: $searchQuery) {
                     Button(action: { showingAddSheet = true }) {
                         ZStack {
                             Circle().fill(KLTokens.pitch)
@@ -144,9 +146,17 @@ struct FriendsScreen: View {
 
     // MARK: - 친구 리스트
 
+    // 검색어 비어있으면 전체. 비어있지 않으면 displayName 부분 일치 (대소문자 무시 + 공백 trim).
+    private var filteredFriends: [FriendSummary] {
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return friends }
+        return friends.filter { $0.displayName.localizedCaseInsensitiveContains(q) }
+    }
+
     private var friendsListSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            (Text("내 친구 · ") + Text("\(friends.count)").monospacedDigit())
+        let visible = filteredFriends
+        return VStack(alignment: .leading, spacing: 0) {
+            (Text("내 친구 · ") + Text("\(visible.count)").monospacedDigit())
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(KLTokens.textSec)
                 .padding(.horizontal, 20)
@@ -154,11 +164,13 @@ struct FriendsScreen: View {
 
             if friends.isEmpty {
                 emptyFriendsState
+            } else if visible.isEmpty {
+                noMatchState
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(friends.enumerated()), id: \.element.id) { index, friend in
+                    ForEach(Array(visible.enumerated()), id: \.element.id) { index, friend in
                         NavigationLink(value: friend) {
-                            friendRow(friend, isLast: index == friends.count - 1)
+                            friendRow(friend, isLast: index == visible.count - 1)
                         }
                         .buttonStyle(.plain)
                     }
@@ -169,6 +181,21 @@ struct FriendsScreen: View {
                 .klCardShadow(scheme)
             }
         }
+    }
+
+    private var noMatchState: some View {
+        VStack(spacing: 6) {
+            Text("일치하는 친구가 없어요")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(KLTokens.text)
+            Text("이름 일부를 다시 입력해 보세요")
+                .font(.system(size: 12))
+                .foregroundStyle(KLTokens.textSec)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .background(KLTokens.bgElev, in: RoundedRectangle(cornerRadius: KLTokens.radiusCard))
+        .padding(.horizontal, 16)
     }
 
     private var emptyFriendsState: some View {

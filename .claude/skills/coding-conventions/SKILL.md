@@ -220,15 +220,9 @@ class FriendMatchService(...) {
         if (!friendshipService.isAccepted(viewerId, friendUserId)) {
             throw UnauthorizedFriendshipException()
         }
-        // 2. 심박수 hide 토글 확인
-        val friend = userService.findById(friendUserId)
-            ?: throw NotFoundUserException()
-        
-        // 3. 데이터 조회
+        // 2. 데이터 조회 후 응답 변환 (모든 지표 평문 — 마스킹 정책 없음)
         val matches = matchRepository.findByUserIdOrderByPlayedAtDesc(friendUserId)
-        
-        // 4. 권한 기반 마스킹 (심박수)
-        return matches.map { MatchSummaryResponse.from(it, hideHeartRate = friend.hideHeartRate) }
+        return matches.map(MatchSummaryResponse::from)
     }
 }
 ```

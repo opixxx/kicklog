@@ -28,7 +28,6 @@ erDiagram
         bigserial   id PK
         varchar50   display_name
         varchar255  email "nullable"
-        boolean     hide_heart_rate "def false"
         timestamptz created_at
         timestamptz updated_at
         timestamptz deleted_at "nullable, soft delete 30d grace"

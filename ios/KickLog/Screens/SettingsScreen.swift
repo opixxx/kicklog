@@ -19,7 +19,6 @@ struct SettingsScreen: View {
     @Query(filter: #Predicate<Venue> { $0.serverId > 0 })
     private var myVenues: [Venue]
 
-    @State private var hideHeartRate: Bool = false
     @State private var displayNameDraft: String = ""
     @State private var isShowingNameEditor: Bool = false
     @State private var isUpdatingProfile: Bool = false
@@ -37,7 +36,6 @@ struct SettingsScreen: View {
                 KLNavBar(title: "설정")
                 profileCard
                 profileSection
-                visibilitySection
                 venueSection
                 dataSection
                 #if DEBUG
@@ -55,13 +53,7 @@ struct SettingsScreen: View {
             case .list: VenueListScreen()
             }
         }
-        .onAppear {
-            hideHeartRate = me?.hideHeartRate ?? false
-        }
         .task { await refreshMe() }
-        .onChange(of: me?.hideHeartRate) { _, newValue in
-            hideHeartRate = newValue ?? false
-        }
         .alert("오류", isPresented: Binding(
             get: { settingsErrorMessage != nil },
             set: { if !$0 { settingsErrorMessage = nil } }
@@ -145,36 +137,6 @@ struct SettingsScreen: View {
         f.locale = Locale(identifier: "ko_KR")
         f.dateFormat = "yyyy년 M월 d일"
         return f.string(from: createdAt)
-    }
-
-    private var visibilitySection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            KLSettingsHeader(text: "공개 설정")
-            KLSettingsGroup {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("친구에게 심박수 숨기기")
-                            .font(.system(size: 16))
-                            .tracking(-0.3)
-                            .foregroundStyle(KLTokens.text)
-                        Text("켜면 친구가 내 평균/최고 심박수를 볼 수 없습니다")
-                            .font(.system(size: 12))
-                            .lineSpacing(2)
-                            .foregroundStyle(KLTokens.textSec)
-                    }
-                    Spacer(minLength: 0)
-                    Toggle("", isOn: Binding(
-                        get: { me?.hideHeartRate ?? hideHeartRate },
-                        set: { updateHideHeartRate($0) }
-                    ))
-                        .labelsHidden()
-                        .tint(KLTokens.pitch)
-                        .disabled(me == nil || isUpdatingProfile)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 11)
-            }
-        }
     }
 
     private var venueSection: some View {
@@ -342,8 +304,7 @@ struct SettingsScreen: View {
 
     private func refreshMe() async {
         do {
-            let user = try await UserService.shared.fetchMe(into: modelContext)
-            hideHeartRate = user.hideHeartRate
+            _ = try await UserService.shared.fetchMe(into: modelContext)
         } catch {
             settingsErrorMessage = error.localizedDescription
         }
@@ -368,32 +329,6 @@ struct SettingsScreen: View {
                 )
                 isShowingNameEditor = false
             } catch {
-                settingsErrorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    private func updateHideHeartRate(_ newValue: Bool) {
-        guard let user = me else { return }
-        let previousValue = user.hideHeartRate
-        guard previousValue != newValue else { return }
-
-        hideHeartRate = newValue
-        user.hideHeartRate = newValue
-        try? modelContext.save()
-
-        Task { @MainActor in
-            isUpdatingProfile = true
-            defer { isUpdatingProfile = false }
-            do {
-                _ = try await UserService.shared.updateMe(
-                    hideHeartRate: newValue,
-                    into: modelContext
-                )
-            } catch {
-                hideHeartRate = previousValue
-                user.hideHeartRate = previousValue
-                try? modelContext.save()
                 settingsErrorMessage = error.localizedDescription
             }
         }

@@ -36,11 +36,10 @@ struct UserDTO: Decodable {
     let id: Int64
     let displayName: String
     let email: String?
-    let hideHeartRate: Bool
     let createdAt: Date
 }
 
+// PATCH /users/me — 백엔드에서 displayName 단일 필드 + @NotBlank 필수로 변경됨 (p0-cleanup).
 struct UpdateMeRequest: Encodable {
-    let displayName: String?
-    let hideHeartRate: Bool?
+    let displayName: String
 }

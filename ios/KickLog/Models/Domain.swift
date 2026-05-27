@@ -13,7 +13,6 @@ final class User {
     @Attribute(.unique) var serverId: Int64
     var displayName: String
     var email: String?
-    var hideHeartRate: Bool
     var createdAt: Date
     var lastSyncedAt: Date?
 
@@ -21,14 +20,12 @@ final class User {
         serverId: Int64,
         displayName: String,
         email: String? = nil,
-        hideHeartRate: Bool = false,
         createdAt: Date = .now,
         lastSyncedAt: Date? = nil
     ) {
         self.serverId = serverId
         self.displayName = displayName
         self.email = email
-        self.hideHeartRate = hideHeartRate
         self.createdAt = createdAt
         self.lastSyncedAt = lastSyncedAt
     }
@@ -45,7 +42,6 @@ extension User {
         if let existing = try? context.fetch(descriptor).first {
             existing.displayName = dto.displayName
             existing.email = dto.email
-            existing.hideHeartRate = dto.hideHeartRate
             existing.createdAt = dto.createdAt
             existing.lastSyncedAt = .now
             try? context.save()
@@ -55,7 +51,6 @@ extension User {
             serverId: dto.id,
             displayName: dto.displayName,
             email: dto.email,
-            hideHeartRate: dto.hideHeartRate,
             createdAt: dto.createdAt,
             lastSyncedAt: .now
         )
@@ -238,7 +233,6 @@ final class Friend {
     var displayName: String
     var friendshipStatus: String    // "pending" | "accepted"
     var initiatedByMe: Bool
-    var hideHeartRate: Bool         // 친구가 hide 시 본인이 마스킹
     var lastFetchedAt: Date?
 
     init(
@@ -246,14 +240,12 @@ final class Friend {
         displayName: String,
         friendshipStatus: String,
         initiatedByMe: Bool,
-        hideHeartRate: Bool = false,
         lastFetchedAt: Date? = nil
     ) {
         self.friendUserId = friendUserId
         self.displayName = displayName
         self.friendshipStatus = friendshipStatus
         self.initiatedByMe = initiatedByMe
-        self.hideHeartRate = hideHeartRate
         self.lastFetchedAt = lastFetchedAt
     }
 }

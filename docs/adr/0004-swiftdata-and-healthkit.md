@@ -158,7 +158,6 @@ final class User {
     @Attribute(.unique) var serverId: Int64
     var displayName: String
     var email: String?
-    var hideHeartRate: Bool = false
     var createdAt: Date
     var lastSyncedAt: Date?
 }
@@ -224,7 +223,6 @@ final class Friend {
     var displayName: String
     var friendshipStatus: String                    // "pending" | "accepted"
     var initiatedByMe: Bool
-    var hideHeartRate: Bool                          // 친구가 hide 시 마스킹
     var lastFetchedAt: Date?
 }
 

@@ -96,7 +96,7 @@ struct MatchSummaryResponse: Decodable, Hashable {
     let totalDistanceM: Int
     let maxSpeedKmh: Double
     let sprintCount: Int
-    let avgHeartRate: Int?        // 친구 hideHeartRate=true 면 null
+    let avgHeartRate: Int?        // null = HealthKit 측정값 없는 워크아웃
     let quarterCount: Int
 }
 

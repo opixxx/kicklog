@@ -70,12 +70,7 @@ struct MatchesScreen: View {
     // MARK: - NavBar
 
     private var navBar: some View {
-        KLNavBar(title: "경기", subtitle: navSubtitle) {
-            HStack(spacing: 12) {
-                KLIcon(name: "magnifyingglass", size: 22, color: KLTokens.pitch)
-                KLIcon(name: "plus.circle.fill", size: 26, color: KLTokens.pitch)
-            }
-        }
+        KLNavBar(title: "경기", subtitle: navSubtitle)
     }
 
     private var navSubtitle: String {

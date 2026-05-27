@@ -7,7 +7,6 @@ data class UserResponse(
     val id: Long,
     val displayName: String,
     val email: String?,
-    val hideHeartRate: Boolean,
     val createdAt: Instant,
 ) {
     companion object {
@@ -16,7 +15,6 @@ data class UserResponse(
                 id = user.id,
                 displayName = user.displayName,
                 email = user.email,
-                hideHeartRate = user.hideHeartRate,
                 createdAt = user.createdAt,
             )
         }

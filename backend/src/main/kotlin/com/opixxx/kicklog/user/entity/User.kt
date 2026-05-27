@@ -21,9 +21,6 @@ class User(
     @Column(name = "email")
     var email: String? = null,
 
-    @Column(name = "hide_heart_rate", nullable = false)
-    var hideHeartRate: Boolean = false,
-
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.now(),
 
@@ -35,9 +32,8 @@ class User(
 ) {
     fun isDeleted(): Boolean = deletedAt != null
 
-    fun updateProfile(displayName: String?, hideHeartRate: Boolean?, now: Instant) {
-        displayName?.let { this.displayName = it }
-        hideHeartRate?.let { this.hideHeartRate = it }
+    fun updateProfile(displayName: String, now: Instant) {
+        this.displayName = displayName
         this.updatedAt = now
     }
 

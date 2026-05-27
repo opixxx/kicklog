@@ -1,9 +1,9 @@
 import SwiftUI
 
 // 친구 상세 — 아바타 헤더 + 4개 통계 카드 + 최근 경기 리스트.
-// 본인 시즌 통계와 달리 평균심박은 비공개(KickLog 정책 — heart rate 공유 안함).
-// 최근 경기는 GET /users/{userId}/matches 실연동 (5.5). 통계 4종은 별도 시즌 통계 API
-// 연동 전까지 더미 유지.
+// 통계 4종(거리/골·어시/승무패/평균심박) 모두 GET /users/{userId}/seasons/{year} (8.2) 실연동.
+// 심박 마스킹 정책 폐기 (V11 마이그레이션) — 친구는 모든 지표를 평문으로 본다.
+// 최근 경기는 GET /users/{userId}/matches 실연동 (5.5).
 struct FriendDetailScreen: View {
     let friend: FriendSummary
     @Environment(\.dismiss) private var dismiss
@@ -16,14 +16,10 @@ struct FriendDetailScreen: View {
     @State private var isLoadingMore = false
     @State private var errorMessage: String?
 
-    // 더미 통계 (시즌 통계 API 연동 전까지)
-    private let totalGames = 12
-    private let distanceKm = 78.2
-    private let goals = 9
-    private let assists = 14
-    private let wins = 7
-    private let draws = 3
-    private let losses = 2
+    // 친구 시즌 통계 — 현재 연도 1년치만 표시 (디자인상 picker 없음).
+    // nil = 로딩 / 실패 → 카드는 placeholder "—". 매치 로드 실패와는 독립적.
+    @State private var stats: SeasonStatResponse?
+    private let displayYear = Calendar.current.component(.year, from: .now)
 
     var body: some View {
         ScrollView {
@@ -79,118 +75,148 @@ struct FriendDetailScreen: View {
                 .tracking(-0.5)
                 .foregroundStyle(KLTokens.text)
                 .padding(.top, 12)
-            (Text("2026 시즌 · ") + Text("\(totalGames)").monospacedDigit() + Text("경기"))
+            (Text("\(String(stats?.year ?? displayYear)) 시즌 · ") + Text("\(stats?.matchCount ?? 0)").monospacedDigit() + Text("경기"))
                 .font(.system(size: 13))
                 .foregroundStyle(KLTokens.textSec)
                 .padding(.top, 4)
-
-            HStack(spacing: 4) {
-                KLIcon(name: "heart.fill", size: 11, color: KLTokens.textTer)
-                Text("심박수 비공개")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(KLTokens.textSec)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(KLTokens.chipBg, in: Capsule())
-            .padding(.top, 12)
+                .padding(.bottom, 4)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
         .padding(.bottom, 18)
     }
 
-    // MARK: - 4-card grid
+    // MARK: - 4-card grid (8.2 SeasonStatResponse 기반)
+    // stats == nil 이면 숫자는 "—" placeholder.
 
     private var statsGrid: some View {
         LazyVGrid(
             columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)],
             spacing: 10
         ) {
-            KLSeasonCard(icon: "figure.run", title: "누적 거리") {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(String(format: "%.1f", distanceKm))
-                        .font(KLFont.numeric(30, weight: .bold))
-                        .tracking(-1)
-                        .foregroundStyle(KLTokens.text)
-                    Text("km")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(KLTokens.textSec)
-                }
-                (Text("\(totalGames)").monospacedDigit() + Text("경기"))
-                    .font(.system(size: 12))
-                    .foregroundStyle(KLTokens.textSec)
-                    .padding(.top, 8)
-            }
+            distanceCard
+            goalAssistCard
+            recordCard
+            heartRateCard
+        }
+        .padding(.horizontal, 16)
+    }
 
-            KLSeasonCard(icon: "soccerball", title: "골 / 어시스트") {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline, spacing: 0) {
-                        Text("\(goals)")
-                            .font(KLFont.numeric(26, weight: .bold))
-                            .tracking(-0.8)
-                            .foregroundStyle(KLTokens.text)
-                        Text("골")
-                            .font(.system(size: 12))
-                            .foregroundStyle(KLTokens.text)
-                    }
-                    Text("·")
-                        .foregroundStyle(KLTokens.textTer)
-                    HStack(alignment: .firstTextBaseline, spacing: 0) {
-                        Text("\(assists)")
-                            .font(KLFont.numeric(26, weight: .bold))
-                            .tracking(-0.8)
-                            .foregroundStyle(KLTokens.text)
-                        Text("어시")
-                            .font(.system(size: 12))
-                            .foregroundStyle(KLTokens.text)
-                    }
-                }
-                (Text("경기당 ") + Text("0.8").monospacedDigit() + Text("골"))
-                    .font(.system(size: 12))
+    private var distanceCard: some View {
+        let value = stats.map { String(format: "%.1f", Double($0.totalDistanceM) / 1000.0) } ?? "—"
+        let matchCount = stats?.matchCount ?? 0
+        return KLSeasonCard(icon: "figure.run", title: "누적 거리") {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value)
+                    .font(KLFont.numeric(30, weight: .bold))
+                    .tracking(-1)
+                    .foregroundStyle(KLTokens.text)
+                Text("km")
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(KLTokens.textSec)
-                    .padding(.top, 8)
             }
+            (Text("\(matchCount)").monospacedDigit() + Text("경기"))
+                .font(.system(size: 12))
+                .foregroundStyle(KLTokens.textSec)
+                .padding(.top, 8)
+        }
+    }
 
-            KLSeasonCard(icon: "trophy.fill", iconColor: KLTokens.amber, title: "승무패") {
+    private var goalAssistCard: some View {
+        // 경기당 골 = totalGoals / matchCount. matchCount 0 이면 숨김 (0으로 나누기 회피).
+        let perMatch: Double? = {
+            guard let stats, stats.matchCount > 0 else { return nil }
+            return Double(stats.totalGoals) / Double(stats.matchCount)
+        }()
+        return KLSeasonCard(icon: "soccerball", title: "골 / 어시스트") {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    Text("\(wins)")
-                        .font(KLFont.numeric(26, weight: .bold))
-                        .tracking(-0.8)
-                        .foregroundStyle(KLTokens.winFg)
-                    Text("-")
-                        .foregroundStyle(KLTokens.textTer)
-                        .padding(.horizontal, 4)
-                    Text("\(draws)")
+                    Text(stats.map { String($0.totalGoals) } ?? "—")
                         .font(KLFont.numeric(26, weight: .bold))
                         .tracking(-0.8)
                         .foregroundStyle(KLTokens.text)
-                    Text("-")
-                        .foregroundStyle(KLTokens.textTer)
-                        .padding(.horizontal, 4)
-                    Text("\(losses)")
+                    Text("골")
+                        .font(.system(size: 12))
+                        .foregroundStyle(KLTokens.text)
+                }
+                Text("·")
+                    .foregroundStyle(KLTokens.textTer)
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text(stats.map { String($0.totalAssists) } ?? "—")
                         .font(KLFont.numeric(26, weight: .bold))
                         .tracking(-0.8)
-                        .foregroundStyle(KLTokens.loseFg)
+                        .foregroundStyle(KLTokens.text)
+                    Text("어시")
+                        .font(.system(size: 12))
+                        .foregroundStyle(KLTokens.text)
                 }
-                (Text("승률 ") + Text("58%").monospacedDigit())
-                    .font(.system(size: 12))
-                    .foregroundStyle(KLTokens.textSec)
-                    .padding(.top, 8)
             }
-
-            KLSeasonCard(icon: "heart.fill", iconColor: KLTokens.red, title: "평균심박") {
-                Text("—")
-                    .font(KLFont.numeric(26, weight: .bold))
-                    .tracking(-0.8)
-                    .foregroundStyle(KLTokens.textTer)
-                Text("비공개")
+            if let perMatch {
+                (Text("경기당 ") + Text(String(format: "%.1f", perMatch)).monospacedDigit() + Text("골"))
                     .font(.system(size: 12))
                     .foregroundStyle(KLTokens.textSec)
                     .padding(.top, 8)
             }
         }
-        .padding(.horizontal, 16)
+    }
+
+    private var recordCard: some View {
+        // 승률 = winCount / (W+D+L) * 100. 합이 0이면 숨김 (SeasonScreen winRateLabel 과 동일 규약).
+        let total = (stats?.winCount ?? 0) + (stats?.drawCount ?? 0) + (stats?.lossCount ?? 0)
+        let winPct: Int? = {
+            guard let stats, total > 0 else { return nil }
+            return Int((Double(stats.winCount) / Double(total) * 100).rounded())
+        }()
+        return KLSeasonCard(icon: "trophy.fill", iconColor: KLTokens.amber, title: "승무패") {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text(stats.map { String($0.winCount) } ?? "—")
+                    .font(KLFont.numeric(26, weight: .bold))
+                    .tracking(-0.8)
+                    .foregroundStyle(KLTokens.winFg)
+                Text("-")
+                    .foregroundStyle(KLTokens.textTer)
+                    .padding(.horizontal, 4)
+                Text(stats.map { String($0.drawCount) } ?? "—")
+                    .font(KLFont.numeric(26, weight: .bold))
+                    .tracking(-0.8)
+                    .foregroundStyle(KLTokens.text)
+                Text("-")
+                    .foregroundStyle(KLTokens.textTer)
+                    .padding(.horizontal, 4)
+                Text(stats.map { String($0.lossCount) } ?? "—")
+                    .font(KLFont.numeric(26, weight: .bold))
+                    .tracking(-0.8)
+                    .foregroundStyle(KLTokens.loseFg)
+            }
+            if let winPct {
+                (Text("승률 ") + Text("\(winPct)%").monospacedDigit())
+                    .font(.system(size: 12))
+                    .foregroundStyle(KLTokens.textSec)
+                    .padding(.top, 8)
+            }
+        }
+    }
+
+    // 평균심박 — SeasonStatResponse.avgHeartRate 평문 노출 (마스킹 정책 폐기 — V11).
+    // stats nil 또는 avgHeartRate == 0 (측정값 없음) 이면 "—" placeholder.
+    private var heartRateCard: some View {
+        let value = stats?.avgHeartRate ?? 0
+        let display = value > 0 ? "\(value)" : "—"
+        return KLSeasonCard(icon: "heart.fill", iconColor: KLTokens.red, title: "평균심박") {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(display)
+                    .font(KLFont.numeric(26, weight: .bold))
+                    .tracking(-0.8)
+                    .foregroundStyle(value > 0 ? KLTokens.text : KLTokens.textTer)
+                Text("bpm")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(KLTokens.textSec)
+            }
+            Text("시즌 평균")
+                .font(.system(size: 12))
+                .foregroundStyle(KLTokens.textSec)
+                .padding(.top, 8)
+        }
     }
 
     // MARK: - 최근 경기 (실연동)
@@ -353,8 +379,15 @@ struct FriendDetailScreen: View {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+
+        // 시즌 통계와 최근 경기 병렬 fetch. 통계 실패는 placeholder "—" 유지(매치 영역과 독립).
+        async let matchesTask = FriendService.shared.fetchFriendMatches(userId: friend.userId)
+        async let statsTask = SeasonStatService.shared.fetchFriend(userId: friend.userId, year: displayYear)
+
+        stats = try? await statsTask
+
         do {
-            let response = try await FriendService.shared.fetchFriendMatches(userId: friend.userId)
+            let response = try await matchesTask
             matches = response.content
             nextCursor = response.nextCursor
             hasNext = response.hasNext

@@ -181,11 +181,11 @@ ADR-0001에서 백엔드 도입(Kotlin + Spring Boot + PostgreSQL)과 친구 기
 -- =========================================
 
 -- Users (display_name 기반)
+-- NOTE: hide_heart_rate 컬럼은 V11 마이그레이션으로 폐기됨 (PRD 단순화 — 친구는 모든 지표 평문 조회).
 CREATE TABLE users (
   id              BIGSERIAL PRIMARY KEY,
   display_name    VARCHAR(50)  NOT NULL,
   email           VARCHAR(255),                       -- 첫 가입 provider에서 받은 것
-  hide_heart_rate BOOLEAN      NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   deleted_at      TIMESTAMPTZ                         -- soft delete (30일 grace)
@@ -349,7 +349,7 @@ POST   /auth/logout/this-device     { refreshToken }
 ### Users
 ```
 GET    /users/me                    내 프로필
-PATCH  /users/me                    display_name·hide_heart_rate 수정
+PATCH  /users/me                    display_name 수정 (단일 필드)
 DELETE /users/me                    계정 삭제 (soft, 30일 grace)
 POST   /users/me/cancel-deletion    삭제 취소
 GET    /users/search?q=...&limit=20 친구 검색 (display_name 부분 일치)
