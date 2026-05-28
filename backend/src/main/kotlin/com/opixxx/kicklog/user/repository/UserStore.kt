@@ -7,6 +7,7 @@ interface UserStore {
     fun save(user: User): User
     fun findById(id: Long): User?
     fun searchByDisplayName(query: String, limit: Int, excludeUserId: Long): List<User>
+    fun findActiveByDisplayName(displayName: String): User?
     fun findExpiredDeleted(cutoff: Instant): List<User>
     fun delete(user: User)
     fun findAllActiveByIds(ids: Collection<Long>): List<User>

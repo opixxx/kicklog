@@ -25,6 +25,7 @@ class FriendshipMigrationTest {
 
     @Test
     fun `친구 마이그레이션은 PostgreSQL에서 적용되고 JPA validate를 통과한다`() {
+        // P1 #4 — V13 에서 friend_invitations 테이블이 DROP 되어 friendships 만 남는다.
         val tableCount = jdbcTemplate.queryForObject(
             """
             select count(*)
@@ -35,7 +36,7 @@ class FriendshipMigrationTest {
             Int::class.java,
         )
 
-        assertEquals(2, tableCount)
+        assertEquals(1, tableCount)
     }
 
     companion object {

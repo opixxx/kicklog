@@ -16,7 +16,6 @@ ADR-0003 의 8개 테이블. `users` 가 모든 도메인의 루트, 친구 관�
 erDiagram
     users ||--o{ oauth_identities   : "has"
     users ||--o{ refresh_tokens      : "has"
-    users ||--o{ friend_invitations  : "creates"
     users ||--o{ venues              : "owns"
     users ||--o{ matches             : "records"
     users ||--o{ friendships         : "user_low"
@@ -26,7 +25,7 @@ erDiagram
 
     users {
         bigserial   id PK
-        varchar50   display_name
+        varchar50   display_name "UK(active) — V12"
         varchar255  email "nullable"
         timestamptz created_at
         timestamptz updated_at
@@ -62,16 +61,6 @@ erDiagram
         timestamptz created_at
         timestamptz accepted_at "nullable"
         timestamptz updated_at
-    }
-
-    friend_invitations {
-        bigserial   id PK
-        bigint      inviter_id FK
-        varchar8    token UK "base62"
-        timestamptz expires_at "15d"
-        int         use_count "def 0"
-        timestamptz revoked_at "nullable"
-        timestamptz created_at
     }
 
     venues {
@@ -132,7 +121,6 @@ erDiagram
 | users | oauth_identities | 1:N | CASCADE | MVP 는 사실상 1:1 (provider 별 별도 계정, ADR-0003 D7) |
 | users | refresh_tokens | 1:N | CASCADE | 기기/세션당 1 row |
 | users | friendships | 1:N (×2) | CASCADE | `user_low_id`·`user_high_id` 양쪽 FK + `initiated_by_id` |
-| users | friend_invitations | 1:N | CASCADE | inviter |
 | users | venues | 1:N | CASCADE | `(user_id, name)` UNIQUE |
 | users | matches | 1:N | CASCADE | `(user_id, client_match_id)` UNIQUE (멱등 PUT) |
 | venues | matches | 0..1:N | **SET NULL** | venue 삭제해도 경기 보존 |

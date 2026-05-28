@@ -22,6 +22,12 @@ final class UserService {
         return User.upsert(from: dto, into: context)
     }
 
+    // 닉네임 가용 확인 — 본인 현재 닉네임이거나 미사용이면 available=true (P1 V12 unique).
+    func checkDisplayName(_ displayName: String) async throws -> DisplayNameCheckResponse {
+        let items = [URLQueryItem(name: "displayName", value: displayName)]
+        return try await apiClient.get("/users/check-display-name", query: items)
+    }
+
     func deleteMe() async throws {
         let _: EmptyResponse = try await apiClient.delete("/users/me")
     }

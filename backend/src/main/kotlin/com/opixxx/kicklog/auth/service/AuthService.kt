@@ -15,6 +15,7 @@ import com.opixxx.kicklog.user.entity.User
 import com.opixxx.kicklog.user.repository.UserStore
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.security.SecureRandom
 import java.time.Instant
 
 @Service
@@ -89,7 +90,7 @@ class AuthService(
             return existing.user
         }
 
-        val user = userRepository.save(User.create(displayNameHint ?: "사용자", email))
+        val user = saveUserWithUniqueDisplayName(displayNameHint ?: "사용자", email)
         oauthIdentityRepository.save(
             OAuthIdentity(
                 user = user,
@@ -99,6 +100,29 @@ class AuthService(
             ),
         )
         return user
+    }
+
+    // 가입 시 displayName 충돌 자동 suffix — base 점유면 "${base}-${hex4}" 로 최대 N회 재시도.
+    // 응용 레벨 사전 조회만으로 결정 — `@Transactional(signIn)` 안에서 `DataIntegrityViolationException`
+    // catch 후 retry 는 Hibernate 가 트랜잭션을 rollback-only 로 마킹해 안전하지 않다.
+    // 운영 단계 ~2명 베타 컨텍스트에서 사전 select 통과 후 동시 race 확률 ~0 으로 허용.
+    // race 발생 시 5xx 응답 — 운영 격상 시 별도 `DisplayNameAllocator` 빈 (`Propagation.REQUIRES_NEW`) 으로 격리 권장.
+    private fun saveUserWithUniqueDisplayName(displayNameHint: String, email: String?): User {
+        val base = displayNameHint.trim().takeIf { it.isNotEmpty() } ?: "사용자"
+        // attempt 0 = base 1회, 1..MAX_DISPLAY_NAME_SUFFIX_RETRY = suffix 5회 — 총 6 attempts.
+        for (attempt in 0..MAX_DISPLAY_NAME_SUFFIX_RETRY) {
+            val candidate = if (attempt == 0) base else "$base-${randomHex4()}"
+            if (userRepository.findActiveByDisplayName(candidate) == null) {
+                return userRepository.save(User.create(candidate, email))
+            }
+        }
+        throw KickLogException(ErrorCode.INTERNAL_ERROR)
+    }
+
+    private fun randomHex4(): String {
+        val bytes = ByteArray(2)
+        secureRandom.nextBytes(bytes)
+        return bytes.joinToString("") { "%02X".format(it) }
     }
 
     private fun verifyRefreshClaims(refreshToken: String) = try {
@@ -142,5 +166,10 @@ class AuthService(
             it.revoke()
             refreshTokenRepository.save(it)
         }
+    }
+
+    companion object {
+        private const val MAX_DISPLAY_NAME_SUFFIX_RETRY = 5
+        private val secureRandom = SecureRandom()
     }
 }

@@ -60,6 +60,4 @@ kicklog:
     local-search-url: ${KAKAO_LOCAL_SEARCH_URL:https://dapi.kakao.com/v2/local/search/keyword.json}
     connect-timeout-millis: ${KAKAO_LOCAL_CONNECT_TIMEOUT_MILLIS:2000}
     read-timeout-millis: ${KAKAO_LOCAL_READ_TIMEOUT_MILLIS:3000}
-  invitation:
-    # 친구 초대 링크의 base URL. 운영은 kicklog.org 로 통일 (ADR-0007).
-    base-url: ${INVITATION_BASE_URL:https://kicklog.org/i}
+  # 초대 링크 도메인은 P1 V13 에서 폐기 — kicklog.invitation prefix 와 INVITATION_BASE_URL 환경변수 모두 제거.

@@ -44,5 +44,9 @@ class InMemoryUserRepository : UserStore {
         return ids.mapNotNull(users::get).filterNot(User::isDeleted)
     }
 
+    override fun findActiveByDisplayName(displayName: String): User? {
+        return users.values.firstOrNull { it.displayName == displayName && !it.isDeleted() }
+    }
+
     fun count(): Int = users.size
 }

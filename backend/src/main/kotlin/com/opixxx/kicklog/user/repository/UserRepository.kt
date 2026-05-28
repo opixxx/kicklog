@@ -27,4 +27,6 @@ interface UserRepository : JpaRepository<User, Long> {
     fun findAllByDeletedAtBefore(cutoff: Instant): List<User>
 
     fun findAllByIdInAndDeletedAtIsNull(ids: Collection<Long>): List<User>
+
+    fun findFirstByDisplayNameAndDeletedAtIsNull(displayName: String): User?
 }

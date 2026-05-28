@@ -1,7 +1,5 @@
 package com.opixxx.kicklog.friend
 
-import com.opixxx.kicklog.friend.entity.FriendInvitation
-import com.opixxx.kicklog.friend.repository.FriendInvitationRepository
 import com.opixxx.kicklog.common.security.JwtTokenProvider
 import com.opixxx.kicklog.user.entity.User
 import com.opixxx.kicklog.user.repository.UserRepository
@@ -17,8 +15,6 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -33,9 +29,6 @@ class FriendshipAcceptanceTest {
 
     @Autowired
     private lateinit var userRepository: UserRepository
-
-    @Autowired
-    private lateinit var invitationRepository: FriendInvitationRepository
 
     @Test
     fun `친구 요청을 보내고 상대가 수락하면 친구 목록에 보인다`() {
@@ -88,30 +81,6 @@ class FriendshipAcceptanceTest {
         }.andExpect {
             status { isForbidden() }
             jsonPath("$.code") { value("FRIEND_NOT_RECIPIENT") }
-        }
-    }
-
-    @Test
-    fun `초대 토큰으로 친구 요청을 보낸다`() {
-        val inviter = createUser("초대자")
-        val requester = createUser("초대수락요청자")
-        val requesterToken = jwtTokenProvider.createAccessToken(requester.id)
-        invitationRepository.save(
-            FriendInvitation(
-                inviterId = inviter.id,
-                token = "Invite12",
-                expiresAt = Instant.now().plus(15, ChronoUnit.DAYS),
-            ),
-        )
-
-        mockMvc.post("/friendships") {
-            header(HttpHeaders.AUTHORIZATION, "Bearer $requesterToken")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"token":"Invite12"}"""
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.status") { value("pending") }
-            jsonPath("$.initiatedByMe") { value(true) }
         }
     }
 
