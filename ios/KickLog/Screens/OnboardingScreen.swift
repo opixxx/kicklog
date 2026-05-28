@@ -46,21 +46,15 @@ private struct OnboardPage1: View {
         VStack {
             Spacer()
             VStack(spacing: 0) {
-                // KickLog 앱 아이콘 (pitch 그라디언트 + 축구공 + 타임라인)
-                ZStack {
-                    RoundedRectangle(cornerRadius: 28)
-                        .fill(LinearGradient(colors: [KLTokens.pitch, KLTokens.pitchDeep],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 124, height: 124)
-                        .shadow(color: KLTokens.pitch.opacity(0.35), radius: 20, x: 0, y: 16)
-
-                    VStack(spacing: 0) {
-                        KLIcon(name: "soccerball.inverse", size: 50, color: .white)
-                            .padding(.bottom, 6)
-                        TimelineMark()
-                    }
-                }
-                .padding(.bottom, 28)
+                // KickLog 앱 아이콘 (Assets.xcassets/KickLogIcon — 앱 아이콘과 동일 비주얼).
+                Image("KickLogIcon")
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 124, height: 124)
+                    .clipShape(RoundedRectangle(cornerRadius: 28))
+                    .shadow(color: KLTokens.pitch.opacity(0.35), radius: 20, x: 0, y: 16)
+                    .padding(.bottom, 28)
 
                 Text("KickLog")
                     .font(.system(size: 38, weight: .heavy))
@@ -77,24 +71,6 @@ private struct OnboardPage1: View {
             Spacer()
             bottomControls(currentPage: $currentPage, totalPages: 4)
         }
-    }
-}
-
-// 작은 타임라인 마크 (페이지 1 아이콘용)
-private struct TimelineMark: View {
-    var body: some View {
-        ZStack {
-            Rectangle()
-                .fill(.white)
-                .frame(width: 60, height: 3)
-                .clipShape(Capsule())
-            HStack(spacing: 20) {
-                Circle().fill(.white).frame(width: 6, height: 6)
-                Circle().fill(KLTokens.amber).frame(width: 6, height: 6)
-                Circle().fill(.white).frame(width: 6, height: 6)
-            }
-        }
-        .frame(width: 60)
     }
 }
 
@@ -271,16 +247,21 @@ private struct WatchIllustration: View {
 private struct OnboardPage3: View {
     @Binding var currentPage: Int
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var scheme
     @Query private var users: [User]
     @State private var signInErrorMessage: String?
     @State private var isSigningIn: Bool = false
     @State private var showDeletedAccountRecovery: Bool = false
 
+    // Apple HIG — 라이트 UI 는 검정 버튼 + 흰 글자, 다크 UI 는 흰 버튼 + 검정 글자.
+    // 기존 검정 고정은 다크모드에서 배경(KLTokens.bg)과 동일해 버튼 경계가 사라지는 문제가 있었음.
+    private var appleButtonBackground: Color { scheme == .dark ? .white : .black }
+    private var appleButtonForeground: Color { scheme == .dark ? .black : .white }
+
     var body: some View {
         VStack {
             Spacer().frame(height: 30)
-            SoccerFieldIllustration()
-                .frame(width: 220, height: 120)
+            OnboardingPlayerIllustration()
                 .padding(.bottom, 22)
 
             Text("시작하기")
@@ -296,18 +277,18 @@ private struct OnboardPage3: View {
                 Button(action: handleAppleSignIn) {
                     HStack(spacing: 8) {
                         if isSigningIn {
-                            ProgressView().tint(.white)
+                            ProgressView().tint(appleButtonForeground)
                         } else {
-                            KLIcon(name: "apple.logo", size: 20, color: .white)
+                            KLIcon(name: "apple.logo", size: 20, color: appleButtonForeground)
                             Text("Apple로 시작하기")
                                 .font(.system(size: 17, weight: .semibold))
                                 .tracking(-0.3)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(appleButtonForeground)
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .background(.black, in: RoundedRectangle(cornerRadius: 14))
+                    .background(appleButtonBackground, in: RoundedRectangle(cornerRadius: 14))
                 }
                 .buttonStyle(.plain)
                 .disabled(isSigningIn)
@@ -442,31 +423,20 @@ private extension APIError {
     }
 }
 
-// 축구장 그라디언트 일러스트
-private struct SoccerFieldIllustration: View {
+// Page 3 일러스트 — figure.soccer SF Symbol + pitch 그라디언트.
+// 가입 시작 시점에 "사람이 뛰는 활동" 메타포 — Page 1(로고) / Page 2(워치) 와 다양성.
+private struct OnboardingPlayerIllustration: View {
     var body: some View {
-        GeometryReader { proxy in
-            let w = proxy.size.width
-            let h = proxy.size.height
-
-            // 필드 배경
-            RoundedRectangle(cornerRadius: 6)
+        ZStack {
+            Circle()
                 .fill(LinearGradient(colors: [KLTokens.pitch, KLTokens.pitchDeep],
-                                     startPoint: .top, endPoint: .bottom))
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: 160, height: 160)
+                .shadow(color: KLTokens.pitch.opacity(0.35), radius: 24, x: 0, y: 14)
 
-            // 라인들
-            Path { path in
-                // 중앙선
-                path.move(to: CGPoint(x: w / 2, y: 0))
-                path.addLine(to: CGPoint(x: w / 2, y: h))
-                // 중앙 원
-                path.addEllipse(in: CGRect(x: w / 2 - 18, y: h / 2 - 18, width: 36, height: 36))
-                // 좌측 페널티
-                path.addRect(CGRect(x: 0, y: h * 0.32, width: 22, height: h * 0.4))
-                // 우측 페널티
-                path.addRect(CGRect(x: w - 22, y: h * 0.32, width: 22, height: h * 0.4))
-            }
-            .stroke(.white.opacity(0.7), lineWidth: 1.2)
+            Image(systemName: "figure.soccer")
+                .font(.system(size: 88, weight: .medium))
+                .foregroundStyle(.white)
         }
     }
 }
