@@ -33,6 +33,10 @@ final class WorkoutImporter {
             return
         }
 
+        // 이전 빌드에서 import 됐던 가입일 이전 미라벨 매치 일괄 정리 (idempotent).
+        // 라벨링 완료한 매치는 사용자가 직접 결정 — 매치 상세 → 삭제 (DELETE /matches/{id}).
+        cleanupPreSignupUnlabeledMatches(signupDate: signupDate)
+
         let workoutType = HKObjectType.workoutType()
         let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
             HKQuery.predicateForWorkouts(with: .soccer),
@@ -112,6 +116,24 @@ final class WorkoutImporter {
     private func currentUserSignupDate() -> Date? {
         let descriptor = FetchDescriptor<User>()
         return (try? modelContext.fetch(descriptor))?.first?.createdAt
+    }
+
+    // MARK: - 가입일 이전 미라벨 매치 cleanup
+
+    // 가입일 이전에 시작된 라벨링 안 한 매치를 일괄 삭제.
+    // Match.quarters 는 @Relationship(deleteRule: .cascade) 라 연관 QuarterWorkout 도 자동 정리.
+    // 라벨링 완료한 매치(labeledAt != nil)는 의도적 데이터라 그대로 둔다 — 사용자가 매치 상세에서
+    // 직접 삭제 (DELETE /matches/{id} 백엔드 sync 포함) 여부를 결정.
+    private func cleanupPreSignupUnlabeledMatches(signupDate: Date) {
+        let descriptor = FetchDescriptor<Match>(
+            predicate: #Predicate { $0.labeledAt == nil && $0.playedAt < signupDate }
+        )
+        guard let matches = try? modelContext.fetch(descriptor), !matches.isEmpty else { return }
+        for match in matches {
+            modelContext.delete(match)
+        }
+        try? modelContext.save()
+        print("WorkoutImporter: 가입일 이전 미라벨 매치 \(matches.count)건 정리")
     }
 
     // MARK: - anchor 영속화
