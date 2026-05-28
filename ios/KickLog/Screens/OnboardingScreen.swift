@@ -98,40 +98,116 @@ private struct TimelineMark: View {
     }
 }
 
-// MARK: - Page 2: Watch 안내
+// MARK: - Page 2: Watch 안내 (쿼터 단위 사용법 + Soccer 강조)
 
 private struct OnboardPage2: View {
     @Binding var currentPage: Int
 
     var body: some View {
-        VStack {
-            Spacer().frame(height: 40)
-            WatchIllustration()
-                .padding(.bottom, 22)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 0) {
+                    Spacer().frame(height: 24)
+                    WatchIllustration()
+                        .padding(.bottom, 16)
 
-            Text("워치가 모든 걸 기록해요")
-                .font(.system(size: 26, weight: .heavy))
-                .tracking(-0.8)
-                .foregroundStyle(KLTokens.text)
-                .multilineTextAlignment(.center)
-                .padding(.bottom, 12)
+                    Text("워치가 모든 걸 기록해요")
+                        .font(.system(size: 24, weight: .heavy))
+                        .tracking(-0.8)
+                        .foregroundStyle(KLTokens.text)
+                        .multilineTextAlignment(.center)
+                        .padding(.bottom, 14)
 
-            VStack(spacing: 0) {
-                Text("워치 운동 앱에서 ")
-                    .foregroundStyle(KLTokens.textSec)
-                + Text("Soccer").bold().foregroundStyle(KLTokens.text)
-                + Text("를 선택해 시작/종료만 하면 됩니다. 폰은 그 사이 가만히 있어도 돼요.")
-                    .foregroundStyle(KLTokens.textSec)
+                    SoccerWarningBox()
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 16)
+
+                    QuarterUsageSteps()
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 24)
+                }
             }
-            .font(.system(size: 15, weight: .medium))
-            .lineSpacing(4)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 32)
-            .frame(maxWidth: 320)
-
-            Spacer()
             bottomControls(currentPage: $currentPage, totalPages: 4)
         }
+    }
+}
+
+// ⚠ 주의 박스 — 워치에서 Soccer 외 종목은 KickLog 가 import 하지 않음 (WorkoutImporter.predicateForWorkouts(.soccer)).
+private struct SoccerWarningBox: View {
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            KLIcon(name: "exclamationmark.triangle.fill", size: 18, color: KLTokens.amber)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 4) {
+                (Text("반드시 ") + Text("Soccer (축구)").bold() + Text(" 선택"))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(KLTokens.text)
+                Text("다른 종목(Running 등)은 KickLog 에 잡히지 않아요.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(KLTokens.textSec)
+                    .lineSpacing(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            (scheme == .dark ? KLTokens.amber.opacity(0.12) : Color(hex: 0xFFF8E6)),
+            in: RoundedRectangle(cornerRadius: 12)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(KLTokens.amber.opacity(0.35), lineWidth: 1)
+        )
+    }
+}
+
+// 1~4 쿼터 단위 사용법. 한 경기 = 1~4개의 Soccer Workout 이라는 모델을 단계로 풀어냄.
+private struct QuarterUsageSteps: View {
+    private let steps: [(title: String, sub: String)] = [
+        ("워치 운동 앱 → Soccer 선택", "쿼터를 시작할 때마다 새 운동으로 시작합니다"),
+        ("쿼터 시작 시 시작, 쿼터 끝나면 정지", "출전한 쿼터만 기록하면 됩니다"),
+        ("다음 쿼터마다 다시 Soccer 새 운동", "1~4쿼터 반복 — 쿼터당 1개의 운동"),
+        ("경기 후 폰을 열면 자동으로 묶임", "같은 날·연속된 쿼터를 한 경기로 인식합니다"),
+    ]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                HStack(alignment: .top, spacing: 12) {
+                    ZStack {
+                        Circle().fill(KLTokens.pitch).frame(width: 24, height: 24)
+                        Text("\(index + 1)")
+                            .font(.system(size: 13, weight: .bold).monospacedDigit())
+                            .foregroundStyle(.white)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(step.title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .tracking(-0.2)
+                            .foregroundStyle(KLTokens.text)
+                        Text(step.sub)
+                            .font(.system(size: 12))
+                            .foregroundStyle(KLTokens.textSec)
+                            .lineSpacing(2)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .overlay(alignment: .bottom) {
+                    if index != steps.count - 1 {
+                        Rectangle()
+                            .fill(KLTokens.sep)
+                            .frame(height: 0.5)
+                            .padding(.leading, 50)
+                    }
+                }
+            }
+        }
+        .background(KLTokens.bgElev, in: RoundedRectangle(cornerRadius: KLTokens.radiusCard))
     }
 }
 
