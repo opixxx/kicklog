@@ -25,9 +25,23 @@ final class WorkoutImporter {
 
     // 새 Soccer 워크아웃을 페치 → 분석 → SwiftData 저장 → 자동 그룹핑.
     // anchor 기반 incremental — 이미 처리한 워크아웃은 다시 안 옴.
+    // 가입일 이전 워크아웃은 import 하지 않음 — 옛 백데이터로 라벨링 대기 큐가 오염되지 않도록.
     func importNewSoccerWorkouts() async {
+        // User 가 SwiftData 에 아직 영속화되기 전이면 import 건너뜀 (가입일 기준 없음).
+        guard let signupDate = currentUserSignupDate() else {
+            print("WorkoutImporter: User 미존재 — import 건너뜀 (가입 완료 후 재호출)")
+            return
+        }
+
+        // 이전 빌드에서 import 됐던 가입일 이전 미라벨 매치 일괄 정리 (idempotent).
+        // 라벨링 완료한 매치는 사용자가 직접 결정 — 매치 상세 → 삭제 (DELETE /matches/{id}).
+        cleanupPreSignupUnlabeledMatches(signupDate: signupDate)
+
         let workoutType = HKObjectType.workoutType()
-        let predicate = HKQuery.predicateForWorkouts(with: .soccer)
+        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            HKQuery.predicateForWorkouts(with: .soccer),
+            HKQuery.predicateForSamples(withStart: signupDate, end: nil, options: .strictStartDate),
+        ])
         let anchor = await loadAnchor()
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -94,6 +108,32 @@ final class WorkoutImporter {
 
         // 자동 그룹핑 (Phase D)
         await grouper.assignToMatch(quarter)
+    }
+
+    // MARK: - 가입일 조회
+
+    // SwiftData 에 영속화된 본인 User.createdAt 반환. 1단말 MVP 라 첫 행 신뢰.
+    private func currentUserSignupDate() -> Date? {
+        let descriptor = FetchDescriptor<User>()
+        return (try? modelContext.fetch(descriptor))?.first?.createdAt
+    }
+
+    // MARK: - 가입일 이전 미라벨 매치 cleanup
+
+    // 가입일 이전에 시작된 라벨링 안 한 매치를 일괄 삭제.
+    // Match.quarters 는 @Relationship(deleteRule: .cascade) 라 연관 QuarterWorkout 도 자동 정리.
+    // 라벨링 완료한 매치(labeledAt != nil)는 의도적 데이터라 그대로 둔다 — 사용자가 매치 상세에서
+    // 직접 삭제 (DELETE /matches/{id} 백엔드 sync 포함) 여부를 결정.
+    private func cleanupPreSignupUnlabeledMatches(signupDate: Date) {
+        let descriptor = FetchDescriptor<Match>(
+            predicate: #Predicate { $0.labeledAt == nil && $0.playedAt < signupDate }
+        )
+        guard let matches = try? modelContext.fetch(descriptor), !matches.isEmpty else { return }
+        for match in matches {
+            modelContext.delete(match)
+        }
+        try? modelContext.save()
+        print("WorkoutImporter: 가입일 이전 미라벨 매치 \(matches.count)건 정리")
     }
 
     // MARK: - anchor 영속화
