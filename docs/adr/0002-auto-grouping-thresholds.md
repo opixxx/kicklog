@@ -38,11 +38,18 @@ ADR-0001 D6에서 "자동 그룹핑 + 사용자 확정 체크박스" 결정. ADR
   - 200m는 인접 공원 운동장도 묶일 위험
   - **Haversine 공식** 사용 (iOS `CLLocation.distance(from:)`)
 
-### D3. GPS Route가 없는 경우 — **새 Match 생성 (보수적)**
+### D3. GPS Route가 없는 경우 — **시간 임계만으로 같은 Match (개정 2026-05-28)**
 
-- HealthKit `HKWorkoutRoute`가 없는 경우 (사용자가 워치 GPS 권한 거부 등):
-  - 시간 임계 만족해도 **위치 매칭 불가** → 새 Match 생성
-  - MVP는 사용자가 라벨링 시점에 수동으로 매칭 가능 (v1.1)
+- HealthKit `HKWorkoutRoute`가 한쪽이라도 없는 경우:
+  - 시간 임계(90분) 만족하면 **같은 Match로 묶음**
+  - 양쪽 다 GPS 가 있을 때만 100m 거리 검증 (옆 코트 동시간 케이스 방어)
+  - 잘못 묶인 경우 라벨링 화면 D5 토글("이 쿼터는 별도 경기")로 분리
+
+**개정 사유 (2026-05-28 실측):**
+- Apple Watch **자동 감지** 워크아웃은 `HKWorkoutRoute` 가 거의 항상 비어있음 (수동 시작/종료해도 야간·실내·짧은 워크아웃에서 Route 미생성 빈번)
+- 초기 D3("GPS 없으면 새 Match")는 정상 시나리오에서도 매번 분리 → 5/28 테스트에서 1·2·4쿼터가 3개 별도 Match 로 생성됨
+- 90분 시간 임계 자체가 충분히 보수적 — 사용자가 90분 안에 다른 운동장에서 또 축구할 확률은 매우 낮음
+- 잘못 묶인 케이스는 D5 수동 분리로 폴백 (이미 MVP 에 포함된 안전장치)
 
 ### D4. 알고리즘 위치 — **iOS 클라이언트**
 
@@ -106,15 +113,16 @@ class WorkoutGrouper {
             let timeDelta = quarter.startedAt.timeIntervalSince(lastQuarter.endedAt)
             guard timeDelta >= 0 && timeDelta <= timeThresholdSeconds else { continue }
             
-            // 2. 위치 임계 (GPS route 없으면 매칭 실패 → 새 Match)
-            guard let newCoord = await fetchFirstCoord(uuid: quarter.sourceWorkoutUUID),
-                  let lastCoord = await fetchFirstCoord(uuid: lastQuarter.sourceWorkoutUUID) else {
-                continue
+            // 2. 위치 임계 (양쪽 다 GPS 있을 때만 거리 검증, D3 개정)
+            let newCoord = await fetchFirstCoord(uuid: quarter.sourceWorkoutUUID)
+            let lastCoord = await fetchFirstCoord(uuid: lastQuarter.sourceWorkoutUUID)
+            if let newCoord, let lastCoord {
+                let distance = newCoord.distance(from: lastCoord)
+                guard distance <= distanceThresholdMeters else { continue }
+                return match
             }
             
-            let distance = newCoord.distance(from: lastCoord)
-            guard distance <= distanceThresholdMeters else { continue }
-            
+            // GPS 한쪽이라도 부재 — 시간만으로 매칭 (D3 개정)
             return match
         }
         return nil
@@ -133,7 +141,7 @@ class WorkoutGrouper {
 | 1쿼터만 뛰고 집에 감, 다음 주 같은 운동장 경기 | 시간 임계(1주) 초과 → 별도 Match ✅ |
 | 같은 운동장 오전 9시 / 오후 2시 두 경기 | 시간 5시간 차이 → 별도 Match ✅ |
 | 옆 코트(50m 떨어진)에서 같은 시간대 경기 | 위치 50m → 100m 이내 → **같은 Match로 잘못 묶일 위험** ⚠️ (드물지만 사용자가 라벨링 시 분리 가능) |
-| GPS 권한 거부 → route 없음 | 매번 별도 Match → 사용자 라벨링 시 수동 매칭 (v1.1) |
+| GPS 권한 거부 / 자동감지 → route 없음 | **시간 임계만으로 같은 Match (D3 개정)** ✅ |
 | 첫 좌표가 라커룸 (운동장에서 80m 떨어진) | 두 번째 쿼터부터는 운동장 내 좌표 → 라커룸 좌표와 100m 차이 → 분리 위험 ⚠️ |
 | 운동장이 200×100m로 큼 (대형 공원) | 한쪽 끝 ~ 반대쪽 끝 거리 ~ 200m → 동일 경기인데 분리 위험. v1.1에 venue 등록 기반 매칭으로 보완. |
 
@@ -174,3 +182,4 @@ class WorkoutGrouper {
 | 날짜 | 변경 | 사유 |
 |---|---|---|
 | 2026-05-21 | 초기 작성 | grill-me 인터뷰 D1 (시간 90분 + 위치 100m) |
+| 2026-05-28 | D3 개정 — GPS 부재 시 시간만으로 매칭 | 실측 결과 자동감지 워크아웃의 GPS Route 가 거의 항상 비어있어 1·2·4쿼터가 3개 별도 Match 로 생성된 케이스 발생. 90분 임계만으로도 충분히 보수적이라 판단. |

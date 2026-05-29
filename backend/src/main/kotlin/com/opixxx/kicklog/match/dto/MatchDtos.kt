@@ -114,6 +114,10 @@ data class UpsertQuarterRequest(
     @field:DecimalMin(value = "0.0", message = "평균 속도는 0 이상이어야 합니다")
     val avgSpeedKmh: Double = 0.0,
 
+    // ADR-0001 D8 (2026-05-29 개정) — 쿼터별 최고속도. iOS distance 샘플 기반 derive + 35 km/h cap.
+    @field:DecimalMin(value = "0.0", message = "최고 속도는 0 이상이어야 합니다")
+    val maxSpeedKmh: Double = 0.0,
+
     @field:Min(value = 0, message = "평균 심박은 0 이상이어야 합니다")
     val avgHeartRate: Int = 0,
 
@@ -135,6 +139,7 @@ data class UpsertQuarterRequest(
             durationSeconds = durationSeconds,
             distanceM = distanceM,
             avgSpeedKmh = avgSpeedKmh,
+            maxSpeedKmh = maxSpeedKmh,
             avgHeartRate = avgHeartRate,
             maxHeartRate = maxHeartRate,
             sprintCount = sprintCount,
@@ -235,6 +240,8 @@ data class QuarterWorkoutResponse(
     val durationSeconds: Int,
     val distanceM: Int,
     val avgSpeedKmh: Double,
+    // ADR-0001 D8 (2026-05-29 개정) — 쿼터별 최고속도.
+    val maxSpeedKmh: Double,
     val avgHeartRate: Int?,
     val maxHeartRate: Int?,
     val sprintCount: Int,
@@ -250,6 +257,7 @@ data class QuarterWorkoutResponse(
                 durationSeconds = quarter.durationSeconds,
                 distanceM = quarter.distanceM,
                 avgSpeedKmh = quarter.avgSpeedKmh,
+                maxSpeedKmh = quarter.maxSpeedKmh,
                 avgHeartRate = quarter.avgHeartRate,
                 maxHeartRate = quarter.maxHeartRate,
                 sprintCount = quarter.sprintCount,

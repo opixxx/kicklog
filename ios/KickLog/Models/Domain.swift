@@ -139,6 +139,7 @@ final class QuarterWorkout {
     // 쿼터별 집계 (ADR-0004 D8 캐시)
     var distanceM: Int
     var avgSpeedKmh: Double
+    var maxSpeedKmh: Double
     var avgHeartRate: Int
     var maxHeartRate: Int
     var sprintCount: Int
@@ -155,6 +156,7 @@ final class QuarterWorkout {
         durationSeconds: Int,
         distanceM: Int = 0,
         avgSpeedKmh: Double = 0,
+        maxSpeedKmh: Double = 0,
         avgHeartRate: Int = 0,
         maxHeartRate: Int = 0,
         sprintCount: Int = 0,
@@ -169,6 +171,7 @@ final class QuarterWorkout {
         self.durationSeconds = durationSeconds
         self.distanceM = distanceM
         self.avgSpeedKmh = avgSpeedKmh
+        self.maxSpeedKmh = maxSpeedKmh
         self.avgHeartRate = avgHeartRate
         self.maxHeartRate = maxHeartRate
         self.sprintCount = sprintCount

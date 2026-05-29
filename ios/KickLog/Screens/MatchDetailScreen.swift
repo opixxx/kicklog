@@ -203,8 +203,8 @@ struct MatchDetailScreen: View {
             if !sortedQuarters.isEmpty {
                 VStack(spacing: 10) {
                     KLBarChart(
-                        title: "평균 속도", unit: "km/h",
-                        values: sortedQuarters.map(\.avgSpeedKmh),
+                        title: "이동거리", unit: "km",
+                        values: sortedQuarters.map { Double($0.distanceM) / 1000.0 },
                         labels: quarterLabels
                     )
                     .klCard()
@@ -231,6 +231,22 @@ struct MatchDetailScreen: View {
                     .foregroundStyle(KLTokens.textSec)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)
+            }
+
+            // 쿼터별 상세 카드 — 출전 쿼터마다 6 metric (운동시간/이동거리/최고속도/평균심박/최고심박/kcal)
+            if !sortedQuarters.isEmpty {
+                Text("쿼터별 상세")
+                    .font(KLFont.sectionTitle())
+                    .tracking(-0.5)
+                    .foregroundStyle(KLTokens.text)
+                    .padding(.top, 24)
+                    .padding(.bottom, 10)
+
+                VStack(spacing: 10) {
+                    ForEach(sortedQuarters, id: \.persistentModelID) { quarter in
+                        quarterDetailCard(quarter)
+                    }
+                }
             }
 
             Text("상세 정보")
@@ -275,6 +291,62 @@ struct MatchDetailScreen: View {
             .fill(KLTokens.bg)
         )
         .offset(y: -28)
+    }
+
+    // MARK: - Quarter detail card (출전 쿼터별 6 metric)
+
+    private func quarterDetailCard(_ quarter: QuarterWorkout) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Q\(quarter.quarterNo)")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(KLTokens.text)
+                Spacer()
+            }
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)],
+                spacing: 12
+            ) {
+                quarterMetric(label: "운동시간",
+                              value: durationLabel(quarter.durationSeconds), unit: "")
+                quarterMetric(label: "이동거리",
+                              value: String(format: "%.1f", Double(quarter.distanceM) / 1000.0), unit: "km")
+                quarterMetric(label: "최고속도",
+                              value: String(format: "%.1f", quarter.maxSpeedKmh), unit: "km/h")
+                quarterMetric(label: "평균심박",
+                              value: "\(quarter.avgHeartRate)", unit: "bpm")
+                quarterMetric(label: "최고심박",
+                              value: "\(quarter.maxHeartRate)", unit: "bpm")
+                quarterMetric(label: "에너지",
+                              value: "\(quarter.activeEnergyKcal)", unit: "kcal")
+            }
+        }
+        .klCard()
+    }
+
+    private func quarterMetric(label: String, value: String, unit: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundStyle(KLTokens.textSec)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(value)
+                    .font(.system(size: 17, weight: .bold).monospacedDigit())
+                    .foregroundStyle(KLTokens.text)
+                if !unit.isEmpty {
+                    Text(unit)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(KLTokens.textSec)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func durationLabel(_ seconds: Int) -> String {
+        let m = seconds / 60
+        let s = seconds % 60
+        return String(format: "%d:%02d", m, s)
     }
 
     // MARK: - Derived display

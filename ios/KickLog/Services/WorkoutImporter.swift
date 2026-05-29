@@ -98,6 +98,7 @@ final class WorkoutImporter {
             durationSeconds: Int(workout.duration),
             distanceM: metrics.distanceM,
             avgSpeedKmh: metrics.avgSpeedKmh,
+            maxSpeedKmh: metrics.maxSpeedKmh,
             avgHeartRate: metrics.avgHeartRate,
             maxHeartRate: metrics.maxHeartRate,
             sprintCount: metrics.sprintCount,

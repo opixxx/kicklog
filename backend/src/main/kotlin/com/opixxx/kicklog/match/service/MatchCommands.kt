@@ -27,6 +27,8 @@ data class UpsertQuarterCommand(
     val durationSeconds: Int = 0,
     val distanceM: Int = 0,
     val avgSpeedKmh: Double = 0.0,
+    // ADR-0001 D8 (2026-05-29 개정) — 쿼터별 최고속도. iOS distance 샘플 기반 derive + 35 km/h cap.
+    val maxSpeedKmh: Double = 0.0,
     val avgHeartRate: Int = 0,
     val maxHeartRate: Int = 0,
     val sprintCount: Int = 0,

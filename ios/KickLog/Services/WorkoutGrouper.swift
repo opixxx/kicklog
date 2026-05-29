@@ -4,7 +4,9 @@ import CoreLocation
 import SwiftData
 
 // ADR-0002 — 90분 시간 임계 + 100m 위치 임계로 QuarterWorkout 들을 Match 에 묶는다.
-// GPS Route 없으면 새 Match 보수 생성 (D3).
+// D3 (2026-05-28 개정): 한쪽이라도 GPS Route 가 없으면 시간 임계만으로 같은 Match 에 묶는다.
+// (자동감지 워크아웃은 GPS Route 가 거의 항상 비어있어 기존 보수 정책은 매번 새 Match 만 만들었음)
+// 잘못 묶인 경우 라벨링 화면의 "이 쿼터는 별도 경기" 토글(D5)로 분리.
 @MainActor
 final class WorkoutGrouper {
     // ADR-0002 D1/D2 임계값
@@ -49,18 +51,19 @@ final class WorkoutGrouper {
             let gap = quarter.startedAt.timeIntervalSince(mostRecentEnd)
             guard gap >= 0 && gap <= Self.timeThresholdSeconds else { continue }
 
-            // 2) 위치 임계 — 양쪽 다 GPS 있을 때만 매칭
+            // 2) 위치 임계 — 양쪽 다 GPS 가 있을 때만 거리로 검증
             if let newLocation, let candidateLocation = await firstLocationForMatch(candidate) {
                 let distance = newLocation.distance(from: candidateLocation)
                 if distance <= Self.distanceThresholdMeters {
                     return candidate
                 }
-                // GPS 가 있는데 멀면 다른 운동장 → 새 Match
+                // GPS 양쪽 다 있는데 100m 초과 → 다른 운동장
                 continue
             }
 
-            // D3: GPS 없으면 보수적으로 새 Match — candidate 못 매칭
-            // (단, 양쪽 다 GPS 없는 경우는 시간만으로 합칠지 결정. MVP 는 합치지 않음)
+            // D3 (개정): 한쪽이라도 GPS 부재 — 시간 임계만 통과해도 같은 Match.
+            // 잘못 묶이면 라벨링 화면 D5 토글로 사용자가 분리.
+            return candidate
         }
         return nil
     }
@@ -132,7 +135,8 @@ extension Match {
     func recalculateHeadlineMetrics() {
         guard !quarters.isEmpty else { return }
         totalDistanceM = quarters.reduce(0) { $0 + $1.distanceM }
-        maxSpeedKmh = quarters.map(\.avgSpeedKmh).max() ?? 0
+        // 진짜 최고속도 — 각 쿼터의 구간별 max 중 max (단일 쿼터에서도 avg 와 분리)
+        maxSpeedKmh = quarters.map(\.maxSpeedKmh).max() ?? 0
         sprintCount = quarters.reduce(0) { $0 + $1.sprintCount }
         let totalDuration = quarters.reduce(0) { $0 + $1.durationSeconds }
         if totalDuration > 0 {

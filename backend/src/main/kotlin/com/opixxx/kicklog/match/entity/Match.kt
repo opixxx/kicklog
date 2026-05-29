@@ -142,6 +142,7 @@ class Match(
                     durationSeconds = it.durationSeconds,
                     distanceM = it.distanceM,
                     avgSpeedKmh = it.avgSpeedKmh,
+                    maxSpeedKmh = it.maxSpeedKmh,
                     avgHeartRate = it.avgHeartRate,
                     maxHeartRate = it.maxHeartRate,
                     sprintCount = it.sprintCount,
