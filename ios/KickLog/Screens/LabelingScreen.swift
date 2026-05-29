@@ -14,8 +14,8 @@ struct LabelingScreen: View {
         match.quarters.sorted { $0.startedAt < $1.startedAt }
     }
 
-    // 폼 상태
-    @State private var selectedQuarterIDs: Set<PersistentIdentifier> = []
+    // 폼 상태 — 사용자가 출전한 쿼터 번호 (1~4). 시간순 워크아웃이 정렬된 체크 쿼터에 자동 매핑.
+    @State private var selectedQuarterNumbers: Set<Int> = []
     @State private var opponent: String = ""
     @State private var position: String = "MF"
     @State private var userGoals: Int = 0
@@ -74,9 +74,12 @@ struct LabelingScreen: View {
             }
         }
         .sheet(item: $trimTargetQuarter) { quarter in
-            let index = (detectedQuarters.firstIndex { $0.persistentModelID == quarter.persistentModelID } ?? 0) + 1
+            // 매핑된 quarterNo 찾기 — 시간순 워크아웃 index 위치의 selectedQuarterNumbers 정렬값
+            let workoutIndex = detectedQuarters.firstIndex { $0.persistentModelID == quarter.persistentModelID } ?? 0
+            let sortedSelected = selectedQuarterNumbers.sorted()
+            let label = (workoutIndex < sortedSelected.count) ? "Q\(sortedSelected[workoutIndex])" : "Q?"
             TrimSheet(
-                label: "Q\(index)",
+                label: label,
                 detectedStart: quarter.startedAt,
                 detectedEnd: quarter.endedAt
             ) { newStart, newEnd in
@@ -96,8 +99,15 @@ struct LabelingScreen: View {
     // MARK: - 초기 상태
 
     private func loadInitialState() {
-        // 라벨링 화면 진입 시 모든 감지 쿼터 default 선택
-        selectedQuarterIDs = Set(detectedQuarters.map(\.persistentModelID))
+        // 디폴트: 시간순 워크아웃 수만큼 앞 쿼터부터 선택 (예: 3개 → Q1·Q2·Q3).
+        // 기존 quarterNo (재라벨링 시) 가 있으면 그것 우선 복원.
+        let existingNumbers = detectedQuarters.compactMap { $0.quarterNo > 0 ? $0.quarterNo : nil }
+        if !existingNumbers.isEmpty {
+            selectedQuarterNumbers = Set(existingNumbers)
+        } else {
+            let count = min(detectedQuarters.count, 4)
+            selectedQuarterNumbers = count > 0 ? Set(1...count) : []
+        }
         opponent = match.opponentName ?? ""
         position = match.position ?? "MF"
         userGoals = match.userGoals ?? 0
@@ -174,24 +184,20 @@ struct LabelingScreen: View {
 
     private var quartersSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader("내가 뛴 쿼터 · 출전한 쿼터만 체크하세요")
+            sectionHeader("내가 뛴 쿼터 · 출전한 쿼터만 체크하세요 (체크 수 = 워크아웃 수)")
             HStack(spacing: 8) {
-                ForEach(Array(detectedQuarters.enumerated()), id: \.element.persistentModelID) { index, quarter in
-                    let label = "Q\(index + 1)"
-                    let minutes = Int(quarter.durationSeconds / 60)
-                    let isSelected = selectedQuarterIDs.contains(quarter.persistentModelID)
-                    let isOvertime = quarter.durationSeconds > 30 * 60
+                ForEach(1...4, id: \.self) { quarterNo in
+                    let mapped = mappedWorkout(forQuarter: quarterNo)
+                    let minutes = mapped.map { Int($0.durationSeconds / 60) } ?? 0
+                    let isSelected = selectedQuarterNumbers.contains(quarterNo)
+                    let isOvertime = (mapped?.durationSeconds ?? 0) > 30 * 60
                     let state: KLQuarterChip.State =
                         isSelected
                         ? (isOvertime ? .warn : .on)
                         : .off
-                    KLQuarterChip(quarter: label, minutes: minutes, state: state) {
-                        toggleQuarter(quarter)
+                    KLQuarterChip(quarter: "Q\(quarterNo)", minutes: minutes, state: state) {
+                        toggleQuarter(quarterNo)
                     }
-                }
-                // 4개 미만이면 placeholder 칸으로 너비 균형
-                ForEach(detectedQuarters.count..<4, id: \.self) { _ in
-                    Color.clear.frame(maxWidth: .infinity, minHeight: 78)
                 }
             }
             .padding(.horizontal, 16)
@@ -199,33 +205,48 @@ struct LabelingScreen: View {
         }
     }
 
-    private func toggleQuarter(_ quarter: QuarterWorkout) {
-        if selectedQuarterIDs.contains(quarter.persistentModelID) {
-            selectedQuarterIDs.remove(quarter.persistentModelID)
+    // 선택된 쿼터들 (정렬) 의 i 번째 = 시간순 워크아웃의 i 번째. 그 매핑된 워크아웃 반환.
+    private func mappedWorkout(forQuarter quarterNo: Int) -> QuarterWorkout? {
+        guard selectedQuarterNumbers.contains(quarterNo) else { return nil }
+        let sortedSelected = selectedQuarterNumbers.sorted()
+        guard let mapIndex = sortedSelected.firstIndex(of: quarterNo) else { return nil }
+        guard mapIndex < detectedQuarters.count else { return nil }
+        return detectedQuarters[mapIndex]
+    }
+
+    private func toggleQuarter(_ quarterNo: Int) {
+        if selectedQuarterNumbers.contains(quarterNo) {
+            selectedQuarterNumbers.remove(quarterNo)
         } else {
-            selectedQuarterIDs.insert(quarter.persistentModelID)
+            // 워크아웃 수 초과해서 선택 불가 (매핑 못 함)
+            guard selectedQuarterNumbers.count < detectedQuarters.count else { return }
+            selectedQuarterNumbers.insert(quarterNo)
         }
     }
 
     // MARK: - 30분 초과 경고
 
-    private var overtimeQuarter: QuarterWorkout? {
-        detectedQuarters
-            .filter { selectedQuarterIDs.contains($0.persistentModelID) }
-            .first { $0.durationSeconds > 30 * 60 }
+    // 매핑된 워크아웃 중 30분 초과 첫 번째 — (매핑된 quarterNo, 워크아웃) 튜플.
+    private var overtimeMapping: (quarterNo: Int, workout: QuarterWorkout)? {
+        let sortedSelected = selectedQuarterNumbers.sorted()
+        for (mapIndex, qNo) in sortedSelected.enumerated() {
+            guard mapIndex < detectedQuarters.count else { break }
+            let w = detectedQuarters[mapIndex]
+            if w.durationSeconds > 30 * 60 {
+                return (qNo, w)
+            }
+        }
+        return nil
     }
 
     private var shouldShowOvertimeWarning: Bool {
-        overtimeQuarter != nil
+        overtimeMapping != nil
     }
 
     private var warningCard: some View {
-        let overtime = overtimeQuarter
-        let label = overtime.map { quarter in
-            let index = (detectedQuarters.firstIndex { $0.persistentModelID == quarter.persistentModelID } ?? 0) + 1
-            return "Q\(index)"
-        } ?? "Q?"
-        let minutes = overtime.map { Int($0.durationSeconds / 60) } ?? 0
+        let overtime = overtimeMapping
+        let label = overtime.map { "Q\($0.quarterNo)" } ?? "Q?"
+        let minutes = overtime.map { Int($0.workout.durationSeconds / 60) } ?? 0
         return HStack(alignment: .top, spacing: 12) {
             KLIcon(name: "exclamationmark.triangle.fill", size: 22, color: KLTokens.amber)
                 .padding(.top, 1)
@@ -240,7 +261,7 @@ struct LabelingScreen: View {
                     .lineSpacing(2)
 
                 Button {
-                    trimTargetQuarter = overtime
+                    trimTargetQuarter = overtime?.workout
                 } label: {
                     HStack(spacing: 4) {
                         Text("시간 조정")
@@ -373,27 +394,30 @@ struct LabelingScreen: View {
     // MARK: - 저장 가능 조건
 
     private var canSave: Bool {
-        // 최소 한 쿼터 선택 + 상대팀 이름 입력
-        !selectedQuarterIDs.isEmpty && !opponent.trimmingCharacters(in: .whitespaces).isEmpty
+        // 체크된 쿼터 수 == 감지된 워크아웃 수 (1:1 매핑 강제) + 상대팀 이름 입력
+        selectedQuarterNumbers.count == detectedQuarters.count
+            && !opponent.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     // MARK: - 저장 흐름
 
     private func save() {
-        // 1. 선택된 쿼터에 시간순 1,2,3,4 부여, 미선택은 0 + match relationship 해제
-        let sortedAll = detectedQuarters
-        let selectedSorted = sortedAll
-            .filter { selectedQuarterIDs.contains($0.persistentModelID) }
-            .sorted { $0.startedAt < $1.startedAt }
-
-        for (index, quarter) in selectedSorted.enumerated() {
-            quarter.quarterNo = index + 1
-            quarter.match = match
+        // 1. 시간순 워크아웃을 정렬된 selectedQuarterNumbers 와 1:1 매핑.
+        //    예: 워크아웃 3개 + 사용자가 Q1·Q2·Q4 체크 → 시간순 1→Q1, 2→Q2, 3→Q4.
+        let sortedSelected = selectedQuarterNumbers.sorted()
+        var matched: Set<PersistentIdentifier> = []
+        for (mapIndex, quarterNo) in sortedSelected.enumerated() {
+            guard mapIndex < detectedQuarters.count else { break }
+            let workout = detectedQuarters[mapIndex]
+            workout.quarterNo = quarterNo
+            workout.match = match
+            matched.insert(workout.persistentModelID)
         }
 
-        for quarter in sortedAll where !selectedQuarterIDs.contains(quarter.persistentModelID) {
-            quarter.quarterNo = 0
-            quarter.match = nil
+        // 매핑 안 된 워크아웃 (체크 수 < 워크아웃 수 인 경우 잉여) 은 분리.
+        for workout in detectedQuarters where !matched.contains(workout.persistentModelID) {
+            workout.quarterNo = 0
+            workout.match = nil
         }
 
         // 2. Match 메타 업데이트.

@@ -31,6 +31,7 @@ struct PutQuarterRequest: Encodable {
     let durationSeconds: Int
     let distanceM: Int
     let avgSpeedKmh: Double
+    let maxSpeedKmh: Double
     let avgHeartRate: Int
     let maxHeartRate: Int
     let sprintCount: Int
@@ -73,6 +74,7 @@ struct QuarterDetailResponse: Decodable {
     let durationSeconds: Int
     let distanceM: Int
     let avgSpeedKmh: Double
+    let maxSpeedKmh: Double
     let avgHeartRate: Int?
     let maxHeartRate: Int?
     let sprintCount: Int
@@ -330,6 +332,7 @@ extension Match {
                     durationSeconds: dto.durationSeconds,
                     distanceM: dto.distanceM,
                     avgSpeedKmh: dto.avgSpeedKmh,
+                    maxSpeedKmh: dto.maxSpeedKmh,
                     avgHeartRate: dto.avgHeartRate ?? 0,
                     maxHeartRate: dto.maxHeartRate ?? 0,
                     sprintCount: dto.sprintCount,
@@ -369,6 +372,7 @@ extension QuarterWorkout {
             durationSeconds: durationSeconds,
             distanceM: distanceM,
             avgSpeedKmh: avgSpeedKmh,
+            maxSpeedKmh: maxSpeedKmh,
             avgHeartRate: avgHeartRate,
             maxHeartRate: maxHeartRate,
             sprintCount: sprintCount,

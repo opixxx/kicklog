@@ -32,6 +32,8 @@ struct SettingsScreen: View {
     @State private var checkTask: Task<Void, Never>?
     #if DEBUG
     @State private var isSeedingWorkout: Bool = false
+    @State private var isResettingMatches: Bool = false
+    @State private var showResetConfirmation: Bool = false
     @State private var debugInfoMessage: String?
     #endif
 
@@ -75,6 +77,12 @@ struct SettingsScreen: View {
             Button("확인", role: .cancel) { debugInfoMessage = nil }
         } message: {
             Text(debugInfoMessage ?? "")
+        }
+        .alert("내 매치를 모두 삭제할까요?", isPresented: $showResetConfirmation) {
+            Button("취소", role: .cancel) {}
+            Button("삭제 + 리셋", role: .destructive) { handleResetMatches() }
+        } message: {
+            Text("백엔드/로컬 매치가 전부 삭제되고 HealthKit 워크아웃이 새 그룹핑 정책으로 재import됩니다.")
         }
         #endif
         .alert("계정을 삭제할까요?", isPresented: $showDeleteConfirmation) {
@@ -196,12 +204,23 @@ struct SettingsScreen: View {
                     KLSettingsRow(
                         labelOnly: isSeedingWorkout ? "시드 중..." : "테스트 워크아웃 시드",
                         sub: "동일 GPS 근방 4쿼터 (≈75분) 임의 데이터 생성",
+                        chevron: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isSeedingWorkout || isResettingMatches)
+
+                Button(action: { showResetConfirmation = true }) {
+                    KLSettingsRow(
+                        labelOnly: isResettingMatches ? "리셋 중..." : "내 매치 + anchor 리셋",
+                        sub: "백엔드/로컬 매치 전체 삭제 + HealthKit 재import",
                         chevron: false,
+                        destructive: true,
                         isLast: true
                     )
                 }
                 .buttonStyle(.plain)
-                .disabled(isSeedingWorkout)
+                .disabled(isSeedingWorkout || isResettingMatches)
             }
         }
     }
@@ -232,6 +251,48 @@ struct SettingsScreen: View {
             } catch {
                 settingsErrorMessage = "시드 실패: \(error.localizedDescription)"
             }
+        }
+    }
+
+    // 매치 전체 삭제 + HealthKit anchor 리셋 + Observer 재시작 → 새 정책으로 재import.
+    private func handleResetMatches() {
+        guard !isResettingMatches else { return }
+        Task { @MainActor in
+            isResettingMatches = true
+            defer { isResettingMatches = false }
+
+            // 1) 본인 Match 전체 삭제 (백엔드 + 로컬). 백엔드 실패해도 로컬은 정리.
+            let matches = (try? modelContext.fetch(FetchDescriptor<Match>())) ?? []
+            var deleted = 0
+            var backendFailed = 0
+            for match in matches {
+                do {
+                    try await MatchSyncService.shared.delete(match, in: modelContext)
+                    deleted += 1
+                } catch {
+                    modelContext.delete(match)
+                    backendFailed += 1
+                }
+            }
+
+            // 2) workoutAnchor 리셋 — 다음 import 가 전체 워크아웃을 다시 가져오게 함.
+            let anchorKey = "workoutAnchor"
+            let stateDescriptor = FetchDescriptor<HealthKitState>(
+                predicate: #Predicate { $0.key == anchorKey }
+            )
+            if let states = try? modelContext.fetch(stateDescriptor) {
+                for state in states { modelContext.delete(state) }
+            }
+            try? modelContext.save()
+
+            // 3) Observer 재시작 → importNewSoccerWorkouts 즉시 호출 + 새 그룹핑 정책 적용.
+            await HealthKitService.shared.startObserver(modelContext: modelContext)
+
+            let backendNote = backendFailed > 0 ? "\n백엔드 실패 \(backendFailed)건은 로컬만 정리" : ""
+            debugInfoMessage = """
+            매치 \(deleted)건 삭제\(backendNote)
+            anchor 리셋 → 워크아웃 재import 시작
+            """
         }
     }
     #endif

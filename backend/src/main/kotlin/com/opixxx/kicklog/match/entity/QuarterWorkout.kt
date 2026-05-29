@@ -43,6 +43,10 @@ class QuarterWorkout(
     @Column(name = "avg_speed_kmh", nullable = false)
     var avgSpeedKmh: Double = 0.0,
 
+    // ADR-0001 D8 (2026-05-29 개정) — 쿼터별 최고속도. iOS 가 distance 샘플 기반 derive + 35 km/h cap 적용한 값.
+    @Column(name = "max_speed_kmh", nullable = false)
+    var maxSpeedKmh: Double = 0.0,
+
     @Column(name = "avg_heart_rate", nullable = false)
     var avgHeartRate: Int = 0,
 
