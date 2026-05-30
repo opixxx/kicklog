@@ -1,0 +1,18 @@
+# 부하 테스트 전용 profile — 경로 B(nginx ↔ backend keep-alive lifecycle) 재현.
+#
+# server.tomcat.keep-alive-timeout 을 env 로 토글해 3막 상태를 만든다:
+#   S1 (비대칭, race 유발): TOMCAT_KEEPALIVE_TIMEOUT=1s   (< nginx 60s)
+#   S2 (예방):             TOMCAT_KEEPALIVE_TIMEOUT=80s   (> nginx 60s)
+#   (S0 = nginx upstream keepalive 자체를 끈 상태 — nginx conf 로 제어, backend 무관)
+#
+# DB·JWT·Kakao 설정은 base application.yml 의 env 기본값을 그대로 상속한다
+# (/loadtest/ping 은 DB 미접촉이지만, JPA validate + Flyway 부팅을 위해 postgres 는 필요).
+server:
+  tomcat:
+    keep-alive-timeout: ${TOMCAT_KEEPALIVE_TIMEOUT:20s}
+    max-keep-alive-requests: ${TOMCAT_MAX_KEEPALIVE_REQUESTS:100}
+
+logging:
+  level:
+    root: WARN
+    com.opixxx.kicklog: INFO

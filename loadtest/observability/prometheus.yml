@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 2s      # TIME_WAIT 은 빠르게 변하므로 촘촘히
+  evaluation_interval: 2s
+
+scrape_configs:
+  # nginx netns 의 node-exporter (nginx 측 TIME_WAIT)
+  - job_name: node-nginx
+    static_configs:
+      - targets: ['nginx:9100']
+        labels: { side: 'nginx' }
+
+  # backend netns 의 node-exporter (backend 측 TIME_WAIT)
+  - job_name: node-backend
+    static_configs:
+      - targets: ['backend:9101']
+        labels: { side: 'backend' }
+
+# k6 는 remote-write 로 푸시한다 (--web.enable-remote-write-receiver):
+#   K6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write k6 run -o experimental-prometheus-rw ...

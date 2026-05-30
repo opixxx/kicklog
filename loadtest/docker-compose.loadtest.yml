@@ -1,0 +1,46 @@
+# 경로 B 재현 환경 — k6 → nginx → backend (loopback keep-alive lifecycle)
+#
+# 토글 변수:
+#   NGINX_CONF               : ./nginx/no-keepalive.conf (S0) | ./nginx/keepalive.conf (S1/S2)
+#   TOMCAT_KEEPALIVE_TIMEOUT : 1s (S1 비대칭/race) | 80s (S2 예방) | 20s (기본)
+#
+# 실행 예 (자세한 절차는 README.md):
+#   NGINX_CONF=./nginx/no-keepalive.conf docker compose -f docker-compose.loadtest.yml up -d --build
+name: kicklog-loadtest
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: kicklog
+      POSTGRES_USER: kicklog
+      POSTGRES_PASSWORD: kicklog
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kicklog"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ../backend
+    environment:
+      SPRING_PROFILES_ACTIVE: loadtest
+      DB_URL: jdbc:postgresql://postgres:5432/kicklog
+      DB_USERNAME: kicklog
+      DB_PASSWORD: kicklog
+      # 3막 토글 — 비대칭(S1)이면 1s, 예방(S2)이면 80s
+      TOMCAT_KEEPALIVE_TIMEOUT: ${TOMCAT_KEEPALIVE_TIMEOUT:-20s}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"   # host 8080 → nginx 80 (k6 는 localhost:8080 으로 부하)
+    volumes:
+      # NGINX_CONF 로 S0(no-keepalive) ↔ S1/S2(keepalive) 토글
+      - ${NGINX_CONF:-./nginx/no-keepalive.conf}:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
