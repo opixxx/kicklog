@@ -29,10 +29,11 @@ KickLog 운영은 **nginx-on-box → Tomcat** 구조다 (ADR-0006 D2 "NAT/ALB �
 
 | 측정 | before | after | 비고 |
 |---|---|---|---|
-| **A. loopback TIME_WAIT** (200 RPS steady) | **~14,700** (nginx 10.6K + backend 7.2K) | **~122**, ESTAB 1개로 3만 요청 reuse | **99%↓** |
-| **C. 502 race** (간헐 burst, Tomcat 1s) | **0.05% (1/1,801)** + `upstream prematurely closed` 로그 | **0% (0/1,760)** | 비대칭 해소 |
+| **A. loopback TIME_WAIT** (200 RPS steady) | **nginx 10.6K + backend 7.24K** (합산 peak ~16K) | **~44** (nginx 1 + backend 43), ESTAB 1개로 3만 요청 reuse | **~99.7%↓** |
+| **C. 502 race** (간헐 burst, Tomcat 1s) | **0.08% (1/1,207)** + `upstream prematurely closed` 로그 | **0%** | 비대칭 해소 |
 | latency (p95) | 3.40ms | 3.22ms | **거의 불변** |
 
+- 수치는 **Grafana 캡처 실행(2026-05-30) 기준**. 실행마다 평형 TIME_WAIT·burst 분모가 ±변동(동형 실행: TIME_WAIT 14,668, race 1/1,801) — 메커니즘 동일, "약 1.5만 → 수십(99%↓)", "약 1000~1200건당 1건 → 0" 가 정확한 표현.
 - A 의 평형 TIME_WAIT 은 `RPS × TIME_WAIT(60s)` 계산식과 일치.
 - C 의 "1000:1~2" 비율은 race window(backend FIN ~ nginx 인지 사이) 의 너비. **steady 고RPS 로는 재현 불가**(커넥션이 안 쉬어 backend idle timeout 미발동) — 반드시 간헐 idle-gap.
 - **정직성**: race 관측 가속을 위해 Tomcat `keep-alive-timeout` 을 1s 로 압축(shake-table). **기본 20s 에서도 동일 메커니즘, window 너비만 다름.** "운영 502 사고" 가 아니라 **예측 → 재현 → 예방** (운영엔 keepalive 가 없어 race 가 발생한 적 없음).
