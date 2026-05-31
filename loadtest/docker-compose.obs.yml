@@ -1,0 +1,55 @@
+# 관측 스택 — docker-compose.loadtest.yml 과 함께 사용한다 (같은 project name 으로 네트워크 공유):
+#   docker compose -f docker-compose.loadtest.yml -f docker-compose.obs.yml up -d
+#
+# node-exporter 는 nginx/backend 의 network namespace 를 공유해 각 컨테이너의
+# /proc/net/sockstat(TIME_WAIT)을 노출한다. prometheus 가 scrape, grafana 가 시각화.
+name: kicklog-loadtest
+
+services:
+  # nginx 의 netns 공유 → node_sockstat_TCP_tw = nginx 측 TIME_WAIT
+  node-exporter-nginx:
+    image: prom/node-exporter:v1.8.2
+    command:
+      - '--collector.sockstat'
+      - '--web.listen-address=:9100'
+    network_mode: "service:nginx"
+    depends_on: [nginx]
+
+  # backend 의 netns 공유 → backend 측 TIME_WAIT
+  node-exporter-backend:
+    image: prom/node-exporter:v1.8.2
+    command:
+      - '--collector.sockstat'
+      - '--web.listen-address=:9101'
+    network_mode: "service:backend"
+    depends_on: [backend]
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-remote-write-receiver'   # k6 remote-write 수신
+      - '--storage.tsdb.retention.time=2h'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom-data:/prometheus           # down/up 사이 타임라인 유지
+    depends_on: [node-exporter-nginx, node-exporter-backend]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+      GF_USERS_DEFAULT_THEME: "light"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on: [prometheus]
+
+volumes:
+  prom-data:
