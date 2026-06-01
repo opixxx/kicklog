@@ -134,7 +134,7 @@
 
 ### D16. 기술 스택 / 인프라
 
-- iOS: Swift / SwiftUI / SwiftData / Swift Charts / **iOS 26.4+** / SPM / Swift Testing / MV 아키텍처
+- iOS: Swift / SwiftUI / SwiftData / Swift Charts / **iOS 18.0+** / SPM / Swift Testing / MV 아키텍처
 - Backend: Kotlin / Spring Boot 3 / Java 17 / PostgreSQL 15 / Gradle / Flyway / Spring Security (JWT) / REST
 - 호스팅 예정: Railway 또는 Fly.io
 - Repo: GitHub Private (`opixxx/kicklog`), 모노레포 (ios/ + backend/ + docs/ + infra/)
@@ -170,4 +170,5 @@
 | 날짜 | 변경 | 사유 |
 |---|---|---|
 | 2026-05-21 | D16 iOS 최소 지원 `17` → `26.4` | Xcode 기본값 + 2026-05 시점에 iOS 17은 EOL 근접. 본인+팀원 모두 최신 폰 가정. 원래 ADR 작성 시 시점 가정 오류. |
+| 2026-06-01 | D16 iOS 최소 지원 `26.4` → `18.0` | App Store 배포 준비 중 재검토. `26.4`는 출시 대상 기기를 사실상 전부 배제 → 커버리지 손실 과다. 실제 코드가 쓰는 최신 API는 새 `Tab`(iOS 18+)이고, SwiftData·runningSpeed가 iOS 17 하한 → 코드 수정 없이 내릴 수 있는 하한이 `18.0`. iOS 18 점유율이 높아 커버리지/작업량 최적점으로 `18.0` 채택. |
 | 2026-05-21 | D2 데이터 공유 모델 — Kakao Login 추가 (Apple + Kakao 둘 다) | 한국 사용자에게 카카오 로그인이 압도적. ADR-0003 D7에서 정식 결정. |
