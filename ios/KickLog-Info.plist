@@ -46,6 +46,8 @@
 	</dict>
 	<key>NSHealthShareUsageDescription</key>
 	<string>축구 경기 데이터를 분석해 거리·속도·심박수·쿼터별 체력 변화 리포트를 제공합니다.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>앱이 생성한 축구 워크아웃 데이터를 건강 앱에 기록하기 위해 사용됩니다.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
