@@ -51,8 +51,11 @@ struct LegalDocScreen: View {
 private struct LegalWebView: UIViewRepresentable {
     let fileURL: URL
 
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView()
+        webView.navigationDelegate = context.coordinator
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
@@ -61,5 +64,21 @@ private struct LegalWebView: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         webView.loadFileURL(fileURL, allowingReadAccessTo: fileURL.deletingLastPathComponent())
+    }
+
+    // 번들 로컬 HTML(file://) 외의 네비게이션은 차단한다.
+    // 외부 URL 임의 이동을 막아 unrestricted navigation 보안 위험을 제거한다.
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
+            if navigationAction.request.url?.isFileURL == true {
+                decisionHandler(.allow)
+            } else {
+                decisionHandler(.cancel)
+            }
+        }
     }
 }
