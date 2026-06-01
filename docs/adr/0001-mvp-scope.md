@@ -143,7 +143,7 @@
 
 ### D16. 기술 스택 / 인프라
 
-- iOS: Swift / SwiftUI / SwiftData / Swift Charts / **iOS 26.4+** / SPM / Swift Testing / MV 아키텍처
+- iOS: Swift / SwiftUI / SwiftData / Swift Charts / **iOS 18.0+** / SPM / Swift Testing / MV 아키텍처
 - Backend: Kotlin / Spring Boot 3 / Java 17 / PostgreSQL 15 / Gradle / Flyway / Spring Security (JWT) / REST
 - 호스팅 예정: Railway 또는 Fly.io
 - Repo: GitHub Private (`opixxx/kicklog`), 모노레포 (ios/ + backend/ + docs/ + infra/)
@@ -179,6 +179,7 @@
 | 날짜 | 변경 | 사유 |
 |---|---|---|
 | 2026-05-21 | D16 iOS 최소 지원 `17` → `26.4` | Xcode 기본값 + 2026-05 시점에 iOS 17은 EOL 근접. 본인+팀원 모두 최신 폰 가정. 원래 ADR 작성 시 시점 가정 오류. |
+| 2026-06-01 | D16 iOS 최소 지원 `26.4` → `18.0` | App Store 배포 준비 중 재검토. `26.4`는 출시 대상 기기를 사실상 전부 배제 → 커버리지 손실 과다. 실제 코드가 쓰는 최신 API는 새 `Tab`(iOS 18+)이고, SwiftData·runningSpeed가 iOS 17 하한 → 코드 수정 없이 내릴 수 있는 하한이 `18.0`. iOS 18 점유율이 높아 커버리지/작업량 최적점으로 `18.0` 채택. |
 | 2026-05-21 | D2 데이터 공유 모델 — Kakao Login 추가 (Apple + Kakao 둘 다) | 한국 사용자에게 카카오 로그인이 압도적. ADR-0003 D7에서 정식 결정. |
 | 2026-05-29 | D8 스프린트 지속 시간 정정 (1초 → 3초) + 속도 산출 알고리즘 명세 추가 | 5/28 실측에서 평균/최고 5.0 km/h 동일 + 스프린트 0 으로 표시되는 이슈 발견. 코드는 이미 3초였고 문서가 1초로 불일치 → 문서를 코드에 맞춰 정정. runningSpeed 가 대부분 비어있는 자동감지 워크아웃 대응으로 distanceWalkingRunning 샘플 기반 derive 알고리즘 추가. |
 | 2026-05-29 | D8 sanity cap 35 km/h 추가 | 5/28 실측에서 max 40.1 km/h (인간 한계 초과) 가 표시되는 이슈 발견. 헬스킷 export 분석 결과 야간 운동장 GPS jump 로 인한 28.5m/2s 같은 노이즈 샘플이 원인. 35 km/h cap 으로 명백한 노이즈만 제거하고 30 km/h 대 진짜 풀스프린트는 보존. |

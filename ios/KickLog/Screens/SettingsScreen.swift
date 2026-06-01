@@ -60,6 +60,13 @@ struct SettingsScreen: View {
             case .list: VenueListScreen()
             }
         }
+        .navigationDestination(for: InfoRoute.self) { route in
+            switch route {
+            case .licenses: LicenseScreen()
+            case .privacy: LegalDocScreen(document: .privacy)
+            case .terms: LegalDocScreen(document: .terms)
+            }
+        }
         .task { await refreshMe() }
         .alert("오류", isPresented: Binding(
             get: { settingsErrorMessage != nil },
@@ -168,6 +175,9 @@ struct SettingsScreen: View {
     // SettingsScreen 내부 NavigationStack 의 destination 라우트 식별자.
     // 운동장 목록만이라 단일 case지만, 향후 다른 진입점도 같은 방식으로 확장한다.
     enum VenueRoute: Hashable { case list }
+
+    // 정보 섹션 진입점 라우트. 개인정보·약관은 번들 HTML 을 앱 내 WKWebView 로 표시.
+    enum InfoRoute: Hashable { case licenses, privacy, terms }
 
     private var dataSection: some View {
         let pendingCount = pendingSyncMatches.count
@@ -505,9 +515,18 @@ struct SettingsScreen: View {
             KLSettingsHeader(text: "정보")
             KLSettingsGroup {
                 KLSettingsRow(label: "버전", chevron: false, value: "1.0.0")
-                KLSettingsRow(labelOnly: "오픈소스 라이선스")
-                KLSettingsRow(labelOnly: "개인정보 처리방침")
-                KLSettingsRow(labelOnly: "이용약관", isLast: true)
+                NavigationLink(value: InfoRoute.licenses) {
+                    KLSettingsRow(labelOnly: "오픈소스 라이선스")
+                }
+                .buttonStyle(.plain)
+                NavigationLink(value: InfoRoute.privacy) {
+                    KLSettingsRow(labelOnly: "개인정보 처리방침")
+                }
+                .buttonStyle(.plain)
+                NavigationLink(value: InfoRoute.terms) {
+                    KLSettingsRow(labelOnly: "이용약관", isLast: true)
+                }
+                .buttonStyle(.plain)
             }
         }
     }

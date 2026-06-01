@@ -19,7 +19,7 @@ kicklog/
 ### iOS
 - Swift 5.10+ / SwiftUI / SwiftData
 - HealthKit, CoreLocation, Swift Charts
-- 최소 지원: iOS 26.4
+- 최소 지원: iOS 18.0
 - 번들 ID: `com.opixxx.kicklog`
 
 ### Backend

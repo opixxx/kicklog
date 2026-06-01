@@ -31,6 +31,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>KAKAO_NATIVE_APP_KEY</key>
 	<string>23a1a73d29eab91b76c6c0a587542598</string>
 	<key>LSApplicationQueriesSchemes</key>
@@ -44,8 +46,6 @@
 	</dict>
 	<key>NSHealthShareUsageDescription</key>
 	<string>축구 경기 데이터를 분석해 거리·속도·심박수·쿼터별 체력 변화 리포트를 제공합니다.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>개발 빌드에서 E2E 테스트용 임의 축구 워크아웃을 생성합니다. 릴리즈 빌드에서는 사용하지 않습니다.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
