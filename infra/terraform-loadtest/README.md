@@ -49,14 +49,24 @@ curl -X POST http://<backend_public_ip>:8080/loadtest/seed \
 # 3) 토큰 발급(시드된 userId 로)
 curl 'http://<backend_public_ip>:8080/loadtest/token?userId=1'
 
-# 4) loadgen 에서 k6 실행 (target 은 backend private IP — 같은 VPC)
-#    k6 스크립트는 scp 로 올리거나 직접 작성. 측정 핫스팟:
-#    GET /users/me/seasons/{year}, GET /matches, PUT /matches, GET /friendships
-ssh ec2-user@<loadgen_public_ip>
-docker run --rm -i -v $PWD:/scripts grafana/k6 run /scripts/scenario.js
+# 4) loadgen 에서 k6 실행 (target 은 backend private IP — 같은 VPC, 네트워크 변수 최소)
+#    측정 핫스팟(read): GET /users/me/seasons/{year}(통계 derive), GET /matches(커서 N+1), GET /friendships
+scp -i <key.pem> k6/api-load.js ec2-user@<loadgen_public_ip>:~/
+ssh -i <key.pem> ec2-user@<loadgen_public_ip>
+docker run --rm -i -v $PWD:/s \
+  -e BASE_URL=http://<backend_private_ip>:8080 \
+  -e SEED_USER_FROM=1 -e SEED_USER_TO=1000 \
+  grafana/k6 run /s/api-load.js
 ```
 
 > RDS Performance Insights(AWS 콘솔)로 부하 중 느린 쿼리·대기 이벤트를 관찰한다.
+> k6 출력의 `http_req_duration{name:seasons|matches_list|friendships}` 태그별 p95 와
+> ramping 단계별 처리량 꺾임(knee point)을 함께 본다.
+
+### WRITE(PUT /matches) 측정은 venue 시드 선행 필요
+`UpsertMatchRequest.venueId` 가 non-null FK 라, 현재 시드(venue 미생성)로는 write 부하를 걸 수 없다.
+`k6/api-load.js` 의 `writeScenario` 는 골격만 두고 비활성화돼 있다 — `LoadTestSeedService` 에 venue 시드를
+추가하는 후속 작업 후 활성화한다 (read 시나리오만으로도 핵심 병목인 통계 derive·커서 N+1 은 측정된다).
 
 ## 종료 (과금 중단)
 
