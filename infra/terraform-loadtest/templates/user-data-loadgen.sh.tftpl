@@ -1,0 +1,11 @@
+#!/bin/bash
+# loadgen EC2 부팅 — docker + k6(grafana/k6 이미지) 준비.
+# k6 스크립트는 apply 후 admin 이 scp 또는 직접 작성해 docker 로 실행한다 (README 참조).
+set -euxo pipefail
+
+dnf update -y
+dnf install -y docker git
+systemctl enable --now docker
+
+# k6 이미지 미리 pull (부하 시작 지연 제거)
+docker pull grafana/k6:latest
