@@ -40,7 +40,7 @@ class LoadTestHarnessAcceptanceTest : LoadTestPostgresSupport() {
     @Test
     fun `loadtest 토큰으로 보호 엔드포인트를 호출한다`() {
         // given: 시드된 사용자 1명 — seed 로 user 를 만들고 그 범위의 첫 id 를 사용
-        val seedResponse = mockMvc.post("/loadtest/seed") {
+        val seedResponse = mockMvc.post(SEED_PATH) {
             contentType = MediaType.APPLICATION_JSON
             content = """{"userCount":1,"matchesPerUser":1}"""
         }.andExpect {
@@ -50,7 +50,7 @@ class LoadTestHarnessAcceptanceTest : LoadTestPostgresSupport() {
         val seededUserId = objectMapper.readTree(seedResponse).get("seededUserIdFrom").asLong()
 
         // when: GET /loadtest/token?userId={id}
-        val tokenResponse = mockMvc.get("/loadtest/token") {
+        val tokenResponse = mockMvc.get(TOKEN_PATH) {
             param("userId", seededUserId.toString())
         }.andExpect {
             status { isOk() }
@@ -70,7 +70,7 @@ class LoadTestHarnessAcceptanceTest : LoadTestPostgresSupport() {
 
     @Test
     fun `대량 시드 요청은 사용자 매치 쿼터 행 수를 응답한다`() {
-        mockMvc.post("/loadtest/seed") {
+        mockMvc.post(SEED_PATH) {
             contentType = MediaType.APPLICATION_JSON
             content = """{"userCount":5,"matchesPerUser":10,"quartersPerMatch":4}"""
         }.andExpect {
@@ -86,7 +86,7 @@ class LoadTestHarnessAcceptanceTest : LoadTestPostgresSupport() {
     @Test
     fun `quartersPerMatch 미지정이면 매치당 4쿼터를 생성한다`() {
         // edge-case: quartersPerMatch 기본값(미지정) → matchesPerUser * 4
-        mockMvc.post("/loadtest/seed") {
+        mockMvc.post(SEED_PATH) {
             contentType = MediaType.APPLICATION_JSON
             content = """{"userCount":2,"matchesPerUser":3}"""
         }.andExpect {
@@ -100,7 +100,7 @@ class LoadTestHarnessAcceptanceTest : LoadTestPostgresSupport() {
     @Test
     fun `userCount 가 0 이면 400 으로 거부한다`() {
         // unhappy: Bean Validation (@field:Positive / @field:Min)
-        mockMvc.post("/loadtest/seed") {
+        mockMvc.post(SEED_PATH) {
             contentType = MediaType.APPLICATION_JSON
             content = """{"userCount":0,"matchesPerUser":10}"""
         }.andExpect {
@@ -110,11 +110,16 @@ class LoadTestHarnessAcceptanceTest : LoadTestPostgresSupport() {
 
     @Test
     fun `matchesPerUser 가 음수이면 400 으로 거부한다`() {
-        mockMvc.post("/loadtest/seed") {
+        mockMvc.post(SEED_PATH) {
             contentType = MediaType.APPLICATION_JSON
             content = """{"userCount":5,"matchesPerUser":-1}"""
         }.andExpect {
             status { isBadRequest() }
         }
+    }
+
+    companion object {
+        private const val SEED_PATH = "/loadtest/seed"
+        private const val TOKEN_PATH = "/loadtest/token"
     }
 }
