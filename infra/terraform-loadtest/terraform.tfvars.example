@@ -1,0 +1,17 @@
+# 복사해서 terraform.tfvars 로 채운다 (terraform.tfvars 는 .gitignore — 커밋 금지).
+# cp terraform.tfvars.example terraform.tfvars
+
+# ─── 필수 ─────────────────────────────────────────────
+ssh_key_name = "kicklog-keypair"          # AWS Console 에서 미리 생성한 key pair 이름
+admin_cidr   = "1.2.3.4/32"               # 본인 IP (curl ifconfig.me 로 확인, /32)
+
+rds_password = "CHANGE_ME_strong_password"
+jwt_secret   = "loadtest-dummy-secret-at-least-32-characters-long"  # 32자+ (우회 발급이라 더미 OK)
+
+ghcr_pat          = "ghp_xxxxxxxxxxxxxxxxxxxx"   # GHCR read:packages PAT
+backend_image_tag = "sha-xxxxxxx"                # loadtest 코드 포함 이미지 (PR #62 merge 후 CD SHA)
+
+# ─── 선택 (기본값 있음) ───────────────────────────────
+# backend_instance_type = "t3.large"
+# loadgen_instance_type = "c5.large"
+# rds_instance_class    = "db.t3.medium"

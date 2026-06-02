@@ -1,0 +1,22 @@
+#!/bin/bash
+# backend EC2 부팅 — docker + GHCR pull + loadtest 프로파일로 8080 직접 노출.
+# nginx 없이 8080 직접 (측정 목적이 코드/쿼리 병목 — proxy hop 제거).
+set -euxo pipefail
+
+dnf update -y
+dnf install -y docker
+systemctl enable --now docker
+
+# GHCR private 이미지 pull
+echo "${ghcr_pat}" | docker login ghcr.io -u "${github_owner}" --password-stdin
+
+# backend 실행 (loadtest 프로파일 → /loadtest/token·/loadtest/seed 활성, RDS 연결)
+# Flyway 가 부팅 시 빈 RDS 에 V1~V14 스키마를 적용한다.
+docker run -d --name kicklog-backend --restart unless-stopped \
+  -p 8080:8080 \
+  -e SPRING_PROFILES_ACTIVE=loadtest \
+  -e DB_URL="jdbc:postgresql://${rds_address}:5432/${db_name}" \
+  -e DB_USERNAME="${db_username}" \
+  -e DB_PASSWORD="${db_password}" \
+  -e JWT_SECRET="${jwt_secret}" \
+  "ghcr.io/${github_owner}/kicklog:${backend_image_tag}"

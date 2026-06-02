@@ -1,0 +1,10 @@
+# Terraform state (로컬, prod 와 분리) — 절대 커밋 금지
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+tfplan
+
+# 시크릿 (rds_password, jwt_secret, ghcr_pat 등)
+terraform.tfvars
+*.auto.tfvars
