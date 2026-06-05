@@ -21,7 +21,9 @@ prod 전용 리소스(Secrets Manager·OIDC·certbot·CD·S3·budget·observabil
 1. AWS Console 에서 EC2 key pair 생성 → `ssh_key_name`
 2. GHCR PAT(read:packages) 발급 → `ghcr_pat`
 3. **loadtest 코드 포함 backend 이미지**가 GHCR 에 있어야 한다 → `backend_image_tag`
-   - PR #62 merge 후 CD 가 빌드한 `sha-xxxxxxx`, 또는 로컬에서 수동 build/push
+   - CD 가 푸시하는 태그는 **full 40자 git SHA** (`sha-<7>` 아님!) 또는 `latest`. main 최신 SHA 사용.
+   - 실제 태그 조회(PAT, read:packages): `curl -s -H "Authorization: Bearer $TOKEN" https://ghcr.io/v2/<owner>/kicklog/tags/list`
+   - ⚠️ 잘못된 태그여도 `terraform apply` 는 성공한다(값 미검증). EC2 안 `docker pull` 만 조용히 실패 → 8080 미기동. image/PAT 수정 후엔 `terraform apply -replace=aws_instance.backend` 로 교체(in-place 는 user-data 재실행 안 함).
 4. `cp terraform.tfvars.example terraform.tfvars` 후 값 채우기
 
 ## 실행
@@ -53,10 +55,14 @@ curl 'http://<backend_public_ip>:8080/loadtest/token?userId=1'
 #    측정 핫스팟(read): GET /users/me/seasons/{year}(통계 derive), GET /matches(커서 N+1), GET /friendships
 scp -i <key.pem> k6/api-load.js ec2-user@<loadgen_public_ip>:~/
 ssh -i <key.pem> ec2-user@<loadgen_public_ip>
-docker run --rm -i -v $PWD:/s \
+# ⚠️ sudo 필수(fresh ssh 세션은 docker 그룹 미반영). 스크립트는 /tmp 로(k6 컨테이너 uid 12345 가 홈 700 통과 불가).
+cp ~/api-load.js /tmp/ && chmod 644 /tmp/api-load.js
+sudo docker run --rm -i -v /tmp:/s \
   -e BASE_URL=http://<backend_private_ip>:8080 \
   -e SEED_USER_FROM=1 -e SEED_USER_TO=1000 \
   grafana/k6 run /s/api-load.js
+# HTML(Grafana) 리포트로 보려면: -e K6_WEB_DASHBOARD=true -e K6_WEB_DASHBOARD_EXPORT=/s/k6-report.html
+# 종료 후 scp -i <key.pem> ec2-user@<loadgen_public_ip>:/tmp/k6-report.html .
 ```
 
 > RDS Performance Insights(AWS 콘솔)로 부하 중 느린 쿼리·대기 이벤트를 관찰한다.

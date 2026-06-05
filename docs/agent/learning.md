@@ -69,3 +69,29 @@
   - [ ] backend-test-writer (N/A — infra)
   - [ ] test strategy (N/A — infra)
 - Skip reason if not promoted: N/A
+
+---
+
+### 2026-06-03 — 복제 부하테스트(트랙 C) 구동 함정 4종 + 측정 해석
+
+- Trigger: production-risk (loadtest infra), 부하테스트 8080 미기동으로 다회 실패
+- Task/ADR: 트랙 C iter1, ADR-0011, `infra/terraform-loadtest/`
+- Failures & Root cause:
+  1. **이미지 태그 형식**: `terraform.tfvars` 가 예시 placeholder(`backend_image_tag = "sha-xxxxxxx"`, `ghcr_pat = "ghp_xxx"`, `admin_cidr = "1.2.3.4/32"`) 그대로인데 `terraform apply` 는 값 검증 없이 성공 → EC2 user-data 안 docker pull 만 실패. README 가 `sha-<7>` 로 안내했으나 **GHCR 실제 태그는 full 40자 git SHA**(+`latest`) → `manifest unknown` → `set -euxo pipefail` user-data 가 침묵 중단 → 8080 미기동(connection refused).
+  2. **user_data 변경 = in-place 갱신만**: 이미지/PAT 를 tfvars 에서 고쳐 `apply` 해도 `aws_instance` 는 in-place 로 user_data 속성만 갱신, **부팅 스크립트 재실행 안 함** → 여전히 미기동. `terraform apply -replace=aws_instance.backend` 로 교체해야 user-data 재실행.
+  3. **docker on fresh ssh**: loadgen 새 ssh 세션은 ec2-user 의 docker 그룹이 미반영 → `docker run` permission denied(126). `sudo docker` 사용.
+  4. **k6 컨테이너 파일 권한**: grafana/k6 가 uid 12345 비-root 라 `/home/ec2-user`(700) 통과 불가 → `stat /s/...: permission denied`. 스크립트를 `/tmp`(1777)에 두고 `-v /tmp:/s`.
+- Prevention:
+  - 부하 인프라 apply 전 **tfvars placeholder 잔존 검사**(`grep -E 'xxxxxxx|1.2.3.4|CHANGE_ME'`) — apply 성공 ≠ 동작.
+  - GHCR 태그는 추측 말고 **실제 조회**: PAT 로 `GET https://ghcr.io/v2/<owner>/<repo>/tags/list` (Accept 헤더는 콤마 1줄로). README 태그 예시 신뢰 금지.
+  - 8080 connection **refused**(빠른 실패)=SG 통과·앱 미기동(=user-data/이미지 문제), **timeout**(드롭)=SG/admin_cidr 문제 — 둘을 구분해 진단.
+  - tfvars 의 image/PAT 변경 후엔 항상 `-replace=aws_instance.backend`.
+- 측정 해석 교훈(재사용):
+  - **빈 결과 쿼리가 느리면 = 공유 자원 큐잉**(풀/CPU), 개별 쿼리 최적화 아님. friendships(시드 0) p95 2.5s 가 결정적 단서였다.
+  - **3티어 동시 관측 필수**: k6(클라) + CloudWatch backend CPU/CreditBalance + RDS CPU/DatabaseConnections. `DatabaseConnections` 가 풀 사이즈에 고정돼 있으면 풀이 동시성 캡.
+  - **버스터블(t3) 인스턴스는 지속 부하 측정 대상으로 부적합** — CreditBalance 고갈 변수가 결과를 오염. 측정엔 c5 등 고정 성능.
+- Updated:
+  - [x] architecture/ADR — ADR-0011 작성
+  - [x] 측정 산출물 — `docs/research/assets/measurement-trackC-iter1.md` (로컬)
+  - [ ] README `infra/terraform-loadtest/README.md` 태그 안내 수정(`sha-<7>` → full SHA) — 후속
+- Skip reason if not promoted: N/A
