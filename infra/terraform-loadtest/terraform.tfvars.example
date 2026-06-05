@@ -8,8 +8,12 @@ admin_cidr   = "1.2.3.4/32"               # 본인 IP (curl ifconfig.me 로 확�
 rds_password = "CHANGE_ME_strong_password"
 jwt_secret   = "loadtest-dummy-secret-at-least-32-characters-long"  # 32자+ (우회 발급이라 더미 OK)
 
-ghcr_pat          = "ghp_xxxxxxxxxxxxxxxxxxxx"   # GHCR read:packages PAT
-backend_image_tag = "sha-xxxxxxx"                # loadtest 코드 포함 이미지 (PR #62 merge 후 CD SHA)
+ghcr_pat          = "ghp_xxxxxxxxxxxxxxxxxxxx"   # GHCR read:packages PAT (classic, 7d 임시 OK)
+# CD 가 푸시하는 GHCR 태그는 full 40자 git SHA (sha-<7> 아님!) 또는 latest.
+# 실제 태그 확인: gh 로 안 되면(read:packages 스코프 필요) PAT 로
+#   TOKEN=$(curl -su "OWNER:$PAT" "https://ghcr.io/token?scope=repository:OWNER/kicklog:pull&service=ghcr.io" | jq -r .token)
+#   curl -s -H "Authorization: Bearer $TOKEN" https://ghcr.io/v2/OWNER/kicklog/tags/list
+backend_image_tag = "0000000000000000000000000000000000000000"  # main 최신 full SHA (loadtest 코드 포함)
 
 # ─── 선택 (기본값 있음) ───────────────────────────────
 # backend_instance_type = "t3.large"
