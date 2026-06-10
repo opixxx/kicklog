@@ -15,6 +15,8 @@
 
 ## Patterns
 
+- [transactionTemplate RED 충돌](pattern_transaction_template_red_conflict.md) — 침묵 fallback 을 명시 실패로 바꾸면 그 fallback 의존 기존 단위 테스트가 GREEN 에서 깨짐
+
 <!--
 ### YYYY-MM-DD — <pattern>
 - Missing case:
