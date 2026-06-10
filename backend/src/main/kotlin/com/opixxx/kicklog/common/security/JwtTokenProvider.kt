@@ -94,7 +94,7 @@ class JwtTokenProvider(
             throw KickLogException(ErrorCode.AUTH_INVALID_TOKEN)
         }
 
-        val expiresAt = Instant.ofEpochSecond((payload["exp"] as Number).toLong())
+        val expiresAt = Instant.ofEpochSecond(longClaim(payload, "exp"))
         if (!expiresAt.isAfter(Instant.now(clock))) {
             throw KickLogException(ErrorCode.AUTH_EXPIRED_TOKEN)
         }
@@ -106,12 +106,30 @@ class JwtTokenProvider(
         }
 
         return JwtClaims(
-            userId = (payload["sub"] as String).toLong(),
+            userId = userIdClaim(payload),
             type = type,
-            issuedAt = Instant.ofEpochSecond((payload["iat"] as Number).toLong()),
+            issuedAt = Instant.ofEpochSecond(longClaim(payload, "iat")),
             expiresAt = expiresAt,
-            jti = (payload["jti"] as String?)?.let(UUID::fromString),
+            jti = jtiClaim(payload),
         )
+    }
+
+    // sub 클레임을 안전하게 Long 으로 변환 — 비숫자/누락/비-String 타입 모두 AUTH_INVALID_TOKEN.
+    private fun userIdClaim(payload: Map<String, Any?>): Long {
+        val sub = payload["sub"] as? String ?: throw KickLogException(ErrorCode.AUTH_INVALID_TOKEN)
+        return sub.toLongOrNull() ?: throw KickLogException(ErrorCode.AUTH_INVALID_TOKEN)
+    }
+
+    private fun longClaim(payload: Map<String, Any?>, key: String): Long {
+        val value = payload[key] as? Number ?: throw KickLogException(ErrorCode.AUTH_INVALID_TOKEN)
+        return value.toLong()
+    }
+
+    private fun jtiClaim(payload: Map<String, Any?>): UUID? {
+        val jti = payload["jti"] as? String ?: return null
+        return runCatching { UUID.fromString(jti) }.getOrElse {
+            throw KickLogException(ErrorCode.AUTH_INVALID_TOKEN)
+        }
     }
 
     private fun encodeJson(value: Any): String {

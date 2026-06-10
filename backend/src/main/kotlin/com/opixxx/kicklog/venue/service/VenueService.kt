@@ -78,11 +78,13 @@ class VenueService(
     fun updateVenue(userId: Long, venueId: Long, name: String): Venue {
         val venue = findOwnedVenue(userId, venueId)
         val normalizedName = name.trim()
-        val duplicated = venueRepository.findByUserIdAndName(userId, normalizedName)
-        if (duplicated != null && duplicated.id != venue.id) {
-            throw KickLogException(ErrorCode.VENUE_NAME_DUPLICATE)
+        // 이름이 기존과 동일하면 중복 검사 불필요 (자기 자신과의 false positive·중복 조회 방지).
+        if (normalizedName != venue.name) {
+            if (venueRepository.findByUserIdAndName(userId, normalizedName) != null) {
+                throw KickLogException(ErrorCode.VENUE_NAME_DUPLICATE)
+            }
+            venue.name = normalizedName
         }
-        venue.name = normalizedName
         return venueRepository.save(venue)
     }
 

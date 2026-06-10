@@ -36,6 +36,11 @@ class JpaMatchStore(
         }
     }
 
+    override fun findAllWithQuartersByIdIn(ids: List<Long>): List<Match> {
+        if (ids.isEmpty()) return emptyList()
+        return matchRepository.findAllWithQuartersByIdIn(ids)
+    }
+
     override fun findAllByUserIdAndPlayedAtBetween(
         userId: Long,
         startInclusive: Instant,

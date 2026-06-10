@@ -13,6 +13,7 @@ import com.opixxx.kicklog.common.security.JwtTokenProvider
 import com.opixxx.kicklog.user.dto.UserResponse
 import com.opixxx.kicklog.user.entity.User
 import com.opixxx.kicklog.user.repository.UserStore
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.security.SecureRandom
@@ -25,6 +26,8 @@ class AuthService(
     private val refreshTokenRepository: RefreshTokenStore,
     private val jwtTokenProvider: JwtTokenProvider,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     @Transactional
     fun signIn(
         provider: OAuthProvider,
@@ -115,6 +118,7 @@ class AuthService(
             if (userRepository.findActiveByDisplayName(candidate) == null) {
                 return userRepository.save(User.create(candidate, email))
             }
+            log.warn("displayName 충돌 — 후보 '{}' 점유됨 (attempt {}/{})", candidate, attempt, MAX_DISPLAY_NAME_SUFFIX_RETRY)
         }
         throw KickLogException(ErrorCode.INTERNAL_ERROR)
     }

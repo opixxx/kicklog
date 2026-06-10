@@ -29,11 +29,12 @@ class MatchService(
         val existing = matchRepository.findByUserIdAndClientMatchId(userId, clientMatchId)
         if (existing != null) {
             existing.replaceWith(command)
-            return SaveMatchResult(initialize(matchRepository.save(existing)), updated = true)
+            // 저장 직후 quarters 는 영속 컨텍스트에 in-memory 로 존재 — 추가 조회 불필요.
+            return SaveMatchResult(matchRepository.save(existing), updated = true)
         }
 
         return SaveMatchResult(
-            initialize(matchRepository.save(Match.create(userId, clientMatchId, command))),
+            matchRepository.save(Match.create(userId, clientMatchId, command)),
             updated = false,
         )
     }
@@ -45,14 +46,14 @@ class MatchService(
         if (match.userId != userId) {
             throw KickLogException(ErrorCode.MATCH_NOT_OWNED)
         }
-        return initialize(match)
+        return withQuarters(match)
     }
 
     @Transactional(readOnly = true)
     fun getMyMatchByClientId(userId: Long, clientMatchId: UUID): Match {
         val match = matchRepository.findByUserIdAndClientMatchId(userId, clientMatchId)
             ?: throw KickLogException(ErrorCode.MATCH_NOT_FOUND)
-        return initialize(match)
+        return withQuarters(match)
     }
 
     @Transactional
@@ -84,17 +85,19 @@ class MatchService(
         if (match.userId != friendUserId) {
             throw KickLogException(ErrorCode.MATCH_NOT_FOUND)
         }
-        return initialize(match)
+        return withQuarters(match)
     }
 
     private fun listMatchesByUser(userId: Long, cursor: String?, size: Int): CursorResponse<Match> {
         val normalizedSize = min(size.coerceAtLeast(1), MAX_PAGE_SIZE)
-        val matches = matchRepository.findAllByUserId(
+        // 1단계: id 페이징 (커서 쿼리 — 컬렉션 fetch join 시 메모리 페이징 발생하므로 분리).
+        val paged = matchRepository.findAllByUserId(
             userId = userId,
             cursor = MatchCursor.decode(cursor),
             limit = normalizedSize + 1,
         )
-        matches.forEach(::initialize)
+        // 2단계: quarters fetch join 재조회 (N+1 제거, 정렬은 재조회 쿼리가 보장).
+        val matches = matchRepository.findAllWithQuartersByIdIn(paged.map(Match::id))
         return toCursorResponse(matches, normalizedSize)
     }
 
@@ -117,9 +120,9 @@ class MatchService(
         return CursorResponse(content = content, size = size, nextCursor = nextCursor, hasNext = hasNext)
     }
 
-    private fun initialize(match: Match): Match {
-        match.quarters.size
-        return match
+    // 단건 응답용 — quarters 를 fetch join 으로 재조회해 OSIV off 환경에서도 detached 접근 안전.
+    private fun withQuarters(match: Match): Match {
+        return matchRepository.findAllWithQuartersByIdIn(listOf(match.id)).firstOrNull() ?: match
     }
 
     companion object {

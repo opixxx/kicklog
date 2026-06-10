@@ -44,10 +44,13 @@ interface MatchRepository : JpaRepository<Match, Long> {
         pageable: Pageable,
     ): List<Match>
 
+    // 시즌 집계 전용 — 페이지네이션 없으므로 컬렉션 fetch join 안전 (N+1 제거).
+    // quarterWorkouts 가 JPA 영속 필드 (quarters 는 정렬 getter — HQL 경로 아님).
     @Query(
         """
-        SELECT m
+        SELECT DISTINCT m
         FROM Match m
+        LEFT JOIN FETCH m.quarterWorkouts
         WHERE m.userId = :userId
           AND m.playedAt >= :startInclusive
           AND m.playedAt < :endExclusive
@@ -59,6 +62,18 @@ interface MatchRepository : JpaRepository<Match, Long> {
         @Param("startInclusive") startInclusive: Instant,
         @Param("endExclusive") endExclusive: Instant,
     ): List<Match>
+
+    // 목록 2단계 로딩 — id 페이징 결과를 fetch join 으로 재조회 (커서 쿼리의 메모리 페이징 회피).
+    @Query(
+        """
+        SELECT DISTINCT m
+        FROM Match m
+        LEFT JOIN FETCH m.quarterWorkouts
+        WHERE m.id IN :ids
+        ORDER BY m.playedAt DESC, m.id DESC
+        """,
+    )
+    fun findAllWithQuartersByIdIn(@Param("ids") ids: List<Long>): List<Match>
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update Match m set m.venueId = null where m.venueId = :venueId")

@@ -34,6 +34,13 @@ class InMemoryMatchRepository : MatchStore {
             .take(limit)
     }
 
+    override fun findAllWithQuartersByIdIn(ids: List<Long>): List<Match> {
+        val idSet = ids.toSet()
+        return matches.values
+            .filter { it.id in idSet }
+            .sortedWith(compareByDescending<Match> { it.playedAt }.thenByDescending { it.id })
+    }
+
     override fun findAllByUserIdAndPlayedAtBetween(
         userId: Long,
         startInclusive: Instant,
