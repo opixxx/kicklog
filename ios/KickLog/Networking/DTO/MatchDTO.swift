@@ -118,23 +118,13 @@ extension MatchSummaryResponse {
             dow: Self.dowFormatter.string(from: playedAt),
             opponent: opponent ?? "—",
             venue: "—",                               // 친구 경기는 venue 이름이 응답에 없음 (venueId 만 노출)
-            result: MatchResult.from(Self.resultToCode(result)),
+            result: MatchResult.from(MatchResult.code(fromWire: result)),
             score: Match.formatScore(teamGoals: teamGoals, opponentGoals: opponentGoals, fallbackUserGoals: goals),
             distanceKm: Double(totalDistanceM) / 1000.0,
             avgSpeedKmh: maxSpeedKmh,
             sprintCount: sprintCount,
             avgHeartRateBpm: avgHeartRate ?? 0        // null = 비공개 → 행에서는 0 으로 표시
         )
-    }
-
-    // "WIN"/"DRAW"/"LOSS" → "W"/"D"/"L" (MatchResult.from 입력 형식)
-    private static func resultToCode(_ wire: String?) -> String? {
-        switch wire {
-        case "WIN": return "W"
-        case "DRAW": return "D"
-        case "LOSS": return "L"
-        default: return nil
-        }
     }
 
     private static let dateNumFormatter: DateFormatter = {
@@ -196,7 +186,7 @@ extension Match {
             context.insert(match)
         }
         match.applySummary(dto, in: context)
-        try? context.save()
+        context.saveOrLog(caller: "Match.upsertSummary")
         return match
     }
 
@@ -211,7 +201,7 @@ extension Match {
             context.insert(match)
         }
         match.applyDetail(dto, in: context)
-        try? context.save()
+        context.saveOrLog(caller: "Match.upsertDetail")
         return match
     }
 
@@ -300,7 +290,7 @@ extension Match {
         self.venueName = venueName(for: venueId, in: context) ?? self.venueName
         self.playedAt = playedAt
         opponentName = opponent
-        self.result = Self.resultFromWire(result)
+        self.result = MatchResult.code(fromWire: result)
         self.position = position
         userGoals = goals
         userAssists = assists
@@ -350,15 +340,6 @@ extension Match {
             predicate: #Predicate { $0.serverId == venueId }
         )
         return (try? context.fetch(descriptor).first)?.name
-    }
-
-    private static func resultFromWire(_ code: String?) -> String? {
-        switch code {
-        case "WIN": return "W"
-        case "DRAW": return "D"
-        case "LOSS": return "L"
-        default: return nil
-        }
     }
 }
 

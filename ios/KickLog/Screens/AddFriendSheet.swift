@@ -182,7 +182,7 @@ struct AddFriendSheet: View {
         } catch {
             if Task.isCancelled { return }
             results = []
-            statusMessage = StatusMessage(text: friendlyMessage(error), isError: true)
+            statusMessage = StatusMessage(text: error.userMessage, isError: true)
         }
     }
 
@@ -197,20 +197,7 @@ struct AddFriendSheet: View {
                 : "\(item.displayName) 님에게 친구 요청을 보냈습니다"
             statusMessage = StatusMessage(text: label, isError: false)
         } catch {
-            statusMessage = StatusMessage(text: friendlyMessage(error), isError: true)
-        }
-    }
-
-    private func friendlyMessage(_ error: Error) -> String {
-        guard let apiError = error as? APIError else { return error.localizedDescription }
-        switch apiError {
-        case .noConnection: return "네트워크 연결을 확인해 주세요"
-        case .unauthorized: return "로그인이 만료되었습니다"
-        case .server(_, let body, _):
-            // FRIEND_ALREADY_EXISTS / FRIEND_SELF_REQUEST 등 백엔드 메시지 그대로 노출.
-            return body?.message ?? "서버 오류가 발생했습니다"
-        case .decodingFailed: return "응답을 처리하지 못했습니다"
-        case .unknown: return "알 수 없는 오류가 발생했습니다"
+            statusMessage = StatusMessage(text: error.userMessage, isError: true)
         }
     }
 

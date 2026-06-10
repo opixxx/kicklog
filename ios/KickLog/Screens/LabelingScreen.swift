@@ -9,6 +9,9 @@ struct LabelingScreen: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var scheme
 
+    // 기존 라벨링된 경기를 다시 여는 "수정" 모드 여부 — 제목/문구 분기에 사용.
+    private var isEditing: Bool { match.labeledAt != nil }
+
     // 감지된 모든 쿼터 (시간순). 라벨링 시점에는 match.quarters 가 4개 들어있음.
     private var detectedQuarters: [QuarterWorkout] {
         match.quarters.sorted { $0.startedAt < $1.startedAt }
@@ -25,6 +28,9 @@ struct LabelingScreen: View {
     @State private var selectedVenue: Venue?
     @State private var showingVenueSheet: Bool = false
     @State private var trimTargetQuarter: QuarterWorkout?
+
+    // distanceM == 0 쿼터 자동 재분석 — 화면당 1회만 (무한 재시도 방지).
+    @State private var didAttemptReanalyze: Bool = false
 
     private var amberButtonFg: Color {
         scheme == .dark ? KLTokens.amber : Color(hex: 0x9A5C00)
@@ -54,7 +60,7 @@ struct LabelingScreen: View {
                         .foregroundStyle(KLTokens.textSec)
                 }
                 ToolbarItem(placement: .principal) {
-                    Text("경기 라벨링")
+                    Text(isEditing ? "경기 수정" : "경기 라벨링")
                         .font(.system(size: 17, weight: .bold))
                         .tracking(-0.3)
                         .foregroundStyle(KLTokens.text)
@@ -68,6 +74,7 @@ struct LabelingScreen: View {
             }
         }
         .onAppear(perform: loadInitialState)
+        .task { await reanalyzeZeroQuartersIfNeeded() }
         .sheet(isPresented: $showingVenueSheet) {
             VenueSelectionScreen { venue in
                 selectedVenue = venue
@@ -90,9 +97,35 @@ struct LabelingScreen: View {
                         store: HealthKitService.shared.store,
                         analyzer: WorkoutAnalyzer()
                     )
-                    try? modelContext.save()
+                    modelContext.saveOrLog(caller: "LabelingScreen.retrim")
                 }
             }
+        }
+    }
+
+    // MARK: - 0 지표 자동 재분석
+
+    // import 시점 HealthKit 동기화 지연으로 distanceM == 0 으로 저장된 쿼터를,
+    // 라벨링 화면 진입 시 HealthKit raw 로 다시 계산해 복구한다.
+    // 화면당 1회만 시도 (didAttemptReanalyze 가드) — 무한 재시도 금지.
+    private func reanalyzeZeroQuartersIfNeeded() async {
+        guard !didAttemptReanalyze else { return }
+        didAttemptReanalyze = true
+
+        let zeroQuarters = match.quarters.filter { $0.distanceM == 0 }
+        guard !zeroQuarters.isEmpty else { return }
+
+        let analyzer = WorkoutAnalyzer()
+        let store = HealthKitService.shared.store
+        var filled = 0
+        for quarter in zeroQuarters {
+            if case .filled = await quarter.reanalyze(store: store, analyzer: analyzer) {
+                filled += 1
+            }
+        }
+        if filled > 0 {
+            match.recalculateHeadlineMetrics()
+            modelContext.saveOrLog(caller: "LabelingScreen.reanalyzeZeroQuarters")
         }
     }
 
