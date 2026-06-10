@@ -1,13 +1,10 @@
 package com.opixxx.kicklog.user.controller
 
-import com.opixxx.kicklog.common.exception.ErrorCode
-import com.opixxx.kicklog.common.exception.KickLogException
 import com.opixxx.kicklog.common.security.KickLogPrincipal
 import com.opixxx.kicklog.user.dto.DisplayNameCheckResponse
 import com.opixxx.kicklog.user.dto.UpdateMeRequest
 import com.opixxx.kicklog.user.dto.UserResponse
 import com.opixxx.kicklog.user.dto.UserSearchResponse
-import com.opixxx.kicklog.user.repository.UserStore
 import com.opixxx.kicklog.user.service.UserService
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
@@ -28,17 +25,11 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/users")
 @Validated
 class UserController(
-    private val userStore: UserStore,
     private val userService: UserService,
 ) {
     @GetMapping("/me")
     fun me(@AuthenticationPrincipal principal: KickLogPrincipal): UserResponse {
-        val user = userStore.findById(principal.userId)
-            ?: throw KickLogException(ErrorCode.USER_NOT_FOUND)
-        if (user.isDeleted()) {
-            throw KickLogException(ErrorCode.USER_DELETED)
-        }
-        return UserResponse.from(user)
+        return userService.getMe(principal.userId)
     }
 
     @PatchMapping("/me")

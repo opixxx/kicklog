@@ -21,6 +21,11 @@ class UserService(
     private val clock: Clock,
 ) {
 
+    @Transactional(readOnly = true)
+    fun getMe(userId: Long): UserResponse {
+        return UserResponse.from(requireActiveUser(userId))
+    }
+
     @Transactional
     fun updateMe(userId: Long, displayName: String): UserResponse {
         val user = requireActiveUser(userId)

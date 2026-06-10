@@ -13,6 +13,7 @@
 - [Filter path matching](feedback_filter_path_matching.md) — Servlet 필터에서 `requestURI == "/literal"` 직접 비교 금지, `PathMatcher` / `shouldNotFilter` 사용
 - [Search empty query](feedback_search_empty_query.md) — `@RequestParam("q") String` 만 두면 빈 문자열에 전체 dump, `@NotBlank` 필수
 - [Profile isolation security](feedback_profile_isolation_security.md) — `@Profile` 격리 엔드포인트는 실제 배포 프로파일명(docker-compose.prod.yml)과 대조해 보안 판정
+- [Error response contract](project_error_response_contract.md) — 401/403 은 HttpStatusEntryPoint 라 body 없음 → traceId 안 실림, advice 미경유
 
 <!--
 ### YYYY-MM-DD — <pattern>
