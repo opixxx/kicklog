@@ -293,7 +293,7 @@ struct SettingsScreen: View {
             if let states = try? modelContext.fetch(stateDescriptor) {
                 for state in states { modelContext.delete(state) }
             }
-            try? modelContext.save()
+            modelContext.saveOrLog(caller: "SettingsScreen.resetWorkoutData")
 
             // 3) Observer 재시작 → importNewSoccerWorkouts 즉시 호출 + 새 그룹핑 정책 적용.
             await HealthKitService.shared.startObserver(modelContext: modelContext)
@@ -332,6 +332,8 @@ struct SettingsScreen: View {
 
     private func handleCurrentDeviceLogout() {
         Task {
+            // 로그아웃으로 라벨링한 로컬 경기를 지우기 전에, 미동기화분을 백엔드로 백업한다.
+            await MatchSyncService.shared.syncPending(in: modelContext)
             await AuthService.shared.logoutCurrentDevice()
             clearLocalSession()
         }
@@ -339,15 +341,29 @@ struct SettingsScreen: View {
 
     private func handleAllDevicesLogout() {
         Task {
+            await MatchSyncService.shared.syncPending(in: modelContext)
             await AuthService.shared.logoutAllDevices()
             clearLocalSession()
         }
     }
 
     private func clearLocalSession() {
+        // 계정 전환 시 데이터 혼입을 막기 위해 "백엔드에 백업된 라벨링 경기" 와 계정 귀속 데이터(친구·User)를 삭제한다.
+        // 라벨링 안 한 경기(labeledAt==nil)는 HealthKit 기반 + 백엔드에 없으므로 유지 — 미라벨 경기 손실 0.
+        // 재로그인 시 fetchMatches 로 본인 확정 경기를 복원하므로 계정 간 데이터가 섞이지 않는다.
+        let labeledMatches = (try? modelContext.fetch(
+            FetchDescriptor<Match>(predicate: #Predicate { $0.labeledAt != nil })
+        )) ?? []
+        for match in labeledMatches { modelContext.delete(match) }   // QuarterWorkout 은 cascade 삭제
+
+        // 친구 관련 데이터는 로그인 계정에 귀속 — 전부 정리한다.
+        try? modelContext.delete(model: Friend.self)
+        try? modelContext.delete(model: FriendMatch.self)
+        try? modelContext.delete(model: FriendQuarterWorkout.self)
+
         // 로컬 User 도 정리 + onboarding 재진입
         for u in users { modelContext.delete(u) }
-        try? modelContext.save()
+        modelContext.saveOrLog(caller: "SettingsScreen.clearLocalSession")
         hasCompletedOnboarding = false
     }
 

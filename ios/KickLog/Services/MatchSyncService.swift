@@ -65,7 +65,7 @@ final class MatchSyncService {
             // venueId 음수 또는 quarters 없음 — 사용자 입력 미완성. syncErrorMessage 만 기록.
             match.lastSyncAttemptAt = .now
             match.syncErrorMessage = "운동장/쿼터 정보 미완성 — sync 보류"
-            try? context.save()
+            context.saveOrLog(caller: "MatchSyncService.sync(incomplete)")
             return
         }
 
@@ -73,11 +73,11 @@ final class MatchSyncService {
         do {
             let response: MatchDetailResponse = try await apiClient.put(path, body: request)
             Match.upsertDetail(from: response, into: context)
-            try? context.save()
+            context.saveOrLog(caller: "MatchSyncService.sync(success)")
         } catch {
             match.lastSyncAttemptAt = .now
             match.syncErrorMessage = error.localizedDescription
-            try? context.save()
+            context.saveOrLog(caller: "MatchSyncService.sync(failure)")
             print("MatchSyncService.sync 실패 \(match.clientMatchId): \(error)")
         }
     }

@@ -44,7 +44,7 @@ extension User {
             existing.email = dto.email
             existing.createdAt = dto.createdAt
             existing.lastSyncedAt = .now
-            try? context.save()
+            context.saveOrLog(caller: "User.upsert")
             return existing
         }
         let user = User(
@@ -55,7 +55,7 @@ extension User {
             lastSyncedAt: .now
         )
         context.insert(user)
-        try? context.save()
+        context.saveOrLog(caller: "User.upsert")
         return user
     }
 }
@@ -211,7 +211,7 @@ extension Venue {
             existing.geoLat = dto.geoLat
             existing.geoLng = dto.geoLng
             existing.createdAt = dto.createdAt
-            try? context.save()
+            context.saveOrLog(caller: "Venue.upsert")
             return existing
         }
 
@@ -223,7 +223,7 @@ extension Venue {
             createdAt: dto.createdAt
         )
         context.insert(venue)
-        try? context.save()
+        context.saveOrLog(caller: "Venue.upsert")
         return venue
     }
 }
@@ -377,17 +377,73 @@ extension FriendMatch: MatchDisplayable {
     var displayedAvgHeartRate: Int? { avgHeartRate }
 }
 
-// MARK: - 모든 모델 타입 — ModelContainer 등록용
+// MARK: - 경기 표시 변환 SoT (화면 간 중복 제거)
+
+// 포지션·운동시간 등 순수 표시 변환. MatchDetailScreen / FriendMatchDetailScreen 양쪽에서 호출.
+enum MatchFormat {
+    // 포지션 코드 → 한글 풀네임. "GK" → "골키퍼 (GK)".
+    static func positionLong(_ code: String?) -> String {
+        switch code {
+        case "GK": return "골키퍼 (GK)"
+        case "DF": return "수비수 (DF)"
+        case "MF": return "미드필더 (MF)"
+        case "FW": return "공격수 (FW)"
+        default: return "—"
+        }
+    }
+
+    // 초 → "M:SS" 운동시간 라벨.
+    static func durationLabel(_ seconds: Int) -> String {
+        String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+// MARK: - VersionedSchema (ADR-0004 — 스키마 진화 대비)
+
+// 현재 스키마 V1. @Model 클래스 정의를 바꾸지 않는 한 스키마 해시가 동일하므로
+// 기존 설치 사용자의 스토어가 그대로 열린다. 필드 추가/타입 변경 시 V2 를 새로 정의하고
+// KickLogMigrationPlan.stages 에 migration stage 를 추가한다.
+enum KickLogSchemaV1: VersionedSchema {
+    static let versionIdentifier = Schema.Version(1, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            User.self,
+            Match.self,
+            QuarterWorkout.self,
+            Venue.self,
+            Friend.self,
+            FriendMatch.self,
+            FriendQuarterWorkout.self,
+            HealthKitState.self,
+        ]
+    }
+}
+
+// 마이그레이션 플랜. 현재는 V1 단일 버전이라 stages 비어 있음 (마이그레이션 불필요).
+enum KickLogMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] {
+        [KickLogSchemaV1.self]
+    }
+
+    static var stages: [MigrationStage] {
+        []
+    }
+}
+
+// MARK: - 모든 모델 타입 — ModelContainer 등록용 (Preview·in-memory 컨테이너 호환)
 
 enum KickLogSchema {
-    static let allModels: [any PersistentModel.Type] = [
-        User.self,
-        Match.self,
-        QuarterWorkout.self,
-        Venue.self,
-        Friend.self,
-        FriendMatch.self,
-        FriendQuarterWorkout.self,
-        HealthKitState.self,
-    ]
+    static let allModels: [any PersistentModel.Type] = KickLogSchemaV1.models
+}
+
+// MARK: - ModelContext 저장 헬퍼
+
+extension ModelContext {
+    /// 저장 실패를 침묵시키지 않고 로그를 남긴다. iOS 가 1차 SoT 라 로컬 저장 실패는 곧 데이터 유실.
+    func saveOrLog(caller: String) {
+        do { try save() } catch {
+            print("[SwiftData] 저장 실패 (\(caller)): \(error)")
+        }
+    }
 }

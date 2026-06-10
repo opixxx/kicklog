@@ -169,7 +169,11 @@ struct VenueDetailScreen: View {
         do {
             _ = try await VenueService.shared.fetchVenue(id: venueId, into: modelContext)
         } catch {
-            errorMessage = friendlyMessage(error)
+            errorMessage = error.userMessage(serverCodes: [
+                "VENUE_NOT_FOUND": "운동장을 찾을 수 없습니다",
+                "VENUE_NOT_OWNED": "권한이 없는 운동장입니다",
+                "VENUE_NAME_DUPLICATE": "같은 이름의 운동장이 이미 있습니다",
+            ])
         }
     }
 
@@ -183,7 +187,11 @@ struct VenueDetailScreen: View {
         do {
             _ = try await VenueService.shared.updateVenue(id: venueId, name: name, into: modelContext)
         } catch {
-            errorMessage = friendlyMessage(error)
+            errorMessage = error.userMessage(serverCodes: [
+                "VENUE_NOT_FOUND": "운동장을 찾을 수 없습니다",
+                "VENUE_NOT_OWNED": "권한이 없는 운동장입니다",
+                "VENUE_NAME_DUPLICATE": "같은 이름의 운동장이 이미 있습니다",
+            ])
         }
     }
 
@@ -196,24 +204,14 @@ struct VenueDetailScreen: View {
             try await VenueService.shared.deleteVenue(id: venueId, in: modelContext)
             dismiss()
         } catch {
-            errorMessage = friendlyMessage(error)
+            errorMessage = error.userMessage(serverCodes: [
+                "VENUE_NOT_FOUND": "운동장을 찾을 수 없습니다",
+                "VENUE_NOT_OWNED": "권한이 없는 운동장입니다",
+                "VENUE_NAME_DUPLICATE": "같은 이름의 운동장이 이미 있습니다",
+            ])
         }
     }
 
-    private func friendlyMessage(_ error: Error) -> String {
-        guard let apiError = error as? APIError else { return error.localizedDescription }
-        switch apiError {
-        case .noConnection: return "네트워크 연결을 확인해 주세요"
-        case .unauthorized: return "로그인이 만료되었습니다"
-        case .server(_, let body, _):
-            if body?.code == "VENUE_NOT_FOUND" { return "운동장을 찾을 수 없습니다" }
-            if body?.code == "VENUE_NOT_OWNED" { return "권한이 없는 운동장입니다" }
-            if body?.code == "VENUE_NAME_DUPLICATE" { return "같은 이름의 운동장이 이미 있습니다" }
-            return body?.message ?? "서버 오류가 발생했습니다"
-        case .decodingFailed: return "응답을 처리하지 못했습니다"
-        case .unknown: return "알 수 없는 오류가 발생했습니다"
-        }
-    }
 }
 
 #Preview {

@@ -410,7 +410,7 @@ private extension OnboardPage3 {
         for user in users {
             modelContext.delete(user)
         }
-        try? modelContext.save()
+        modelContext.saveOrLog(caller: "OnboardingScreen.clearSignedInUser")
     }
 }
 
@@ -535,7 +535,7 @@ private struct OnboardPage4: View {
                         .tracking(-0.3)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 52)
+                        .frame(height: 56)   // 온보딩 버튼 높이 통일 (OAuth 버튼과 동일)
                         .background(KLTokens.pitch, in: RoundedRectangle(cornerRadius: KLTokens.radiusBtn))
                 }
                 .buttonStyle(.plain)
@@ -574,7 +574,7 @@ private func bottomControls(currentPage: Binding<Int>, totalPages: Int) -> some 
                 .tracking(-0.3)
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 52)
+                .frame(height: 56)   // 온보딩 버튼 높이 통일 (OAuth 버튼과 동일)
                 .background(KLTokens.pitch, in: RoundedRectangle(cornerRadius: KLTokens.radiusBtn))
         }
         .buttonStyle(.plain)

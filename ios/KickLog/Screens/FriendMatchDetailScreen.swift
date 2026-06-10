@@ -82,7 +82,7 @@ struct FriendMatchDetailScreen: View {
                         Text(scoreDisplay(match))
                             .font(.system(size: 22, weight: .black).monospacedDigit())
                             .tracking(-0.5)
-                        Text(MatchResult.from(Self.resultCode(match.result)).rawValue)
+                        Text(MatchResult.from(MatchResult.code(fromWire: match.result)).rawValue)
                             .font(.system(size: 15, weight: .bold))
                     }
                     .foregroundStyle(.white)
@@ -220,7 +220,7 @@ struct FriendMatchDetailScreen: View {
                 KLMetaRow(key: "결과") {
                     HStack(spacing: 2) {
                         Text(scoreDisplay(match)).monospacedDigit()
-                        Text(MatchResult.from(Self.resultCode(match.result)).rawValue)
+                        Text(MatchResult.from(MatchResult.code(fromWire: match.result)).rawValue)
                     }
                 }
                 KLMetaRow(key: "포지션", value: positionLong(match.position))
@@ -308,25 +308,12 @@ struct FriendMatchDetailScreen: View {
         do {
             match = try await FriendService.shared.fetchFriendMatch(userId: userId, matchId: matchId)
         } catch {
-            errorMessage = friendlyMessage(error)
+            errorMessage = error.userMessage(serverCodes: [
+                "FRIEND_UNAUTHORIZED": "친구 관계가 아니어서 경기를 볼 수 없습니다",
+                "MATCH_NOT_FOUND": "경기를 찾을 수 없습니다",
+                "USER_NOT_FOUND": "탈퇴했거나 존재하지 않는 사용자입니다",
+            ])
         }
-    }
-
-    private func friendlyMessage(_ error: Error) -> String {
-        if let apiError = error as? APIError {
-            switch apiError {
-            case .noConnection: return "네트워크 연결을 확인해 주세요"
-            case .unauthorized: return "로그인이 만료되었습니다"
-            case .server(_, let body, _):
-                if body?.code == "FRIEND_UNAUTHORIZED" { return "친구 관계가 아니어서 경기를 볼 수 없습니다" }
-                if body?.code == "MATCH_NOT_FOUND" { return "경기를 찾을 수 없습니다" }
-                if body?.code == "USER_NOT_FOUND" { return "탈퇴했거나 존재하지 않는 사용자입니다" }
-                return body?.message ?? "서버 오류가 발생했습니다"
-            case .decodingFailed: return "응답을 처리하지 못했습니다"
-            case .unknown: return "알 수 없는 오류가 발생했습니다"
-            }
-        }
-        return error.localizedDescription
     }
 
     // MARK: - Derived
@@ -336,22 +323,7 @@ struct FriendMatchDetailScreen: View {
     }
 
     private func positionLong(_ pos: String?) -> String {
-        switch pos {
-        case "GK": return "골키퍼 (GK)"
-        case "DF": return "수비수 (DF)"
-        case "MF": return "미드필더 (MF)"
-        case "FW": return "공격수 (FW)"
-        default: return "—"
-        }
-    }
-
-    private static func resultCode(_ wire: String?) -> String? {
-        switch wire {
-        case "WIN": return "W"
-        case "DRAW": return "D"
-        case "LOSS": return "L"
-        default: return nil
-        }
+        MatchFormat.positionLong(pos)
     }
 
     private static let dateTimeFormatter: DateFormatter = {

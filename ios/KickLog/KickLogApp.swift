@@ -5,12 +5,20 @@ import KakaoSDKCommon
 
 @main
 struct KickLogApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+
     // ADR-0004 D1 — CloudKit 미사용, 순수 로컬 SwiftData.
     let modelContainer: ModelContainer = {
         do {
-            let schema = Schema(KickLogSchema.allModels)
+            // VersionedSchema(V1) + MigrationPlan 경유 — 스키마 진화 대비.
+            // V1 의 @Model 정의는 기존과 동일해 스키마 해시가 같으므로 기존 스토어가 그대로 열린다.
+            let schema = Schema(versionedSchema: KickLogSchemaV1.self)
             let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-            return try ModelContainer(for: schema, configurations: config)
+            return try ModelContainer(
+                for: schema,
+                migrationPlan: KickLogMigrationPlan.self,
+                configurations: config
+            )
         } catch {
             fatalError("ModelContainer 초기화 실패: \(error)")
         }
@@ -46,5 +54,13 @@ struct KickLogApp: App {
                 }
         }
         .modelContainer(modelContainer)
+        .onChange(of: scenePhase) { _, newPhase in
+            // 백그라운드 복귀(.active) 시에도 미동기화 Match 를 재시도한다.
+            // 앱 시작 시 1회만 돌던 syncPending 을 foreground 복귀마다 보강 (네트워크 회복 포함).
+            guard newPhase == .active else { return }
+            Task {
+                await MatchSyncService.shared.syncPending(in: modelContainer.mainContext)
+            }
+        }
     }
 }

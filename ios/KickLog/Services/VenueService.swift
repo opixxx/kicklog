@@ -80,7 +80,7 @@ final class VenueService {
         )
         if let local = try? context.fetch(descriptor).first {
             context.delete(local)
-            try? context.save()
+            context.saveOrLog(caller: "VenueService.deleteVenue")
         }
     }
 }
