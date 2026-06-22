@@ -530,7 +530,8 @@ private struct OnboardPage4: View {
 
             VStack(spacing: 16) {
                 Button(action: requestHealthAuthorization) {
-                    Text("권한 허용하기")
+                    // 심사 가이드라인 5.1.1(iv) — 권한 사전 안내 버튼은 "허용" 유도 문구 금지, Continue/Next 류만 허용.
+                    Text("계속하기")
                         .font(.system(size: 17, weight: .bold))
                         .tracking(-0.3)
                         .foregroundStyle(.white)

@@ -62,6 +62,7 @@ final class WorkoutImporter {
                         await self?.saveAnchor(newAnchor)
                     }
                     await self?.importAll(workouts: workouts)
+                    self?.cleanupDuplicatesOfLabeledMatches()
                     continuation.resume()
                 }
             }
@@ -80,10 +81,17 @@ final class WorkoutImporter {
 
     private func importOne(_ workout: HKWorkout) async {
         let uuidString = workout.uuid.uuidString
+        let lowerBound = workout.startDate.addingTimeInterval(-2)
+        let upperBound = workout.startDate.addingTimeInterval(2)
 
-        // 중복 import 방지 (HKWorkout.uuid UNIQUE on QuarterWorkout)
+        // 중복 import 방지: 같은 HealthKit UUID 거나, 같은 시작 시각(±2초)의 쿼터가 이미 있으면 skip.
+        // 시각 매칭은 백엔드 복구분(UUID 형식 차이 등으로 UUID 매칭이 빗나가는 경우)까지 막는 안전망 —
+        // 기기 재설치 후 복구↔재import 경쟁으로 같은 워크아웃이 중복 라벨링 큐로 뜨는 것을 방지한다.
         let descriptor = FetchDescriptor<QuarterWorkout>(
-            predicate: #Predicate { $0.sourceWorkoutUUID == uuidString }
+            predicate: #Predicate {
+                $0.sourceWorkoutUUID == uuidString
+                    || ($0.startedAt >= lowerBound && $0.startedAt <= upperBound)
+            }
         )
         if (try? modelContext.fetch(descriptor))?.isEmpty == false { return }
 
@@ -135,6 +143,48 @@ final class WorkoutImporter {
         }
         modelContext.saveOrLog(caller: "WorkoutImporter.cleanupPreSignupUnlabeledMatches")
         print("WorkoutImporter: 가입일 이전 미라벨 매치 \(matches.count)건 정리")
+    }
+
+    // MARK: - 라벨링 경기와 중복된 미라벨 매치 cleanup
+
+    // 라벨링된 경기와 중복되는 미라벨 매치를 제거한다. 두 경우를 정리한다:
+    //  ① 라벨 경기와 같은 워크아웃(쿼터 시작 시각 일치)을 가진 미라벨 매치
+    //  ② 쿼터가 라벨 경기로 흡수돼(sourceWorkoutUUID unique 충돌) 빈 껍데기로 남은 미라벨 매치
+    // 기기 재설치 후 백엔드 상세 복구와 HealthKit 재import 가 같은 워크아웃을 가리킬 때 발생하는
+    // 중복/잔재를 청소 (idempotent — 매 import 후 1회). 라벨링 완료분은 손대지 않는다.
+    private func cleanupDuplicatesOfLabeledMatches() {
+        let labeledDescriptor = FetchDescriptor<Match>(
+            predicate: #Predicate { $0.labeledAt != nil }
+        )
+        guard let labeled = try? modelContext.fetch(labeledDescriptor) else { return }
+        // 라벨링 경기들의 쿼터 시작 시각(초 단위 반올림)을 집합으로 — 직렬화 ±1초 오차 흡수.
+        let labeledStartSeconds = Set(
+            labeled.flatMap { $0.quarters.map { Int($0.startedAt.timeIntervalSince1970.rounded()) } }
+        )
+        guard !labeledStartSeconds.isEmpty else { return }
+
+        let unlabeledDescriptor = FetchDescriptor<Match>(
+            predicate: #Predicate { $0.labeledAt == nil }
+        )
+        guard let unlabeled = try? modelContext.fetch(unlabeledDescriptor) else { return }
+
+        var removed = 0
+        for match in unlabeled {
+            // ② 쿼터가 라벨 경기로 흡수돼 비어버린 미라벨(빈 껍데기)
+            let isEmpty = match.quarters.isEmpty
+            // ① 라벨 경기와 시작 시각이 겹치는 미라벨
+            let isDuplicate = match.quarters.contains {
+                labeledStartSeconds.contains(Int($0.startedAt.timeIntervalSince1970.rounded()))
+            }
+            if isEmpty || isDuplicate {
+                modelContext.delete(match)
+                removed += 1
+            }
+        }
+        if removed > 0 {
+            modelContext.saveOrLog(caller: "WorkoutImporter.cleanupDuplicatesOfLabeledMatches")
+            print("WorkoutImporter: 라벨링 경기와 중복된 미라벨 매치 \(removed)건 정리")
+        }
     }
 
     // MARK: - anchor 영속화
