@@ -129,26 +129,22 @@ class Match(
         }
     }
 
+    // 쿼터를 quarter_number 기준 in-place 로 동기화한다 (clear + 재INSERT 금지).
+    // 기존 행을 갈아엎으면 IDENTITY 전략상 새 INSERT 가 기존 행 DELETE 보다 먼저 실행되어
+    // (match_id, quarter_number) unique 제약을 위반한다 — 재계산/재라벨링 PUT 이 항상 실패하던 원인.
+    // 따라서 ① 빠진 쿼터만 제거(orphanRemoval) ② 기존 쿼터는 UPDATE ③ 새 쿼터만 INSERT 한다.
     private fun replaceQuarters(command: UpsertMatchCommand) {
-        quarterWorkouts.clear()
-        command.quarters.sortedBy { it.quarterNumber }.forEach {
-            quarterWorkouts.add(
-                QuarterWorkout(
-                    match = this,
-                    quarterNumber = it.quarterNumber,
-                    healthKitWorkoutId = it.healthKitWorkoutId,
-                    startedAt = it.startedAt,
-                    endedAt = it.endedAt,
-                    durationSeconds = it.durationSeconds,
-                    distanceM = it.distanceM,
-                    avgSpeedKmh = it.avgSpeedKmh,
-                    maxSpeedKmh = it.maxSpeedKmh,
-                    avgHeartRate = it.avgHeartRate,
-                    maxHeartRate = it.maxHeartRate,
-                    sprintCount = it.sprintCount,
-                    activeEnergyKcal = it.activeEnergyKcal,
-                ),
-            )
+        val incomingNumbers = command.quarters.map { it.quarterNumber }.toSet()
+        quarterWorkouts.removeIf { it.quarterNumber !in incomingNumbers }
+
+        val existingByNumber = quarterWorkouts.associateBy { it.quarterNumber }
+        command.quarters.sortedBy { it.quarterNumber }.forEach { quarter ->
+            val existing = existingByNumber[quarter.quarterNumber]
+            if (existing != null) {
+                existing.updateFrom(quarter)
+            } else {
+                quarterWorkouts.add(QuarterWorkout.from(this, quarter))
+            }
         }
     }
 

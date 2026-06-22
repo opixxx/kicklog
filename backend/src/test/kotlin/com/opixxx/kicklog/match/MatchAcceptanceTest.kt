@@ -92,6 +92,135 @@ class MatchAcceptanceTest {
     }
 
     @Test
+    fun `이미 저장된 2쿼터 경기를 재계산 PUT 하면 200 과 함께 모든 쿼터 지표가 갱신된다`() {
+        // 회귀: 기존 경기를 다시 PUT(지표 재계산/재라벨링)할 때 quarter_workouts (match_id, quarter_number)
+        // unique 제약 위반(500)으로 저장이 반영되지 않던 버그. 2쿼터 이상에서만 드러난다.
+        val accessToken = jwtTokenProvider.createAccessToken(userId = 201L)
+        val venueId = createVenue(accessToken, name = "재계산운동장")
+        val clientMatchId = "bbbbbbb1-0000-0000-0000-000000000001"
+
+        // 1) 최초 저장 — 2쿼터, distanceM = 0 (import 지연으로 0 저장된 상황 재현)
+        mockMvc.put("/matches/$clientMatchId") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = twoQuarterMatchJson(venueId = venueId, q1Distance = 0, q2Distance = 0)
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.quarters.length()") { value(2) }
+        }
+
+        // 2) 재계산 PUT — 같은 2쿼터를 실제 지표로 갱신 → 200 + 지표 반영 (기존엔 여기서 500)
+        mockMvc.put("/matches/$clientMatchId") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = twoQuarterMatchJson(venueId = venueId, q1Distance = 1500, q2Distance = 1800)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.quarters.length()") { value(2) }
+            jsonPath("$.quarters[0].distanceM") { value(1500) }
+            jsonPath("$.quarters[1].distanceM") { value(1800) }
+        }
+
+        // 3) 재조회로 영속화 확인 (0 으로 되돌아가지 않음)
+        mockMvc.get("/matches/by-client-id/$clientMatchId") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.quarters[0].distanceM") { value(1500) }
+            jsonPath("$.quarters[1].distanceM") { value(1800) }
+        }
+    }
+
+    @Test
+    fun `쿼터 번호 set 을 부분 교체하여 재PUT 하면 삭제·갱신·추가가 한 번에 반영된다`() {
+        // in-place 동기화의 핵심 위험 경로: 한 PUT 안에서 DELETE(Q1) + UPDATE(Q2) + INSERT(Q3)가
+        // 같은 flush 에 묶인다. quarter_number 재사용이 없으므로 unique 충돌 없이 통과해야 한다.
+        val accessToken = jwtTokenProvider.createAccessToken(userId = 203L)
+        val venueId = createVenue(accessToken, name = "부분교체운동장")
+        val clientMatchId = "bbbbbbb3-0000-0000-0000-000000000003"
+
+        // 1) Q1, Q2 저장
+        mockMvc.put("/matches/$clientMatchId") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = twoQuarterMatchJson(venueId = venueId, q1Distance = 1000, q2Distance = 1000)
+        }.andExpect { status { isCreated() } }
+
+        // 2) Q1 제거 + Q2 갱신(거리·심박 동시) + Q3 신규 → 200
+        val body = """
+            {
+              "venueId": $venueId,
+              "playedAt": "2026-05-23T09:00:00Z",
+              "opponent": "OO FC",
+              "position": "MF",
+              "goals": 1,
+              "assists": 0,
+              "teamGoals": 1,
+              "opponentGoals": 0,
+              "quarters": [
+                {
+                  "quarterNumber": 2,
+                  "healthKitWorkoutId": "hk-q2",
+                  "startedAt": "2026-05-23T09:20:00Z",
+                  "endedAt": "2026-05-23T09:35:00Z",
+                  "distanceM": 2222,
+                  "avgHeartRate": 155
+                },
+                {
+                  "quarterNumber": 3,
+                  "healthKitWorkoutId": "hk-q3",
+                  "startedAt": "2026-05-23T09:40:00Z",
+                  "endedAt": "2026-05-23T09:55:00Z",
+                  "distanceM": 3333
+                }
+              ]
+            }
+        """.trimIndent()
+
+        mockMvc.put("/matches/$clientMatchId") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.quarters.length()") { value(2) }
+            jsonPath("$.quarters[0].quarterNumber") { value(2) }
+            jsonPath("$.quarters[0].distanceM") { value(2222) }
+            jsonPath("$.quarters[0].avgHeartRate") { value(155) }   // 지표(거리)뿐 아니라 시각·심박도 갱신되는지
+            jsonPath("$.quarters[1].quarterNumber") { value(3) }
+            jsonPath("$.quarters[1].distanceM") { value(3333) }
+        }
+    }
+
+    @Test
+    fun `2쿼터 경기를 1쿼터로 줄여 재PUT 하면 빠진 쿼터가 삭제된다`() {
+        // orphanRemoval 경로 회귀 — in-place 갱신으로 바꿔도 빠진 쿼터는 정상 삭제되어야 한다.
+        val accessToken = jwtTokenProvider.createAccessToken(userId = 202L)
+        val venueId = createVenue(accessToken, name = "쿼터축소운동장")
+        val clientMatchId = "bbbbbbb2-0000-0000-0000-000000000002"
+
+        mockMvc.put("/matches/$clientMatchId") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = twoQuarterMatchJson(venueId = venueId, q1Distance = 1000, q2Distance = 1000)
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.quarters.length()") { value(2) }
+        }
+
+        mockMvc.put("/matches/$clientMatchId") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = matchJson(venueId = venueId, quarterWorkoutId = "hk-q1-only")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.quarters.length()") { value(1) }
+            jsonPath("$.quarters[0].quarterNumber") { value(1) }
+            jsonPath("$.quarters[0].healthKitWorkoutId") { value("hk-q1-only") }
+        }
+    }
+
+    @Test
     fun `내 경기 목록은 최신순 cursor 방식으로 조회한다`() {
         val accessToken = jwtTokenProvider.createAccessToken(userId = 3L)
         val venueId = createVenue(accessToken, name = "목록 운동장")
@@ -495,6 +624,43 @@ class MatchAcceptanceTest {
                   "healthKitWorkoutId": "$quarterWorkoutId",
                   "startedAt": "$playedAt",
                   "endedAt": "2026-05-27T09:15:00Z"
+                }
+              ]
+            }
+        """.trimIndent()
+    }
+
+    // 2쿼터 경기 JSON — 재PUT 시 unique 제약 충돌 회귀 검증용. 쿼터별 distanceM 을 지정해 갱신을 확인한다.
+    private fun twoQuarterMatchJson(
+        venueId: Long,
+        q1Distance: Int,
+        q2Distance: Int,
+        playedAt: String = "2026-05-23T09:00:00Z",
+    ): String {
+        return """
+            {
+              "venueId": $venueId,
+              "playedAt": "$playedAt",
+              "opponent": "OO FC",
+              "position": "MF",
+              "goals": 1,
+              "assists": 0,
+              "teamGoals": 1,
+              "opponentGoals": 0,
+              "quarters": [
+                {
+                  "quarterNumber": 1,
+                  "healthKitWorkoutId": "hk-q1",
+                  "startedAt": "$playedAt",
+                  "endedAt": "2026-05-23T09:15:00Z",
+                  "distanceM": $q1Distance
+                },
+                {
+                  "quarterNumber": 2,
+                  "healthKitWorkoutId": "hk-q2",
+                  "startedAt": "2026-05-23T09:20:00Z",
+                  "endedAt": "2026-05-23T09:35:00Z",
+                  "distanceM": $q2Distance
                 }
               ]
             }
