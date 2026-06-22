@@ -133,7 +133,7 @@ final class WorkoutImporter {
         for match in matches {
             modelContext.delete(match)
         }
-        try? modelContext.save()
+        modelContext.saveOrLog(caller: "WorkoutImporter.cleanupPreSignupUnlabeledMatches")
         print("WorkoutImporter: 가입일 이전 미라벨 매치 \(matches.count)건 정리")
     }
 

@@ -192,6 +192,10 @@ class FriendshipService(
     private fun now(): Instant = Instant.now(clock)
 
     private fun <T> runInTransaction(action: () -> T): T {
-        return transactionTemplate?.execute { action() } ?: action()
+        val template = transactionTemplate
+            ?: throw IllegalStateException("TransactionTemplate 미주입: 트랜잭션 경계 없이 실행할 수 없습니다")
+        // execute 의 반환 타입이 T? 라 캐스트가 불가피 — action 이 T 를 반환하므로 안전하다.
+        @Suppress("UNCHECKED_CAST")
+        return template.execute { action() } as T
     }
 }

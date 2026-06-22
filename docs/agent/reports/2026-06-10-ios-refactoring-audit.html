@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KickLog iOS 리팩토링 진단 보고서 — 2026-06-10</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181b23;
+    --surface2: #1f2330;
+    --border: #2a2f3e;
+    --text: #e6e9f0;
+    --muted: #9aa3b5;
+    --accent: #4ade80;
+    --high: #f87171;
+    --medium: #fbbf24;
+    --low: #60a5fa;
+    --good: #34d399;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Pretendard", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 48px 24px;
+  }
+  .container { max-width: 920px; margin: 0 auto; }
+  header { margin-bottom: 40px; border-bottom: 1px solid var(--border); padding-bottom: 28px; }
+  h1 { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.5px; }
+  h1 .ball { font-size: 1.6rem; margin-right: 8px; }
+  .subtitle { color: var(--muted); margin-top: 8px; font-size: 0.95rem; }
+  .verdict {
+    margin-top: 20px; padding: 16px 20px; border-radius: 12px;
+    background: linear-gradient(135deg, rgba(74,222,128,0.08), rgba(96,165,250,0.08));
+    border: 1px solid rgba(74,222,128,0.25);
+    font-size: 1.02rem;
+  }
+  .verdict strong { color: var(--accent); }
+  h2 {
+    font-size: 1.3rem; font-weight: 700; margin: 48px 0 6px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  h2 .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 8px; font-size: 0.85rem;
+    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+  }
+  .section-desc { color: var(--muted); font-size: 0.92rem; margin-bottom: 18px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 20px; margin-bottom: 14px;
+  }
+  .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .card-title { font-weight: 700; font-size: 1.02rem; }
+  .badge {
+    font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .badge.high   { background: rgba(248,113,113,0.15); color: var(--high);   border: 1px solid rgba(248,113,113,0.4); }
+  .badge.medium { background: rgba(251,191,36,0.12);  color: var(--medium); border: 1px solid rgba(251,191,36,0.35); }
+  .badge.low    { background: rgba(96,165,250,0.12);  color: var(--low);    border: 1px solid rgba(96,165,250,0.35); }
+  .badge.good   { background: rgba(52,211,153,0.12);  color: var(--good);   border: 1px solid rgba(52,211,153,0.35); }
+  .badge.notice { background: rgba(192,132,252,0.12); color: #c084fc;       border: 1px solid rgba(192,132,252,0.35); }
+  .badge.false-positive { background: rgba(154,163,181,0.12); color: var(--muted); border: 1px solid rgba(154,163,181,0.35); }
+  .card p { font-size: 0.93rem; color: #c6ccda; margin-bottom: 6px; }
+  .card .fix { font-size: 0.93rem; color: var(--text); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+  .card .fix::before { content: "수정 →"; color: var(--accent); font-weight: 700; margin-right: 8px; font-size: 0.82rem; }
+  code {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    font-size: 0.82em; background: var(--surface2);
+    padding: 2px 6px; border-radius: 5px; border: 1px solid var(--border);
+    color: #a5d6ff; word-break: break-all;
+  }
+  pre {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    font-size: 0.8rem; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; margin: 8px 0; overflow-x: auto;
+    color: #a5d6ff; line-height: 1.5;
+  }
+  .loc { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+  .good-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .good-item {
+    background: var(--surface); border: 1px solid rgba(52,211,153,0.2);
+    border-radius: 10px; padding: 12px 14px; font-size: 0.88rem; color: #c6ccda;
+  }
+  .good-item::before { content: "✓"; color: var(--good); font-weight: 800; margin-right: 8px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 0.9rem; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:hover td { background: var(--surface2); }
+  .priority-tag { font-weight: 800; }
+  .p1 { color: var(--high); }
+  .p2 { color: var(--medium); }
+  .p3 { color: var(--low); }
+  footer {
+    margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 0.84rem;
+  }
+  footer code { font-size: 0.78rem; }
+  @media (max-width: 640px) { .good-list { grid-template-columns: 1fr; } body { padding: 24px 14px; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1><span class="ball">📱</span>KickLog iOS 리팩토링 진단 보고서</h1>
+  <div class="subtitle">2026-06-10 · Swift 68개 파일 / 약 10,320줄 · 3개 관점 병렬 분석 (화면 구조 / Services·Networking / 모델·데이터 흐름) + 핵심 지적 직접 검증</div>
+  <div class="verdict">
+    <strong>결론:</strong> 디자인 시스템(KLTokens)·actor 기반 토큰 갱신·Keychain 저장·HealthKit anchor 증분 import 등 기반이 견고하다.
+    최우선 과제는 <strong>① SwiftData VersionedSchema 부재 (출시 후 스키마 변경 불가)</strong> ·
+    <strong>② <code>try? save()</code> 16곳의 저장 실패 침묵</strong> ·
+    <strong>③ 내 경기/친구 경기 상세 화면의 구조 중복</strong> 3가지다.
+  </div>
+</header>
+
+<!-- ═══════════════ 커밋 전 주의 ═══════════════ -->
+<h2><span class="num">⚠</span>커밋 전 원복 필요 (본인이 남긴 임시 변경)</h2>
+<div class="card">
+  <div class="card-head"><span class="badge notice">Reminder</span><span class="card-title">APIConfig.dev 가 prod URL 을 가리키는 중 (미커밋)</span></div>
+  <p>시뮬레이터에서 prod 백엔드를 테스트하려고 <code>dev</code> 를 <code>https://kicklog.org</code> 로 바꿔 둔 상태.
+     파일에 "제출/커밋 전 반드시 원복할 것" 주석이 있으므로 의도된 임시 변경이지만, working tree 에 그대로 남아 있어 실수 커밋 위험이 있다.</p>
+  <div class="loc">📄 APIConfig.swift:9 (git diff 로 확인)</div>
+  <div class="fix">커밋 전 <code>http://localhost:8080</code> 원복. 근본 해결로는 xcconfig / 환경변수 / Debug 전용 설정 토글로 분리해 코드 수정 없이 전환 가능하게.</div>
+</div>
+
+<!-- ═══════════════ P1 ═══════════════ -->
+<h2><span class="num">P1</span>데이터 안전 — 출시 전 필수</h2>
+<div class="section-desc">iOS 가 1차 SoT (HealthKit raw + SwiftData) 인 설계라, 로컬 데이터 안전이 백엔드보다 중요하다.</div>
+
+<div class="card">
+  <div class="card-head"><span class="badge high">High</span><span class="card-title">SwiftData VersionedSchema 부재 — 출시 후 모델 변경 대비 없음</span></div>
+  <p><code>KickLogApp.swift:9-15</code> 가 <code>Schema(KickLogSchema.allModels)</code> 만으로 컨테이너를 만든다.
+     버전 스키마와 마이그레이션 플랜이 없어, 출시 후 <code>Match</code> 에 필드 하나만 추가해도
+     기존 사용자 기기에서 lightweight migration 이 실패하는 변경(타입 변경·required 추가 등)은 <strong>데이터 손실 또는 앱 재설치</strong>로 이어질 수 있다.
+     iOS 가 1차 SoT 라서 로컬 DB 가 곧 원본 — 가장 치명적인 리스크.</p>
+  <div class="loc">📄 KickLogApp.swift:9-15 · Models/Domain.swift (@Model 8개)</div>
+  <div class="fix"><code>VersionedSchema</code> enum (V1) + <code>SchemaMigrationPlan</code> 도입. 지금 정의해 두면 v1.1 필드 추가 시 <code>MigrationStage</code> 만 늘리면 된다. TestFlight 사용자 생기기 전이 도입 적기.</div>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="badge medium">Medium</span><span class="card-title"><code>try? context.save()</code> 16곳 — 저장 실패 침묵</span></div>
+  <p>프로젝트 전체에서 <code>try? save()</code> 가 16곳 (grep 으로 확인). 저장이 실패해도 원인 기록 없이 조용히 넘어가
+     "라벨링 완료했는데 데이터가 사라졌다" 류의 버그를 추적할 수 없게 된다. iOS 가 SoT 라 백엔드 백업이 안 된 시점의 로컬 저장 실패는 곧 데이터 유실.</p>
+  <div class="loc">📄 Domain.swift:47-48,58 · MatchSyncService.swift:68,76,80 · VenueService.swift:83 외</div>
+  <div class="fix">공통 헬퍼 하나로 통일: <code>func saveOrLog(_ context: ModelContext, caller: String)</code> — do/catch 로 최소한 로그 + 치명 경로(라벨링 저장 등)는 사용자 알림.</div>
+</div>
+
+<!-- ═══════════════ P2 ═══════════════ -->
+<h2><span class="num">P2</span>중복 제거 — 구조 개선</h2>
+<div class="section-desc">기능엔 문제없지만 화면이 늘수록 수정 누락 버그를 만드는 중복들.</div>
+
+<div class="card">
+  <div class="card-head"><span class="badge medium">Medium</span><span class="card-title">MatchDetailScreen ↔ FriendMatchDetailScreen 구조 중복 (직접 검증)</span></div>
+  <p>두 화면의 private 멤버 시그니처를 비교한 결과 <code>hero</code> / <code>content</code> / <code>personalContributionText</code> /
+     <code>scoreDisplay</code> / <code>positionLong</code> 가 양쪽에 같은 구조로 존재한다 (529줄 vs 369줄).
+     한쪽은 SwiftData <code>Match</code>, 다른 쪽은 <code>MatchDetailResponse</code> DTO 를 받는 차이뿐.
+     디자인 변경 시 두 곳을 같이 고쳐야 하고, 이미 <code>Domain.swift:359-378</code> 에 <code>MatchDisplayable</code> 프로토콜이 있어 합칠 토대도 마련돼 있다.</p>
+  <div class="loc">📄 MatchDetailScreen.swift:69,186,201,389,393 · FriendMatchDetailScreen.swift:43,124,139,334,338</div>
+  <div class="fix"><code>MatchDisplayable</code> 을 상세 필드까지 확장하고 공용 <code>MatchDetailContent</code> 뷰로 합치기. 편집/삭제/재분석 등 내 경기 전용 액션만 분기.</div>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="badge low">Low</span><span class="card-title">에러 메시지 변환 <code>friendlyMessage()</code> 가 화면마다 복사됨</span></div>
+  <p><code>APIError → 한글 안내문</code> 변환이 FriendDetailScreen, FriendMatchDetailScreen, LabelingScreen 등에 거의 동일하게 반복.
+     에러 alert 용 <code>Binding</code> 래퍼 보일러플레이트도 여러 화면에서 중복.</p>
+  <div class="loc">📄 FriendDetailScreen.swift:425-439 · FriendMatchDetailScreen.swift:315 외</div>
+  <div class="fix"><code>extension Error { var userMessage: String }</code> 하나로 통일 + <code>View.errorAlert(message: Binding&lt;String?&gt;)</code> modifier 추출.</div>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="badge low">Low</span><span class="card-title">score / result 변환 로직 산재</span></div>
+  <p>스코어 포맷이 <code>KLMatchRow.swift:43</code> 과 <code>MatchDTO.swift:122</code> 두 곳에,
+     result 코드 변환(<code>"WIN" ↔ "W"</code>)이 <code>resultToCode</code> / <code>resultFromWire</code> / <code>MatchResult.from</code> 세 곳에 흩어져 있다.
+     백엔드 enum 이 바뀌면 세 곳을 다 찾아야 한다.</p>
+  <div class="loc">📄 MatchDTO.swift:130-138, 355-362 · KLMatchRow.swift:43</div>
+  <div class="fix"><code>MatchResult</code> enum 하나에 wire code ↔ 표시 코드 ↔ 라벨 변환을 모두 집중.</div>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="badge low">Low</span><span class="card-title">거대 View 분해 후보 3곳</span></div>
+  <p>① <code>MatchDetailScreen.hero</code> (69-184줄, 약 115줄 ZStack — 장식·내비·타이틀·스코어 한 덩어리)
+     ② <code>SettingsScreen.displayNameEditor</code> (370-396줄 — NavigationStack·Form·debounce 가 computed property 하나에)
+     ③ <code>LabelingScreen.save()</code> (407-458줄 — 쿼터 매핑 + 메타 갱신 + SwiftData 저장 + 백엔드 sync 가 한 메서드에).
+     나머지 화면(SeasonScreen 등)은 분해가 잘 되어 있어 이 3곳만 정리하면 균질해진다.</p>
+  <div class="loc">📄 MatchDetailScreen.swift:69-184 · SettingsScreen.swift:370-396 · LabelingScreen.swift:407-458</div>
+  <div class="fix">hero 는 HeroHeader/HeroStats 분리, displayNameEditor 는 전용 Sheet View, save() 는 매핑·저장 로직을 <code>MatchLabeler</code> 헬퍼로.</div>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="badge low">Low</span><span class="card-title">Domain.swift 한 파일에 @Model 8개 (393줄)</span></div>
+  <p>User / Match / QuarterWorkout / Venue / Friend / FriendMatch / FriendQuarterWorkout / HealthKitState 가 모두 한 파일.
+     ADR 참조 주석이 잘 달려 있어 당장 문제는 아니지만, VersionedSchema 도입 시 자연스럽게 파일 분리를 함께 하면 좋다.</p>
+  <div class="loc">📄 Models/Domain.swift</div>
+</div>
+
+<!-- ═══════════════ P3 ═══════════════ -->
+<h2><span class="num">P3</span>동작 품질 — HealthKit·동기화 흐름</h2>
+<div class="section-desc">엣지 케이스에서 사용자가 체감하는 문제들.</div>
+
+<div class="card">
+  <div class="card-head"><span class="badge medium">Medium</span><span class="card-title">HealthKit observer 타이밍 갭 — 지표 0 으로 import 될 수 있음</span></div>
+  <p>HKObserverQuery 가 워크아웃 도착 직후 발화하는데, 거리/속도 quantity 샘플은 아직 동기화 전일 수 있다.
+     이 경우 첫 import 가 <code>distanceM=0</code> 으로 저장되고, working tree 에 추가된 <code>reanalyze()</code> 가 복구 수단이지만
+     <strong>자동 트리거되지 않아</strong> 사용자가 수동으로 재분석해야 한다.</p>
+  <div class="loc">📄 WorkoutImporter.swift:29-70 · WorkoutAnalyzer.swift (reanalyze, 미커밋 변경)</div>
+  <div class="fix">라벨링 진입 시 또는 sync 직전에 <code>지표 == 0 인 쿼터</code> 를 감지해 <code>reanalyze()</code> 자동 호출. 또는 import 시 짧은 지연 후 1회 재시도.</div>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="badge low">Low</span><span class="card-title">MatchSync 재시도가 앱 재실행 시에만</span></div>
+  <p>sync 실패 시 <code>syncErrorMessage</code> 기록 후 <code>syncPending()</code> 은 앱 시작 때만 호출된다.
+     네트워크가 잠시 끊겼다 돌아와도 앱을 껐다 켜야 백업이 재개됨. clientMatchId 기반 멱등 PUT 이라 재시도 자체는 안전(ADR-0003 D5 설계 의도 준수).</p>
+  <div class="loc">📄 MatchSyncService.swift:59-88</div>
+  <div class="fix"><code>scenePhase == .active</code> 복귀 시 <code>syncPending()</code> 한 줄 추가 — fire-and-forget 설계 유지하면서 재시도 빈도만 개선.</div>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="badge low">Low</span><span class="card-title">자잘한 정리 묶음</span></div>
+  <p>① 로딩 상태 패턴 불일치 — SeasonScreen 은 <code>LoadState</code> enum, FriendDetailScreen 은 <code>isLoading/errorMessage/...</code> 분산 → 제네릭 <code>LoadState&lt;T&gt;</code> 통일
+     ② <code>FriendDetailScreen.loadMore()</code> Task 취소 미처리 (빠른 스크롤 시 중복 요청 — <code>isLoadingMore</code> 가드로 부분 완화됨)
+     ③ 버튼 높이 56 vs 52 등 매직 넘버 → <code>KLTokens</code> 로
+     ④ WorkoutAnalyzer 의 HealthKit 쿼리에 타임아웃 없음 (행 걸리면 import 무한 대기)
+     ⑤ 심박 평균이 단순 평균 (duration 가중 아님 — 주석으로 인지된 상태, MVP 허용)</p>
+  <div class="loc">📄 SeasonScreen / FriendDetailScreen:309 / OnboardingScreen:289,539 / WorkoutAnalyzer.swift:104-143</div>
+</div>
+
+<!-- ═══════════════ 오탐/해소 ═══════════════ -->
+<h2><span class="num">✕</span>오탐 / 분석 중 해소된 의심</h2>
+<div class="card">
+  <div class="card-head"><span class="badge false-positive">해소</span><span class="card-title">DTO camelCase 디코딩 실패 우려</span></div>
+  <p>분석 에이전트가 "백엔드가 snake_case 면 디코딩 실패" 우려를 제기했으나, Spring Boot Jackson 기본 직렬화는 camelCase 이고
+     api-spec 예시(<code>displayName</code>, <code>createdAt</code>)도 camelCase — <strong>문제없음.</strong></p>
+</div>
+<div class="card">
+  <div class="card-head"><span class="badge false-positive">해소</span><span class="card-title">토큰 갱신 동시성 / 토큰 저장 보안</span></div>
+  <p><code>TokenRefresher</code> 는 actor + in-flight Task 공유로 동시 401 을 단일 refresh 로 dedup — 올바른 구현.
+     토큰은 Keychain 에 <code>kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly</code> 로 저장 (iCloud 동기화 차단) — 모범 사례.
+     <code>DebugWorkoutSeeder</code> 도 파일 전체 <code>#if DEBUG</code> 로 Release 제외 확인.</p>
+  <div class="loc">📄 TokenRefresher.swift · KeychainService.swift:17 · DebugWorkoutSeeder.swift</div>
+</div>
+
+<!-- ═══════════════ 잘 된 부분 ═══════════════ -->
+<h2><span class="num">✓</span>잘 되어 있는 부분 (변경 불필요)</h2>
+<div class="good-list">
+  <div class="good-item">KLTokens 디자인 시스템 — 색·radius·그림자 중앙화, 21개 KL 컴포넌트가 일관 사용</div>
+  <div class="good-item">@Query + #Predicate 적극 활용 — 메모리 필터링 없이 라벨링 대기/완료 분리</div>
+  <div class="good-item">actor 기반 TokenRefresher — 동시 401 dedup, /auth/refresh 재귀 방지, 단일 재시도 플래그</div>
+  <div class="good-item">Keychain 토큰 저장 — AfterFirstUnlock + ThisDeviceOnly</div>
+  <div class="good-item">HKAnchoredObjectQuery 증분 import + anchor 영속화 — 중복 import 방지</div>
+  <div class="good-item">@Relationship cascade + @Attribute(.unique) — SwiftData 관계·제약 올바름</div>
+  <div class="good-item">MatchDisplayable 프로토콜 — Match/FriendMatch 공통 UI 토대 (P2 중복 제거에 재사용 가능)</div>
+  <div class="good-item">clientMatchId 멱등 PUT 동기화 — ADR-0003 D5 설계 의도 정확히 구현</div>
+  <div class="good-item">APIErrorBody 가 백엔드 계약과 일치 — traceId 필드까지 이미 디코딩 준비됨 (백엔드 P2 traceId 구현 시 즉시 연동)</div>
+  <div class="good-item">debounce + Task 취소 처리 (SettingsScreen displayName 체크, VenueSelection 장소 검색)</div>
+</div>
+
+<!-- ═══════════════ 요약 테이블 ═══════════════ -->
+<h2><span class="num">≡</span>우선순위 요약</h2>
+<table>
+  <thead><tr><th>우선순위</th><th>항목</th><th>심각도</th><th>예상 효과</th></tr></thead>
+  <tbody>
+    <tr><td class="priority-tag p1">⚠</td><td>APIConfig.dev 원복 (커밋 전)</td><td><span class="badge notice">Reminder</span></td><td>prod 오염 실수 방지</td></tr>
+    <tr><td class="priority-tag p1">P1</td><td>VersionedSchema + MigrationPlan 도입</td><td><span class="badge high">High</span></td><td>출시 후 모델 변경 가능 (SoT 데이터 보호)</td></tr>
+    <tr><td class="priority-tag p1">P1</td><td>try? save() 16곳 → 로깅 헬퍼 통일</td><td><span class="badge medium">Medium</span></td><td>로컬 데이터 유실 추적 가능</td></tr>
+    <tr><td class="priority-tag p2">P2</td><td>경기 상세 2개 화면 통합 (MatchDisplayable)</td><td><span class="badge medium">Medium</span></td><td>약 300줄 중복 제거, 수정 누락 방지</td></tr>
+    <tr><td class="priority-tag p2">P2</td><td>에러 메시지·score/result 변환 일원화</td><td><span class="badge low">Low</span></td><td>화면 추가 시 보일러플레이트 제거</td></tr>
+    <tr><td class="priority-tag p2">P2</td><td>거대 View 3곳 분해</td><td><span class="badge low">Low</span></td><td>가독성·컴파일 시간</td></tr>
+    <tr><td class="priority-tag p3">P3</td><td>HealthKit 지표 0 자동 재분석</td><td><span class="badge medium">Medium</span></td><td>첫 import 빈 지표 사용자 체감 버그 해소</td></tr>
+    <tr><td class="priority-tag p3">P3</td><td>scenePhase 복귀 시 syncPending()</td><td><span class="badge low">Low</span></td><td>백업 재시도 빈도 개선</td></tr>
+    <tr><td class="priority-tag p3">P3</td><td>자잘한 정리 (LoadState 통일, 매직 넘버 등)</td><td><span class="badge low">Low</span></td><td>균질성</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  iOS 는 하네스 대상 아님 — Xcode 에서 직접 작업하며 worktree/EXEC_PLAN 강제 없음.<br>
+  착수 추천 순서: APIConfig 원복 → VersionedSchema (TestFlight 사용자 생기기 전) → save 헬퍼 → 화면 중복 통합.<br>
+  과한 패턴(MVVM 전면 도입, @Observable 전환)은 의도적으로 제외 — SwiftUI 표준 관행 기준으로만 제안.<br>
+  백엔드 보고서: <code>docs/agent/reports/2026-06-10-refactoring-audit.html</code> · 생성: Claude Code · 2026-06-10
+</footer>
+
+</div>
+</body>
+</html>

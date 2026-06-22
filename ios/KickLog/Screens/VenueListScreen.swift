@@ -161,18 +161,7 @@ struct VenueListScreen: View {
         do {
             _ = try await VenueService.shared.fetchVenues(into: modelContext)
         } catch {
-            errorMessage = friendlyMessage(error)
-        }
-    }
-
-    private func friendlyMessage(_ error: Error) -> String {
-        guard let apiError = error as? APIError else { return error.localizedDescription }
-        switch apiError {
-        case .noConnection: return "네트워크 연결을 확인해 주세요"
-        case .unauthorized: return "로그인이 만료되었습니다"
-        case .server(_, let body, _): return body?.message ?? "운동장 로딩 중 서버 오류"
-        case .decodingFailed: return "응답을 처리하지 못했습니다"
-        case .unknown: return "알 수 없는 오류가 발생했습니다"
+            errorMessage = error.userMessage(serverFallback: "운동장 로딩 중 서버 오류")
         }
     }
 }

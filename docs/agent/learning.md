@@ -95,3 +95,21 @@
   - [x] 측정 산출물 — `docs/research/assets/measurement-trackC-iter1.md` (로컬)
   - [ ] README `infra/terraform-loadtest/README.md` 태그 안내 수정(`sha-<7>` → full SHA) — 후속
 - Skip reason if not promoted: N/A
+
+---
+
+### 2026-06-10 — Colima 환경에서 Testcontainers 침묵 skip + JPA 정렬 getter 함정
+
+- Trigger: production-risk (검증 신뢰성), audit-fixes 작업 중 발견
+- Task/ADR: refactor/audit-fixes, EXEC_PLAN `docs/agent/plans/2026-06-10-audit-fixes.md`
+- Failures & Root cause:
+  1. **Testcontainers 침묵 skip**: 이 머신은 Docker Desktop 이 아니라 **Colima** 라 plain `./gradlew test` 에서 `disabledWithoutDocker` 가 컨테이너 테스트를 **조용히 skip** 한다. "BUILD SUCCESSFUL + N passed" 가 실DB 검증 없이 보일 수 있음 — 기존 `FriendshipMigrationTest` 도 그동안 skip 되고 있었다.
+  2. **JPA 정렬 getter 함정**: `Match.quarters` 는 영속 필드가 아니라 정렬 getter (영속 필드는 `quarterWorkouts`). HQL `JOIN FETCH m.quarters` 는 경로 해석 실패 — fetch join 은 반드시 `m.quarterWorkouts`.
+- Prevention:
+  - 컨테이너 테스트 실행 시 env 필수: `DOCKER_HOST=unix:///Users/opix/.colima/default/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`
+  - 검증 단계에서 passed 수만 보지 말고 **skipped 카운트 0 확인** (`./gradlew test` 리포트의 skipped 컬럼).
+  - HQL 작성 시 엔티티의 **영속 필드명** 확인 (getter 이름 ≠ 필드명일 수 있음).
+- Updated:
+  - [x] EXEC_PLAN 학습 기록 섹션
+  - [ ] verify-and-block.sh 에 Colima env 주입 — 후속 후보
+- Skip reason if not promoted: N/A

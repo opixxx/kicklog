@@ -6,6 +6,9 @@ import com.opixxx.kicklog.friend.entity.FriendshipStatus
 import com.opixxx.kicklog.friend.repository.InMemoryFriendshipRepository
 import com.opixxx.kicklog.user.entity.User
 import com.opixxx.kicklog.user.repository.InMemoryUserRepository
+import org.springframework.transaction.support.SimpleTransactionStatus
+import org.springframework.transaction.support.TransactionCallback
+import org.springframework.transaction.support.TransactionTemplate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -15,7 +18,18 @@ class FriendshipServiceTest {
 
     private val userRepository = InMemoryUserRepository()
     private val friendshipRepository = InMemoryFriendshipRepository()
-    private val service = FriendshipService(friendshipRepository, userRepository)
+
+    // 단위 테스트용 스텁 — 실제 트랜잭션 없이 콜백만 그대로 실행한다.
+    private val transactionTemplate = object : TransactionTemplate() {
+        override fun <T : Any?> execute(action: TransactionCallback<T>): T =
+            action.doInTransaction(SimpleTransactionStatus())
+    }
+
+    private val service = FriendshipService(
+        friendshipRepository = friendshipRepository,
+        userRepository = userRepository,
+        transactionTemplate = transactionTemplate,
+    )
 
     @Test
     fun `targetUserId로 친구 요청을 생성한다`() {

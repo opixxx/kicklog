@@ -67,7 +67,8 @@ class SeasonStatService(
     private fun findSeasonMatches(userId: Long, year: Int): List<Match> {
         val start = LocalDate.of(year, 1, 1).atStartOfDay().toInstant(ZoneOffset.UTC)
         val end = LocalDate.of(year + 1, 1, 1).atStartOfDay().toInstant(ZoneOffset.UTC)
-        return matchRepository.findAllByUserIdAndPlayedAtBetween(userId, start, end).onEach { it.quarters.size }
+        // quarters 는 fetch join 으로 함께 로드된다 (MatchRepository.findAllByUserIdAndPlayedAtBetween).
+        return matchRepository.findAllByUserIdAndPlayedAtBetween(userId, start, end)
     }
 
     // 모든 매치의 모든 쿼터를 duration 가중평균. 쿼터 없거나 총 시간 0이면 0 반환.

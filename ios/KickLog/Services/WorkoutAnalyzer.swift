@@ -15,6 +15,13 @@ struct WorkoutMetrics: Equatable {
     var activeEnergyKcal: Int = 0
 }
 
+// 쿼터 재분석 결과 — "워크아웃 부재"(시뮬레이터·권한·원본 삭제)와 "데이터 0"(조회 방식/시각 경계)을 구분한다.
+enum QuarterReanalyzeResult {
+    case workoutNotFound   // HealthKit 에 해당 워크아웃이 없음
+    case empty             // 워크아웃은 찾았으나 분석 결과 전부 0
+    case filled            // 실제 데이터로 채워짐
+}
+
 // MARK: - QuarterWorkout.retrim() (ADR-0004 D8)
 
 @MainActor
@@ -46,6 +53,25 @@ extension QuarterWorkout {
         // (HK fetch 실패 시 — 시뮬레이터 시드 데이터 — metrics 는 stale 유지)
 
         match?.recalculateHeadlineMetrics()
+    }
+
+    // 시작/종료 시간은 그대로 두고 metrics 만 HealthKit raw 로 다시 계산한다.
+    // import 시점의 HealthKit 동기화 지연(.immediate observer 가 quantity 샘플 도착 전에 분석)으로
+    // 0 으로 저장된 쿼터를 사후 복구할 때 사용. 반환값: 재분석 결과 실제 데이터가 채워졌는지(전부 0 이면 false).
+    func reanalyze(store: HKHealthStore, analyzer: WorkoutAnalyzer) async -> QuarterReanalyzeResult {
+        guard let uuid = UUID(uuidString: sourceWorkoutUUID),
+              let workout = await fetchWorkout(uuid: uuid, store: store) else {
+            return .workoutNotFound
+        }
+        let metrics = await analyzer.analyze(workout: workout, store: store)
+        distanceM = metrics.distanceM
+        avgSpeedKmh = metrics.avgSpeedKmh
+        maxSpeedKmh = metrics.maxSpeedKmh
+        avgHeartRate = metrics.avgHeartRate
+        maxHeartRate = metrics.maxHeartRate
+        sprintCount = metrics.sprintCount
+        activeEnergyKcal = metrics.activeEnergyKcal
+        return metrics != WorkoutMetrics() ? .filled : .empty
     }
 
     private func fetchWorkout(uuid: UUID, store: HKHealthStore) async -> HKWorkout? {

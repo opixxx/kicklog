@@ -83,6 +83,17 @@ extension MatchResult {
         default: return .draw                   // 미라벨링 — 일단 draw 색으로 표시
         }
     }
+
+    // 백엔드 wire 형식("WIN"/"DRAW"/"LOSS") → 내부 코드("W"/"D"/"L"). 변환 SoT.
+    // DTO·화면에서 중복 정의하던 매핑을 한 곳으로 모음.
+    static func code(fromWire wire: String?) -> String? {
+        switch wire {
+        case "WIN": return "W"
+        case "DRAW": return "D"
+        case "LOSS": return "L"
+        default: return nil
+        }
+    }
 }
 
 // MARK: - 경기 행 View

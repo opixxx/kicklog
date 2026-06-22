@@ -1,6 +1,7 @@
 package com.opixxx.kicklog.auth.repository
 
 import com.opixxx.kicklog.auth.entity.RefreshToken
+import java.time.Instant
 import java.util.UUID
 
 class InMemoryRefreshTokenRepository : RefreshTokenStore {
@@ -15,5 +16,11 @@ class InMemoryRefreshTokenRepository : RefreshTokenStore {
 
     override fun findActiveByUserId(userId: Long): List<RefreshToken> {
         return refreshTokens.values.filter { it.user.id == userId && it.isActive() }
+    }
+
+    override fun deleteAllExpiredBefore(now: Instant): Int {
+        val expired = refreshTokens.values.filter { it.expiresAt.isBefore(now) }
+        expired.forEach { refreshTokens.remove(it.jti) }
+        return expired.size
     }
 }

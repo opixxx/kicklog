@@ -2,6 +2,8 @@ package com.opixxx.kicklog.common.exception
 
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
+import org.slf4j.MDC
+import org.springframework.http.HttpStatusCode
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
@@ -12,6 +14,8 @@ data class ErrorResponse(
     val code: String,
     val message: String,
     val path: String,
+    // 요청별 추적 ID (TraceIdFilter 가 MDC 에 주입) — 로그 상관관계용. 필드 추가만 (api-spec 계약).
+    val traceId: String? = null,
 )
 
 @RestControllerAdvice
@@ -22,9 +26,8 @@ class GlobalExceptionHandler {
         exception: KickLogException,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorResponse> {
-        return ResponseEntity
-            .status(exception.errorCode.status)
-            .body(ErrorResponse(exception.errorCode.name, exception.message ?: exception.errorCode.message, request.requestURI))
+        val message = exception.message ?: exception.errorCode.message
+        return errorResponse(exception.errorCode.status, exception.errorCode.name, message, request)
     }
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
@@ -36,9 +39,7 @@ class GlobalExceptionHandler {
         val message = exception.bindingResult.fieldErrors.firstOrNull()?.defaultMessage
             ?: exception.bindingResult.globalErrors.firstOrNull()?.defaultMessage
             ?: ErrorCode.VALIDATION_FAILED.message
-        return ResponseEntity
-            .status(ErrorCode.VALIDATION_FAILED.status)
-            .body(ErrorResponse(ErrorCode.VALIDATION_FAILED.name, message, request.requestURI))
+        return validationError(message, request)
     }
 
     @ExceptionHandler(MissingServletRequestParameterException::class)
@@ -46,9 +47,7 @@ class GlobalExceptionHandler {
         exception: MissingServletRequestParameterException,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorResponse> {
-        return ResponseEntity
-            .status(ErrorCode.VALIDATION_FAILED.status)
-            .body(ErrorResponse(ErrorCode.VALIDATION_FAILED.name, "${exception.parameterName} 파라미터는 필수입니다", request.requestURI))
+        return validationError("${exception.parameterName} 파라미터는 필수입니다", request)
     }
 
     @ExceptionHandler(ConstraintViolationException::class)
@@ -58,8 +57,21 @@ class GlobalExceptionHandler {
     ): ResponseEntity<ErrorResponse> {
         val message = exception.constraintViolations.firstOrNull()?.message
             ?: ErrorCode.VALIDATION_FAILED.message
+        return validationError(message, request)
+    }
+
+    private fun validationError(message: String, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
+        return errorResponse(ErrorCode.VALIDATION_FAILED.status, ErrorCode.VALIDATION_FAILED.name, message, request)
+    }
+
+    private fun errorResponse(
+        status: HttpStatusCode,
+        code: String,
+        message: String,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorResponse> {
         return ResponseEntity
-            .status(ErrorCode.VALIDATION_FAILED.status)
-            .body(ErrorResponse(ErrorCode.VALIDATION_FAILED.name, message, request.requestURI))
+            .status(status)
+            .body(ErrorResponse(code, message, request.requestURI, traceId = MDC.get("traceId")))
     }
 }

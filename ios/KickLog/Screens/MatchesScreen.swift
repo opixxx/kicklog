@@ -216,21 +216,8 @@ struct MatchesScreen: View {
         do {
             _ = try await MatchSyncService.shared.fetchMatches(size: 50, into: modelContext)
         } catch {
-            loadErrorMessage = friendlyMessage(error)
+            loadErrorMessage = error.userMessage
         }
-    }
-
-    private func friendlyMessage(_ error: Error) -> String {
-        if let apiError = error as? APIError {
-            switch apiError {
-            case .noConnection: return "네트워크 연결을 확인해 주세요"
-            case .unauthorized: return "로그인이 만료되었습니다"
-            case .server(_, let body, _): return body?.message ?? "서버 오류가 발생했습니다"
-            case .decodingFailed: return "응답을 처리하지 못했습니다"
-            case .unknown: return "알 수 없는 오류가 발생했습니다"
-            }
-        }
-        return error.localizedDescription
     }
 }
 

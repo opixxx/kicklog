@@ -11,6 +11,9 @@ struct MatchDetailScreen: View {
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
     @State private var errorMessage: String?
+    @State private var editTarget: Match?
+    @State private var isReanalyzing = false
+    @State private var infoMessage: String?
 
     // 라벨링된 쿼터만, quarterNo 오름차순
     private var sortedQuarters: [QuarterWorkout] {
@@ -46,6 +49,19 @@ struct MatchDetailScreen: View {
         } message: {
             Text(errorMessage ?? "")
         }
+        .sheet(item: $editTarget) { editing in
+            // 라벨링 화면을 "수정" 모드로 재사용 — loadInitialState 가 기존 값(쿼터·골·상대팀 등)을 prefill 하고,
+            // 저장 시 PUT(upsert)으로 백엔드를 업데이트한다.
+            LabelingScreen(match: editing)
+        }
+        .alert("지표 재계산", isPresented: Binding(
+            get: { infoMessage != nil },
+            set: { if !$0 { infoMessage = nil } }
+        )) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(infoMessage ?? "")
+        }
     }
 
     // MARK: - Hero
@@ -71,6 +87,17 @@ struct MatchDetailScreen: View {
                     .buttonStyle(.plain)
                     Spacer()
                     Menu {
+                        Button {
+                            editTarget = match
+                        } label: {
+                            Label("수정", systemImage: "pencil")
+                        }
+                        Button {
+                            Task { await reanalyzeMetrics() }
+                        } label: {
+                            Label("지표 재계산", systemImage: "arrow.clockwise")
+                        }
+                        .disabled(isReanalyzing)
                         Button(role: .destructive) {
                             showDeleteConfirmation = true
                         } label: {
@@ -78,7 +105,7 @@ struct MatchDetailScreen: View {
                         }
                         .disabled(isDeleting)
                     } label: {
-                        if isDeleting {
+                        if isDeleting || isReanalyzing {
                             ProgressView()
                                 .tint(.white)
                         } else {
@@ -344,9 +371,7 @@ struct MatchDetailScreen: View {
     }
 
     private func durationLabel(_ seconds: Int) -> String {
-        let m = seconds / 60
-        let s = seconds % 60
-        return String(format: "%d:%02d", m, s)
+        MatchFormat.durationLabel(seconds)
     }
 
     // MARK: - Derived display
@@ -364,13 +389,7 @@ struct MatchDetailScreen: View {
     }
 
     private var positionLong: String {
-        switch match.position {
-        case "GK": return "골키퍼 (GK)"
-        case "DF": return "수비수 (DF)"
-        case "MF": return "미드필더 (MF)"
-        case "FW": return "공격수 (FW)"
-        default: return "—"
-        }
+        MatchFormat.positionLong(match.position)
     }
 
     // MARK: - Formatters
@@ -381,6 +400,42 @@ struct MatchDetailScreen: View {
         f.dateFormat = "yyyy-MM-dd (E) HH:mm"
         return f
     }()
+
+    // MARK: - 지표 재계산
+
+    // import 시점 HealthKit 동기화 지연으로 0 으로 저장된 쿼터를, 동기화 완료 후 다시 분석해 복구한다.
+    private func reanalyzeMetrics() async {
+        guard !isReanalyzing else { return }
+        isReanalyzing = true
+        defer { isReanalyzing = false }
+
+        let analyzer = WorkoutAnalyzer()
+        let store = HealthKitService.shared.store
+        var filled = 0
+        var empty = 0
+        var notFound = 0
+        for quarter in match.quarters {
+            switch await quarter.reanalyze(store: store, analyzer: analyzer) {
+            case .filled: filled += 1
+            case .empty: empty += 1
+            case .workoutNotFound: notFound += 1
+            }
+        }
+        match.recalculateHeadlineMetrics()
+        modelContext.saveOrLog(caller: "MatchDetailScreen.reanalyzeMetrics")
+        // 라벨링된 경기면 갱신된 지표를 백엔드로 동기화한다 (sync 내부에서 labeledAt 검사).
+        await MatchSyncService.shared.sync(match, in: modelContext)
+
+        if filled > 0 {
+            infoMessage = "쿼터 \(filled)개의 지표를 HealthKit 에서 다시 계산했습니다."
+        } else if empty > 0 {
+            // 워크아웃은 찾았는데 분석이 0 — 동기화 지연이 아니라 조회 방식(시각 경계) 문제일 가능성.
+            infoMessage = "워크아웃은 찾았지만 거리·심박 데이터가 비어 있습니다. 조회 방식 문제일 수 있어 추가 수정이 필요합니다."
+        } else {
+            // 워크아웃 자체를 못 찾음 — 시뮬레이터이거나 측정한 기기가 아님.
+            infoMessage = "이 기기의 HealthKit 에서 워크아웃을 찾지 못했습니다. 경기를 측정한 실기기에서 시도하세요."
+        }
+    }
 
     // MARK: - 서버 상세 동기화 / 삭제
 
@@ -396,7 +451,7 @@ struct MatchDetailScreen: View {
             if case .server(404, _, _) = error {
                 return
             }
-            errorMessage = friendlyMessage(error)
+            errorMessage = error.userMessage
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -410,22 +465,10 @@ struct MatchDetailScreen: View {
             try await MatchSyncService.shared.delete(match, in: modelContext)
             dismiss()
         } catch {
-            errorMessage = friendlyMessage(error)
+            errorMessage = error.userMessage
         }
     }
 
-    private func friendlyMessage(_ error: Error) -> String {
-        if let apiError = error as? APIError {
-            switch apiError {
-            case .noConnection: return "네트워크 연결을 확인해 주세요"
-            case .unauthorized: return "로그인이 만료되었습니다"
-            case .server(_, let body, _): return body?.message ?? "서버 오류가 발생했습니다"
-            case .decodingFailed: return "응답을 처리하지 못했습니다"
-            case .unknown: return "알 수 없는 오류가 발생했습니다"
-            }
-        }
-        return error.localizedDescription
-    }
 }
 
 // MARK: - Hero 의 큰 축구장 데코
