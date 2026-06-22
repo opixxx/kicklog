@@ -36,13 +36,20 @@ struct KickLogApp: App {
         WindowGroup {
             RootView()
                 .task {
-                    // 앱 진입 시 Observer Query 등록 (ADR-0004 D4).
-                    // 권한이 아직 없으면 read 결과 빈 배열 — 권한 허용 후 다음 진입에서 정상 동작.
+                    // 1) 백엔드의 라벨링 경기를 먼저 로컬로 복구한다.
+                    //    HealthKit import 보다 반드시 먼저 끝내야 — 그래야 import 가 "이미 라벨링한
+                    //    워크아웃"임을 알아보고 미라벨 경기로 중복 생성하지 않는다 (기기 재설치 시 중복 큐 방지).
+                    await MatchSyncService.shared.restoreLabeledMatches(
+                        in: modelContainer.mainContext
+                    )
+
+                    // 2) Observer Query 등록 + 즉시 import (ADR-0004 D4).
+                    //    권한이 아직 없으면 read 결과 빈 배열 — 권한 허용 후 다음 진입에서 정상 동작.
                     await HealthKitService.shared.startObserver(
                         modelContext: modelContainer.mainContext
                     )
 
-                    // 미동기화 Match 일괄 PUT (ADR-0003 D9 fire-and-forget)
+                    // 3) 미동기화 Match 일괄 PUT (ADR-0003 D9 fire-and-forget)
                     await MatchSyncService.shared.syncPending(
                         in: modelContainer.mainContext
                     )
