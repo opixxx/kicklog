@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KickLog 경기 동기화 버그 진단·해결 보고서 — 2026-06-22</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181b23;
+    --surface2: #1f2330;
+    --border: #2a2f3e;
+    --text: #e6e9f0;
+    --muted: #9aa3b5;
+    --accent: #4ade80;
+    --high: #f87171;
+    --medium: #fbbf24;
+    --low: #60a5fa;
+    --good: #34d399;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Pretendard", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 48px 24px;
+  }
+  .container { max-width: 920px; margin: 0 auto; }
+  header { margin-bottom: 40px; border-bottom: 1px solid var(--border); padding-bottom: 28px; }
+  h1 { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.5px; }
+  h1 .ball { font-size: 1.6rem; margin-right: 8px; }
+  .subtitle { color: var(--muted); margin-top: 8px; font-size: 0.95rem; }
+  .verdict {
+    margin-top: 20px; padding: 16px 20px; border-radius: 12px;
+    background: linear-gradient(135deg, rgba(74,222,128,0.08), rgba(96,165,250,0.08));
+    border: 1px solid rgba(74,222,128,0.25);
+    font-size: 1.02rem;
+  }
+  .verdict strong { color: var(--accent); }
+  h2 {
+    font-size: 1.3rem; font-weight: 700; margin: 48px 0 6px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  h2 .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 8px; font-size: 0.85rem;
+    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+  }
+  h3 { font-size: 1.05rem; font-weight: 700; margin: 24px 0 8px; color: var(--text); }
+  .section-desc { color: var(--muted); font-size: 0.92rem; margin-bottom: 18px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 20px; margin-bottom: 14px;
+  }
+  .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .card-title { font-weight: 700; font-size: 1.02rem; }
+  .badge {
+    font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .badge.high   { background: rgba(248,113,113,0.15); color: var(--high);   border: 1px solid rgba(248,113,113,0.4); }
+  .badge.medium { background: rgba(251,191,36,0.12);  color: var(--medium); border: 1px solid rgba(251,191,36,0.35); }
+  .badge.low    { background: rgba(96,165,250,0.12);  color: var(--low);    border: 1px solid rgba(96,165,250,0.35); }
+  .badge.good   { background: rgba(52,211,153,0.12);  color: var(--good);   border: 1px solid rgba(52,211,153,0.35); }
+  .badge.notice { background: rgba(192,132,252,0.12); color: #c084fc;       border: 1px solid rgba(192,132,252,0.35); }
+  .card p { font-size: 0.93rem; color: #c6ccda; margin-bottom: 6px; }
+  .card ul { margin: 6px 0 6px 20px; font-size: 0.93rem; color: #c6ccda; }
+  .card li { margin-bottom: 4px; }
+  .card .fix { font-size: 0.93rem; color: var(--text); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+  .card .fix::before { content: "해결 →"; color: var(--accent); font-weight: 700; margin-right: 8px; font-size: 0.82rem; }
+  code {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    font-size: 0.82em; background: var(--surface2);
+    padding: 2px 6px; border-radius: 5px; border: 1px solid var(--border);
+    color: #a5d6ff; word-break: break-all;
+  }
+  pre {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    font-size: 0.8rem; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; margin: 8px 0; overflow-x: auto;
+    color: #a5d6ff; line-height: 1.5; white-space: pre;
+  }
+  pre .c { color: var(--muted); }
+  pre .del { color: #f87171; }
+  pre .add { color: #4ade80; }
+  .loc { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 0.9rem; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.4px; }
+  td { color: #c6ccda; }
+  .step { display: flex; gap: 14px; margin-bottom: 12px; align-items: flex-start; }
+  .step .dot {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+    display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700;
+  }
+  .step .body { font-size: 0.92rem; color: #c6ccda; }
+  .step .body b { color: var(--text); }
+  .timeline-arrow { color: var(--muted); margin: 0 6px; }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+  .pill-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1><span class="ball">⚽</span>KickLog 경기 동기화 버그 진단·해결 보고서</h1>
+  <div class="subtitle">2026-06-22 · 두 개의 연쇄 버그 — 백엔드 "지표 재계산 저장 실패" + iOS "라벨링 중복"</div>
+  <div class="verdict">
+    배포 후 발견된 두 가지 데이터 동기화 버그를 진단하고 해결했다.
+    <strong>① 백엔드</strong>는 기존 경기 재저장(PUT) 시 unique 제약 위반으로 500을 던지던 문제,
+    <strong>② iOS</strong>는 앱을 켤 때마다 라벨링한 경기가 "라벨링 큐"에 중복으로 다시 뜨던 문제다.
+    두 버그 모두 <strong>실제 서버 로그와 단말 SQLite store를 직접 열어 원인을 확정</strong>한 뒤 수정하고 재현 테스트로 검증했다.
+  </div>
+</header>
+
+<!-- ───────────────────────── 요약 ───────────────────────── -->
+<h2><span class="num">0</span> 한눈에 보기</h2>
+<table>
+  <thead>
+    <tr><th>버그</th><th>영역</th><th>근본 원인</th><th>해결</th><th>검증</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>지표 재계산이 저장되지 않음</td>
+      <td>백엔드<br>(Kotlin/JPA)</td>
+      <td>JPA <code>IDENTITY</code> + <code>clear()</code> 후 재삽입 → INSERT가 DELETE보다 먼저 실행 → unique 제약 위반</td>
+      <td>쿼터를 <b>in-place 갱신</b>으로 동기화</td>
+      <td>회귀 테스트 3개 + prod 배포 확인</td>
+    </tr>
+    <tr>
+      <td>라벨링한 경기가 큐에 중복 재등장</td>
+      <td>iOS<br>(SwiftData)</td>
+      <td>백엔드 복구가 <b>목록(쿼터 없음)</b>만 가져옴 → 중복 제거 기준 부재 → HealthKit 재import가 미라벨 중복 생성</td>
+      <td>상세까지 복구 + 시각 dedup + 빈 껍데기 정리</td>
+      <td>단말 store 직접 분석 + cold-start 재현 테스트</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ───────────────────────── 버그 A ───────────────────────── -->
+<h2><span class="num">A</span> 백엔드 — "지표 재계산"이 저장되지 않는다</h2>
+<div class="section-desc">한 쿼터의 운동 데이터가 0으로 저장된 경기를 재계산하면 화면엔 반영되는데, 다시 들어가면 0으로 되돌아갔다.</div>
+
+<div class="card">
+  <div class="card-head"><span class="card-title">증상</span><span class="badge high">Bug</span></div>
+  <p>iOS에서 "지표 재계산"을 누르면 화면(메모리)엔 값이 반영되지만, 경기 화면을 나갔다 다시 들어오면 다시 <code>0</code>으로 보였다. 즉 <b>로컬 계산 결과가 서버에 반영되지 않고</b>, 화면 재진입 시 서버의 옛 값(0)이 로컬을 덮어쓰고 있었다.</p>
+</div>
+
+<h3>진단 — EC2 서버 로그</h3>
+<div class="card">
+  <p>iOS 콘솔에는 <code>unauthorized(401)</code>만 보여 처음엔 토큰 문제로 의심했으나, 토큰은 곁가지였다. <b>AWS EC2의 백엔드 컨테이너 로그(<code>docker logs kicklog-backend</code>)</b>를 직접 확인하니 진짜 원인이 드러났다:</p>
+  <pre>ERROR ... DataIntegrityViolationException: duplicate key value violates
+  unique constraint "quarter_workouts_match_id_quarter_number_key"
+  Detail: Key (match_id, quarter_number)=(8, 2) already exists.
+    at MatchService.saveMatch(MatchService.kt:32)
+    at MatchController.upsert(MatchController.kt:35)</pre>
+  <p>재계산 PUT이 서버에서 <b>500 (unique 제약 위반)</b>으로 실패하고 있었다. 그래서 서버엔 0이 그대로 남고, 재진입 시 그 0이 로컬을 덮어쓴 것이다.</p>
+</div>
+
+<h3>근본 원인 — JPA <code>IDENTITY</code> + <code>clear()</code> 재삽입의 함정</h3>
+<div class="card">
+  <p><code>Match.replaceWith()</code>는 경기를 갱신할 때 쿼터를 이렇게 처리했다:</p>
+  <pre><span class="del">quarterWorkouts.clear()                       // 기존 쿼터 DELETE "예약"</span>
+<span class="del">command.quarters.forEach { quarterWorkouts.add(QuarterWorkout(...)) }  // 새 쿼터 INSERT "예약"</span></pre>
+  <p><code>QuarterWorkout.id</code>는 <code>@GeneratedValue(strategy = IDENTITY)</code>다. <b>IDENTITY 전략은 INSERT를 실행해야 PK를 얻으므로, Hibernate가 새 INSERT를 즉시 발행</b>한다. 반면 <code>clear()</code>로 인한 orphan DELETE는 트랜잭션 flush 마지막에 실행된다. 그 결과:</p>
+  <ul>
+    <li>DB에 이미 <code>(match_id=8, quarter_number=2)</code> 가 존재</li>
+    <li>재계산 PUT → 새 <code>(8, 2)</code> INSERT가 <b>기존 행 DELETE보다 먼저</b> 실행</li>
+    <li>→ unique 제약 위반 → 500 → 저장 실패</li>
+  </ul>
+  <p>즉 <b>최초 저장(INSERT)만 성공하고, 이미 존재하는 경기를 수정하는 모든 PUT이 항상 실패</b>하는 구조였다. (재계산·재라벨링 모두 해당)</p>
+</div>
+
+<h3>왜 테스트가 못 잡았나</h3>
+<div class="card">
+  <div class="card-head"><span class="badge notice">교훈</span></div>
+  <p>기존 통합 테스트는 <b>H2 인메모리 DB</b>(<code>ddl-auto: create-drop</code>, <code>flyway.enabled: false</code>)로 돌았다. unique 제약은 <b>Flyway 마이그레이션 SQL에만</b> 있고 <b>엔티티에는 없어서</b>, 테스트 스키마에는 제약이 생성되지 않았다. 그래서 이 버그가 테스트를 통과해 버렸다.</p>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="card-title">해결</span><span class="badge good">Fixed</span></div>
+  <p>쿼터를 갈아엎지 않고 <b><code>quarter_number</code> 기준 in-place 동기화</b>로 변경했다:</p>
+  <pre><span class="add">val incoming = command.quarters.associateBy { it.quarterNumber }</span>
+<span class="add">quarterWorkouts.removeIf { it.quarterNumber !in incoming.keys }   // 빠진 것만 DELETE</span>
+<span class="add">command.quarters.forEach { cmd -></span>
+<span class="add">    existing[cmd.quarterNumber]?.updateFrom(cmd)                  // 기존은 UPDATE</span>
+<span class="add">        ?: quarterWorkouts.add(QuarterWorkout.from(this, cmd))    // 새 것만 INSERT</span>
+<span class="add">}</span></pre>
+  <p class="fix">같은 <code>(match_id, quarter_number)</code> 행을 <b>갱신(UPDATE)</b>하므로 INSERT-before-DELETE 충돌이 원천 제거된다. 추가로 <b>엔티티에 unique 제약을 명시</b>(<code>@Table(uniqueConstraints=…)</code>)해 운영 스키마와 정합을 맞추고, 회귀 테스트가 H2에서도 이 버그를 잡도록 했다.</p>
+  <div class="loc">backend/src/main/kotlin/.../match/entity/Match.kt · QuarterWorkout.kt · MatchAcceptanceTest.kt (회귀 3개)</div>
+</div>
+
+<!-- ───────────────────────── 버그 B ───────────────────────── -->
+<h2><span class="num">B</span> iOS — 앱을 켤 때마다 라벨링한 경기가 큐에 다시 뜬다</h2>
+<div class="section-desc">앱을 강제 종료 후 재실행(또는 재부팅)하면, 이미 라벨링을 끝낸 경기들이 "라벨링 대기 큐"에 중복으로 다시 나타났다.</div>
+
+<div class="card">
+  <div class="card-head"><span class="card-title">배경 — 기기 재설치로 로컬이 비워진 뒤</span><span class="badge high">Bug</span></div>
+  <p>앱스토어 배포 후 앱을 <b>삭제→재설치</b>하면 로컬 SwiftData store와 HealthKit anchor(어디까지 가져왔는지 기록)가 함께 사라진다. 이후 앱이 두 경로로 데이터를 복구한다:</p>
+  <ul>
+    <li><b>백엔드 복구</b> — 서버에 백업된 라벨링 경기를 내려받음 → "최근 경기"</li>
+    <li><b>HealthKit 재import</b> — anchor가 없어 가입일 이후 워크아웃을 처음부터 다시 가져옴 → "라벨링 큐"</li>
+  </ul>
+  <p>이 둘이 <b>같은 워크아웃을 가리키는데도 서로를 알아보지 못해</b>, 한 경기가 "최근 경기(라벨)"와 "라벨링 큐(미라벨)"에 <b>동시에</b> 나타났다.</p>
+</div>
+
+<h3>진단 여정 — 가설을 단말 데이터로 검증</h3>
+<div class="card">
+  <p>로그만으로는 한계가 있어, <b><code>idevicesyslog</code> / <code>devicectl</code>로 단말의 실제 SwiftData store 파일을 PC로 복사</b>한 뒤 <code>sqlite3</code>로 직접 열어 가설을 하나씩 검증했다.</p>
+  <div class="step"><span class="dot">1</span><div class="body"><b>가설: store가 매번 비워진다(영속화 실패)?</b> <span class="timeline-arrow">→</span> store 파일 확인 결과 <code>default.store</code> 148KB + WAL 2.1MB로 <b>데이터는 정상 영속화</b>되고 있었다. 가설 기각.</div></div>
+  <div class="step"><span class="dot">2</span><div class="body"><b>그렇다면 store 안에 중복이 실재한다.</b> <code>ZMATCH</code> 테이블을 보니 4경기가 각각 "라벨 + 미라벨" 쌍으로 존재(같은 <code>playedAt</code>).</div></div>
+  <div class="step"><span class="dot">3</span><div class="body"><b>결정적 단서:</b> 라벨 경기와 미라벨 경기의 쿼터를 비교하니 —</div></div>
+  <pre>matchPK  lbl     quarters
+4        라벨    <span class="del">0</span>      <span class="c">← 라벨 경기에 쿼터가 하나도 없음!</span>
+8        미라벨  3      <span class="c">← 쿼터(진짜 HealthKit UUID)는 미라벨 쪽에만</span></pre>
+</div>
+
+<h3>근본 원인 — 복구가 "목록"만 가져와 쿼터가 비었다</h3>
+<div class="card">
+  <p>앱 시작 시 백엔드 복구는 <b>목록 API(summary)</b>를 호출했는데, 목록 응답에는 <b>쿼터가 들어있지 않다</b>(쿼터는 상세 API에만 있음). 그래서 라벨 경기가 <b>쿼터 없이</b> 복구됐고, 이로 인해:</p>
+  <ul>
+    <li><b>import 중복 제거</b>(<code>sourceWorkoutUUID</code>/시각 매칭): 라벨 경기에 비교할 쿼터가 없음 → 매칭 실패 → 미라벨 생성</li>
+    <li><b>cleanup</b>(라벨 쿼터 시각 집합): 집합이 비어 <code>guard !isEmpty</code>에서 즉시 종료 → 중복 못 치움</li>
+  </ul>
+  <p>즉 "복구 → import 순서"와 "중복 제거 로직"을 갖춰도, <b>비교 기준이 될 쿼터 자체가 없어서</b> 모두 무력했다.</p>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="card-title">해결 — 3겹 방어</span><span class="badge good">Fixed</span></div>
+  <p><b>① 순서 보장 + ② 상세 복구</b> — 앱 시작 시 HealthKit import보다 <b>먼저</b> 백엔드를 복구하되, 목록뿐 아니라 <b>각 경기의 상세(쿼터 포함)까지</b> 내려받는다:</p>
+  <pre><span class="add">// 목록으로 serverId 수집 후, 각 경기 상세까지 복구</span>
+<span class="add">for serverId in serverIds { _ = try? await fetchMatch(serverId: serverId, into: context) }</span></pre>
+  <p>이제 라벨 경기에 쿼터(<code>healthKitWorkoutId</code> = 진짜 HealthKit UUID)가 채워져, import가 "이 워크아웃은 이미 라벨 경기에 있다"고 <b>UUID로 정확히 인식</b>해 미라벨을 아예 안 만든다.</p>
+
+  <p style="margin-top:12px;"><b>③ 빈 껍데기 정리</b> — SwiftData에서 <code>sourceWorkoutUUID</code>는 unique라, 상세 복구로 같은 UUID 쿼터를 만들면 <b>기존 미라벨의 쿼터가 라벨 경기로 흡수</b>된다. 그 결과 미라벨이 "쿼터 0개인 빈 껍데기"로 남는데, 기존 cleanup은 이를 못 치웠다. 그래서 cleanup이 <b>빈 미라벨도 삭제</b>하도록 보강:</p>
+  <pre><span class="add">let isEmpty = match.quarters.isEmpty          // 쿼터가 흡수돼 빈 껍데기</span>
+let isDuplicate = match.quarters.contains { 시각이 라벨과 겹침 }
+<span class="add">if isEmpty || isDuplicate { modelContext.delete(match) }</span></pre>
+  <p class="fix">순서 보장(①)으로 정확도를 높이고, 상세 복구(②)로 dedup이 UUID로 작동해 <b>새 중복을 원천 차단</b>하며, 빈 껍데기 정리(③)로 <b>기존에 쌓인 중복을 청소</b>한다.</p>
+  <div class="loc">ios/KickLog/KickLogApp.swift · Services/MatchSyncService.swift · Services/WorkoutImporter.swift</div>
+</div>
+
+<h3>검증 — 단말 store + cold-start 재현</h3>
+<div class="card">
+  <div class="card-head"><span class="badge good">검증 완료</span></div>
+  <table>
+    <thead><tr><th>시점</th><th>라벨 경기</th><th>미라벨(중복)</th></tr></thead>
+    <tbody>
+      <tr><td>수정 전</td><td>4 (쿼터 0)</td><td>4 (쿼터 3·3·3·…)</td></tr>
+      <tr><td>수정 빌드 첫 실행</td><td>4 (쿼터 9) ✅</td><td>0 ✅ <span class="loc">콘솔: "중복된 미라벨 매치 4건 정리"</span></td></tr>
+      <tr><td>앱 강제 종료 후 재실행(cold start)</td><td>4 (쿼터 9)</td><td><b>0 — 재발 없음</b> ✅</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:10px;">수정 전에는 cold start마다 미라벨 4개가 생겼지만, 수정 후에는 재실행해도 0개를 유지했다. 단말 store를 직접 복사해 SQLite로 확인한 객관적 결과다.</p>
+</div>
+
+<!-- ───────────────────────── 교훈 ───────────────────────── -->
+<h2><span class="num">C</span> 교훈</h2>
+<div class="card">
+  <ul>
+    <li><b>로그가 가리키는 곳을 끝까지 따라간다.</b> iOS의 <code>401</code>은 곁가지였고, 진짜 원인은 서버의 <code>500(unique 위반)</code>이었다. 클라이언트 증상만 보면 엉뚱한 곳을 고친다.</li>
+    <li><b>ORM의 실행 순서를 이해한다.</b> JPA <code>IDENTITY</code> + 컬렉션 <code>clear()</code> 재삽입은 "INSERT가 DELETE보다 먼저" 실행되는 고전적 함정이다. "전부 지우고 다시 넣기"보다 <b>in-place 갱신</b>이 안전하다.</li>
+    <li><b>제약은 엔티티에도 명시한다.</b> 제약이 마이그레이션 SQL에만 있으면, 인메모리 테스트 DB가 제약을 안 만들어 회귀를 놓친다.</li>
+    <li><b>증상이 막히면 데이터를 직접 열어본다.</b> "store가 비워진다"는 그럴듯한 가설을 단말 SQLite를 직접 복사·조회해 기각했고, 진짜 원인(쿼터 0개)을 한 줄의 쿼리로 확정했다.</li>
+    <li><b>동기화는 "양쪽이 서로를 알아보는 키"가 핵심이다.</b> 라벨/미라벨이 같은 워크아웃임을 식별할 키(<code>healthKitWorkoutId</code>)가 한쪽에 없으면, 아무리 정교한 dedup도 작동하지 않는다.</li>
+  </ul>
+</div>
+
+<footer>
+  KickLog 진단·해결 보고서 · 2026-06-22 · 백엔드 fix는 prod 배포 완료(PR #69→#70), iOS fix는 1.0.1 빌드 예정.
+</footer>
+
+</div>
+</body>
+</html>
