@@ -22,6 +22,9 @@ repositories {
 
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
+	// 에러 트래킹 — 5xx·미처리 예외를 Sentry 로 전송 (DSN 미설정 시 자동 비활성).
+	// starter(autoconfiguration)는 Spring Boot 4 미지원(RestClientCustomizer 제거)이라 코어만 사용 + 수동 init.
+	implementation("io.sentry:sentry:8.16.0")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-flyway")
 	implementation("org.springframework.boot:spring-boot-starter-security")

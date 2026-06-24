@@ -25,20 +25,16 @@ class TraceIdFilter : OncePerRequestFilter() {
         response: HttpServletResponse,
         filterChain: FilterChain,
     ) {
-        MDC.put(TRACE_ID_KEY, generateTraceId())
+        MDC.put(MdcKeys.TRACE_ID, generateTraceId())
         try {
             filterChain.doFilter(request, response)
         } finally {
-            MDC.remove(TRACE_ID_KEY)
+            MDC.remove(MdcKeys.TRACE_ID)
         }
     }
 
     private fun generateTraceId(): String {
         val value = ThreadLocalRandom.current().nextInt()
         return "%08x".format(value)
-    }
-
-    companion object {
-        private const val TRACE_ID_KEY = "traceId"
     }
 }
