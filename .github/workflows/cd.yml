@@ -21,6 +21,7 @@ on:
     paths:
       - "backend/**"
       - "infra/docker-compose.prod.yml"
+      - "infra/scripts/fetch-secrets.sh"
       - ".github/workflows/cd.yml"
   workflow_dispatch:
 
@@ -135,10 +136,14 @@ jobs:
           role-to-assume: ${{ vars.AWS_GITHUB_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Upload compose file to S3 staging
+      - name: Upload deploy artifacts to S3 staging
         run: |
           aws s3 cp infra/docker-compose.prod.yml \
             "s3://${DEPLOY_STAGING_BUCKET}/docker-compose.prod.yml" \
+            --no-progress
+          # fetch-secrets.sh 도 함께 배포 — EC2 의 스크립트를 항상 최신(코드 SoT)으로 유지.
+          aws s3 cp infra/scripts/fetch-secrets.sh \
+            "s3://${DEPLOY_STAGING_BUCKET}/fetch-secrets.sh" \
             --no-progress
 
       # ADR-0009: SSM 스크립트가 SHA tag 를 .env.deploy 에 기록하고,
@@ -170,6 +175,12 @@ jobs:
 
           # ── 새 compose 파일 가져오기 (S3 staging) ──
           aws s3 cp s3://${DEPLOY_STAGING_BUCKET}/docker-compose.prod.yml ./docker-compose.yml --no-progress
+
+          # ── fetch-secrets.sh 최신본으로 .env 재생성 (Secrets Manager → .env) ──
+          # .env 를 항상 코드(secret) 기준으로 동기화 — SENTRY_DSN 등 신규 키도 자동 반영.
+          # secret 조회 실패 시 fetch-secrets.sh 가 set -e 로 중단 → 배포 실패(의도).
+          aws s3 cp s3://${DEPLOY_STAGING_BUCKET}/fetch-secrets.sh ./fetch-secrets.sh --no-progress
+          AWS_REGION=${AWS_REGION} bash ./fetch-secrets.sh
 
           # ── .env.deploy 갱신 (KICKLOG_IMAGE_TAG=<full SHA>) ──
           NEW_TAG="${GITHUB_SHA}"
