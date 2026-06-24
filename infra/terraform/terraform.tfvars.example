@@ -40,6 +40,10 @@ jwt_secret = "REPLACE_ME_jwt_secret_32chars_or_more"
 ghcr_pat = "REPLACE_ME_ghcr_personal_access_token"
 
 # ─── Observability / Budget (ADR-0009) ────────────────
+# Sentry DSN (백엔드 에러 트래킹). 빈 값/미지정이면 secret 미생성 + 앱에서 Sentry 비활성.
+# sentry.io > 프로젝트 생성 > Settings > Client Keys (DSN) 에서 발급.
+# sentry_dsn = "https://xxxxx@oXXXX.ingest.sentry.io/XXXXXX"
+
 # 운영 알림 수신 이메일. 빈 값으로 두면 SNS email subscription 안 만듦 (SNS topic 자체는 생성됨).
 # alert_email = "you@example.com"
 

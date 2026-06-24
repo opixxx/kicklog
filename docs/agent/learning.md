@@ -113,3 +113,22 @@
   - [x] EXEC_PLAN 학습 기록 섹션
   - [ ] verify-and-block.sh 에 Colima env 주입 — 후속 후보
 - Skip reason if not promoted: N/A
+
+---
+
+### 2026-06-23 — Sentry 연동: Spring Boot 4 starter 비호환 + Exception 핸들러 광역 캐치 회귀
+
+- Trigger: self-heal (2회), feature/sentry-error-tracking
+- Task/ADR: EXEC_PLAN `docs/agent/plans/2026-06-23-sentry-error-tracking.md`
+- Failures & Root cause:
+  1. **Sentry Spring Boot starter ↔ Spring Boot 4 비호환**: `io.sentry:sentry-spring-boot-starter-jakarta:8.16.0` 의 autoconfiguration 이 Spring Boot 4(Spring Framework 7)에서 **제거된 `org.springframework.boot.web.client.RestClientCustomizer`** 를 참조 → `SentryAutoConfiguration` 조건 평가 단계(nested class introspection)에서 `NoClassDefFoundError` → 컨텍스트 로드 실패. `@ConditionalOnClass` 로도 못 막음(이미 클래스 로딩 시도).
+  2. **`@ExceptionHandler(Exception::class)` 광역 캐치가 Spring MVC 표준 예외를 500 으로 둔갑**: 미처리 예외 fallback 핸들러가 `NoResourceFoundException`(없는 경로 404)·`HttpRequestMethodNotSupportedException`(405) 까지 가로채 500 으로 변환 → `InvitationEndpointRemovalTest` 3건 회귀(404 기대→500). 에러 트래킹 관점에선 **없는 경로 요청이 죄다 5xx 로 Sentry 전송되는 노이즈 폭탄**.
+- Prevention:
+  - **Spring Boot 4 + 서드파티 Spring starter 는 호환성 선검증**: starter autoconfiguration 이 깨지면 **코어 의존성 + 수동 `@Configuration` init** 으로 폴백. 명시적 사용(여기선 `Sentry.captureException` 만)이면 starter 자동통합이 애초에 불필요한 경우가 많다. 컨텍스트 로드 smoke 테스트(`KicklogApplicationTests`)로 부팅 호환성을 반드시 확인.
+  - **`@ExceptionHandler(Exception::class)` 는 반드시 Spring 표준 예외를 선분기**: 핸들러 내부에서 `if (e is org.springframework.web.ErrorResponse) → statusCode 보존` 후 나머지만 500 통일. 인터페이스 `ErrorResponse` 는 `@ExceptionHandler` 타입으로 못 쓰므로(Throwable 아님) instanceof 분기로 처리. 5xx 만 외부 전송.
+  - 외부 전송(에러 트래킹)은 `runCatching` 으로 감싸 **정상 에러 응답 경로를 절대 막지 않게** 한다.
+- Updated:
+  - [x] EXEC_PLAN 학습 기록 섹션
+  - [x] docs/agent/learning.md (본 항목)
+  - [ ] code-reviewer 체크리스트: "`@ExceptionHandler(Exception)` 광역 캐치 시 Spring 표준 예외 선분기 확인" — 후속 후보
+- Skip reason if not promoted: N/A

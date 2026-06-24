@@ -1,5 +1,6 @@
 package com.opixxx.kicklog.common.exception
 
+import com.opixxx.kicklog.common.observability.ErrorReporter
 import org.slf4j.MDC
 import org.springframework.mock.web.MockHttpServletRequest
 import kotlin.test.AfterTest
@@ -15,7 +16,8 @@ import kotlin.test.assertNull
  */
 class GlobalExceptionHandlerTraceIdTest {
 
-    private val handler = GlobalExceptionHandler()
+    // 본 테스트는 4xx(MATCH_NOT_FOUND)만 다뤄 report 가 호출되지 않으므로 no-op 더블로 충분.
+    private val handler = GlobalExceptionHandler(ErrorReporter { })
 
     @AfterTest
     fun clearMdc() {
