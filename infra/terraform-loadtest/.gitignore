@@ -8,6 +8,7 @@ tfplan
 # 시크릿 (rds_password, jwt_secret, ghcr_pat 등)
 terraform.tfvars
 *.auto.tfvars
+*.tfvars.bak
 
 # k6 측정 리포트 (재생성 가능·로컬 보관, 블로그용)
 k6/reports/
