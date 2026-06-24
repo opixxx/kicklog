@@ -41,6 +41,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_FORWARDHEADERSSTRATEGY: NATIVE
+      # Sentry 환경 태그 — DSN(.env) 이 있을 때만 활성. 비밀 아님이라 compose 에 고정.
+      SENTRY_ENVIRONMENT: prod
 
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]

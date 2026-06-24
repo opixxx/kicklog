@@ -1,10 +1,15 @@
 package com.opixxx.kicklog.common.exception
 
+import com.opixxx.kicklog.common.logging.MdcKeys
+import com.opixxx.kicklog.common.observability.ErrorReporter
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
+import org.slf4j.LoggerFactory
 import org.slf4j.MDC
+import org.springframework.http.HttpStatus
 import org.springframework.http.HttpStatusCode
 import org.springframework.http.ResponseEntity
+import org.springframework.web.ErrorResponse as SpringErrorResponse
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -19,15 +24,62 @@ data class ErrorResponse(
 )
 
 @RestControllerAdvice
-class GlobalExceptionHandler {
+class GlobalExceptionHandler(
+    private val errorReporter: ErrorReporter,
+) {
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     @ExceptionHandler(KickLogException::class)
     fun handleKickLogException(
         exception: KickLogException,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorResponse> {
-        val message = exception.message ?: exception.errorCode.message
-        return errorResponse(exception.errorCode.status, exception.errorCode.name, message, request)
+        val errorCode = exception.errorCode
+        // 5xx 만 Sentry 로 전송 — 4xx 비즈니스 예외(인증·NOT_FOUND·권한 등)는 정상 흐름이라 제외.
+        if (errorCode.status.is5xxServerError) {
+            logger.error("서버 오류 발생 [{}]", errorCode.name, exception)
+            errorReporter.report(exception)
+        }
+        val message = exception.message ?: errorCode.message
+        return errorResponse(errorCode.status, errorCode.name, message, request)
+    }
+
+    /**
+     * 어떤 핸들러도 처리하지 못한 예외의 최종 안전망.
+     *
+     * Spring MVC 표준 예외(404 NoResourceFound, 405 MethodNotSupported 등)는 자체 상태코드를 보존한다 —
+     * 그러지 않으면 없는 경로 요청까지 500 으로 둔갑해 Sentry 노이즈가 폭증한다.
+     * 그 외 진짜 미처리 예외만 표준 ErrorResponse(INTERNAL_ERROR, 500)로 통일하고 Sentry 로 전송한다.
+     */
+    @ExceptionHandler(Exception::class)
+    fun handleUnexpectedException(
+        exception: Exception,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorResponse> {
+        if (exception is SpringErrorResponse) {
+            return handleSpringErrorResponse(exception, request)
+        }
+        logger.error("처리되지 않은 예외 발생", exception)
+        errorReporter.report(exception)
+        val errorCode = ErrorCode.INTERNAL_ERROR
+        return errorResponse(errorCode.status, errorCode.name, errorCode.message, request)
+    }
+
+    /** Spring MVC 가 던지는 표준 예외(ErrorResponse 구현)는 상태코드를 보존하고 5xx 만 Sentry 로 보낸다. */
+    private fun handleSpringErrorResponse(
+        springError: SpringErrorResponse,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorResponse> {
+        val status = springError.statusCode
+        if (status.is5xxServerError) {
+            // Spring 의 ErrorResponse 구현체는 항상 Throwable 이라 안전한 캐스트.
+            val throwable = springError as Throwable
+            logger.error("서버 오류 발생 (Spring MVC)", throwable)
+            errorReporter.report(throwable)
+        }
+        val code = HttpStatus.resolve(status.value())?.name ?: ErrorCode.INTERNAL_ERROR.name
+        val message = springError.body.detail ?: code
+        return errorResponse(status, code, message, request)
     }
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
@@ -72,6 +124,6 @@ class GlobalExceptionHandler {
     ): ResponseEntity<ErrorResponse> {
         return ResponseEntity
             .status(status)
-            .body(ErrorResponse(code, message, request.requestURI, traceId = MDC.get("traceId")))
+            .body(ErrorResponse(code, message, request.requestURI, traceId = MDC.get(MdcKeys.TRACE_ID)))
     }
 }

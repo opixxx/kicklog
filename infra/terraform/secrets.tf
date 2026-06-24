@@ -75,3 +75,23 @@ resource "aws_secretsmanager_secret_version" "ghcr_pat" {
   secret_id     = aws_secretsmanager_secret.ghcr_pat.id
   secret_string = var.ghcr_pat
 }
+
+# ─── Sentry DSN (에러 트래킹) ─────────────────────────
+# 미발급(빈 값)이면 secret 자체를 만들지 않는다 — fetch-secrets.sh 가 빈 값으로 처리, 앱은 Sentry 비활성.
+# DSN 발급 후 tfvars 에 채우고 apply 하면 secret 생성 → fetch-secrets.sh 재실행으로 주입.
+resource "aws_secretsmanager_secret" "sentry_dsn" {
+  count                   = var.sentry_dsn != "" ? 1 : 0
+  name                    = "kicklog/sentry-dsn"
+  description             = "Sentry DSN (백엔드 에러 트래킹)"
+  recovery_window_in_days = 7
+
+  tags = {
+    Name = "kicklog-sentry-dsn"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "sentry_dsn" {
+  count         = var.sentry_dsn != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.sentry_dsn[0].id
+  secret_string = var.sentry_dsn
+}

@@ -14,6 +14,7 @@
 - [Search empty query](feedback_search_empty_query.md) — `@RequestParam("q") String` 만 두면 빈 문자열에 전체 dump, `@NotBlank` 필수
 - [Profile isolation security](feedback_profile_isolation_security.md) — `@Profile` 격리 엔드포인트는 실제 배포 프로파일명(docker-compose.prod.yml)과 대조해 보안 판정
 - [Error response contract](project_error_response_contract.md) — 401/403 은 HttpStatusEntryPoint 라 body 없음 → traceId 안 실림, advice 미경유
+- [Sentry error tracking](project_sentry_error_tracking.md) — 코어+수동init(starter 미지원), 5xx만 전송, ErrorReporter 경유, PII 비전송, traceId 키 3곳 중복
 
 <!--
 ### YYYY-MM-DD — <pattern>

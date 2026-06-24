@@ -50,6 +50,11 @@ JWT_SECRET=$(aws secretsmanager get-secret-value \
   --region "$REGION" --secret-id kicklog/jwt-secret \
   --query SecretString --output text)
 
+# Sentry DSN — optional. 미발급이면 secret 이 없으므로 빈 값으로 두고 앱에서 Sentry 비활성 처리한다.
+SENTRY_DSN=$(aws secretsmanager get-secret-value \
+  --region "$REGION" --secret-id kicklog/sentry-dsn \
+  --query SecretString --output text 2>/dev/null || echo "")
+
 # /opt/kicklog/.env 작성 (atomic — 임시파일 + mv)
 TMP=$(mktemp)
 trap 'rm -f "$TMP"' EXIT
@@ -72,6 +77,9 @@ JWT_REFRESH_TOKEN_DAYS=90
 
 # Kakao
 KAKAO_REST_API_KEY=${KAKAO_REST_API_KEY}
+
+# Sentry (에러 트래킹 — DSN 빈 값이면 자동 비활성. SENTRY_ENVIRONMENT 는 compose 에서 prod 주입)
+SENTRY_DSN=${SENTRY_DSN}
 
 # Apple
 APPLE_CLIENT_ID=com.opixxx.KickLog

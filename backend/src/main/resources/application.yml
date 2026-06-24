@@ -44,6 +44,15 @@ management:
     health:
       show-details: when-authorized
 
+# Sentry 에러 트래킹 — SentryConfig 가 수동 init 에서 읽는다 (코어 의존성, starter 미사용).
+# 그 외 옵션(send-default-pii=false, traces-sample-rate=0)은 SentryConfig 에 코드로 고정.
+sentry:
+  # DSN 이 비어 있으면 init 을 건너뛰어 SDK 가 비활성 — local/test 는 별도 설정 없이 off.
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:local}
+  # 릴리스별 회귀 추적용 — CD 에서 git SHA 주입 가능(후속). 미설정이면 무시.
+  release: ${SENTRY_RELEASE:}
+
 logging:
   level:
     root: INFO
