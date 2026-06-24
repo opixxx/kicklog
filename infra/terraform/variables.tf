@@ -131,6 +131,13 @@ variable "ghcr_pat" {
   sensitive   = true
 }
 
+variable "sentry_dsn" {
+  description = "Sentry DSN (백엔드 에러 트래킹). 빈 값이면 Secrets Manager secret 미생성 + 앱에서 Sentry 비활성."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 # ─── GitHub Actions OIDC ──────────────────────────────
 variable "github_repo_owner" {
   description = "GitHub 저장소 owner (OIDC trust condition)"

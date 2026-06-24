@@ -111,7 +111,8 @@ Sentry 에러 트래킹을 백엔드에 연동한다. 현재는 예외가 HTTP �
 
 ## (Optional) 후속 / 관련 이슈
 
-- **시크릿 인프라화**: `infra/scripts/fetch-secrets.sh` + Terraform `secrets.tf` 에 `SENTRY_DSN` 추가, `docker-compose.prod.yml` 가 env 로 전달 (별도 PR).
+- ✅ **시크릿 인프라화 (본 PR 포함)**: Terraform `secrets.tf`(`kicklog/sentry-dsn`, DSN 빈 값이면 count=0 으로 미생성) + `variables.tf`(`sentry_dsn`, default "") + `tfvars.example`, `fetch-secrets.sh`(optional 조회 → `.env` 의 `SENTRY_DSN`), `docker-compose.prod.yml`(`SENTRY_ENVIRONMENT=prod`). 검증: `terraform fmt/validate` 통과.
+  - 남은 활성화 절차(사용자): sentry.io DSN 발급 → tfvars `sentry_dsn` 채우고 `terraform apply` → EC2 에서 `fetch-secrets.sh` 재실행 → `docker compose up -d`.
 - **release 추적**: CD 에서 git SHA 를 `SENTRY_RELEASE` 로 주입 → 배포별 회귀 추적.
 - **모니터링 ADR**: 본 작업 + 향후 로그 집계/메트릭 결정을 ADR 로 남길지 검토 (관측성 로드맵).
 - 2·3순위(CloudWatch Logs 앱 로그 수집, Micrometer/Prometheus)는 사용자 증가/민원 시 착수.
