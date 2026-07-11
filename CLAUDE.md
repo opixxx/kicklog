@@ -23,9 +23,9 @@
   - **에러 응답**: `{ code, message, field?, traceId? }` — `common/exception/ErrorCode` enum 경유, `GlobalExceptionHandler` 단일 진입점
   - **iOS 가 1차 SoT** (HealthKit raw + SwiftData), 백엔드는 백업 + 친구 공유 채널
 
-## 하네스: KickLog Backend
+## 하네스: KickLog
 
-> **백엔드 전용 하네스다.** iOS 는 사용자가 Xcode 에서 직접 작업하며, 자동 검증·리뷰·테스트 강제 없음 (UI/API 연동만 잘 동작하면 OK).
+> **백엔드는 전체 파이프라인, iOS 는 부분 적용** (ADR-0012). 에이전트가 iOS 구현을 맡는 경우가 생기면서 iOS 도 계획 강제·worktree 보호·컴파일 자가수정 대상이 됐다. 단 ATDD·자동 리뷰·테스트 강제는 여전히 백엔드 전용 (iOS 는 테스트 인프라 없음). 사용자가 Xcode 에서 직접 수정하는 것은 hook 밖이라 영향 없음.
 
 **목표:** 구현·버그수정·리팩토링 작업에 대해 Intake → EXEC_PLAN(큰 변경만) → Worktree → 검증 → PR 파이프라인을 유지하여 일관된 품질을 보장한다. (GearShow 하네스의 KickLog 적응판 — `.claude/skills/orchestrator/SKILL.md`)
 
@@ -38,9 +38,9 @@
 **강제 메커니즘 (전체 활성):**
 - `PreToolUse` (Bash): `guard-bash.sh` — 위험 명령 차단 ✅ (단계 1)
 - `SessionStart`: `session-context.sh` — 작업 상태 자동 주입 ✅ (단계 1)
-- `PreToolUse` (Edit/Write): `enforce-worktree.sh` — main에서 **백엔드** 소스 보호 (iOS 는 보호 대상 아님) ✅
-- `PreToolUse` (Edit/Write): `enforce-plan.sh` — 30줄 이상 백엔드 변경에 EXEC_PLAN 강제 ✅
-- `Stop`: `verify-and-block.sh` — 백엔드 compile + 자가수정 루프 (최대 3회) ✅
+- `PreToolUse` (Edit/Write): `enforce-worktree.sh` — main에서 백엔드(.kt 등)·iOS(.swift) 소스 보호 ✅
+- `PreToolUse` (Edit/Write): `enforce-plan.sh` — 30줄 이상 백엔드·iOS 변경에 EXEC_PLAN 강제 ✅
+- `Stop`: `verify-and-block.sh` — 백엔드 compileKotlin / iOS xcodebuild + 자가수정 루프 (최대 3회) ✅
 - `.githooks/pre-commit`: 백엔드 Kotlin compile 게이트 ✅
 - `docs/agent/learning.md`: self-heal, Critical 리뷰, 누락 테스트를 재발 방지 규칙으로 승격
 
@@ -76,7 +76,7 @@ bash scripts/start-task.sh <task-name> feature|fix|refactor|chore|docs
 
 - **ATDD 1차 + TDD (백엔드)**: 30줄 이상 백엔드 변경은 EXEC_PLAN의 "테스트 케이스" 섹션부터 채우고 → RED → GREEN → REFACTOR. 세부는 `docs/spec/test-strategy.md` (SoT).
   - 도구: `backend-test-writer` agent — **Cucumber 인수 시나리오 + Testcontainers 통합 + JUnit 단위**
-- **iOS 는 하네스 대상 아님** — 사용자가 Xcode 에서 직접 작업. 테스트/리뷰 강제 없음. UI/API 연동이 동작하면 OK.
+- **iOS 는 부분 하네스** (ADR-0012) — 30줄 이상 변경 시 EXEC_PLAN + worktree + xcodebuild 자가수정 적용. ATDD·자동 리뷰는 미적용 (UI/API 연동이 동작하면 OK). 사용자의 Xcode 직접 수정은 대상 아님.
 - **작은 변경은 직접**, 큰 변경은 plan 모드 먼저. 30줄 미만은 EXEC_PLAN + TDD 면제.
 - **매 경기 데이터 정제·분석은 iOS에서** (스프린트 계산·쿼터 통계 등). **시즌/월별 집계는 백엔드 SQL derive** (ADR-0004 D9 / ADR-0003 D9.1). 백엔드는 매 경기 저장·공유 + 집계 derive 책임.
 - **자가수정 우회 금지**: `--no-verify`, `-DskipTests`, `@Disabled` 우회 금지.
