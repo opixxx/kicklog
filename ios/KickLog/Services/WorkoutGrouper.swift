@@ -135,9 +135,14 @@ extension Match {
     func recalculateHeadlineMetrics() {
         guard !quarters.isEmpty else { return }
         totalDistanceM = quarters.reduce(0) { $0 + $1.distanceM }
+        // 속도 파생 지표는 신뢰 가능한 쿼터만 집계 (ADR-0012) — 저밀도 쿼터의 엉터리 값이
+        // 헤드라인을 오염시키지 않도록. 전 쿼터가 계산 불가면 헤드라인도 계산 불가.
+        let reliable = quarters.filter(\.speedMetricsAvailable)
+        speedMetricsAvailable = !reliable.isEmpty
         // 진짜 최고속도 — 각 쿼터의 구간별 max 중 max (단일 쿼터에서도 avg 와 분리)
-        maxSpeedKmh = quarters.map(\.maxSpeedKmh).max() ?? 0
-        sprintCount = quarters.reduce(0) { $0 + $1.sprintCount }
+        maxSpeedKmh = reliable.map(\.maxSpeedKmh).max() ?? 0
+        sprintCount = reliable.reduce(0) { $0 + $1.sprintCount }
+        highIntensityRunCount = reliable.reduce(0) { $0 + $1.highIntensityRunCount }
         let totalDuration = quarters.reduce(0) { $0 + $1.durationSeconds }
         if totalDuration > 0 {
             // duration 가중 평균 심박

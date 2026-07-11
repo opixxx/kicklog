@@ -49,6 +49,12 @@ struct KickLogApp: App {
                         modelContext: modelContainer.mainContext
                     )
 
+                    // 2.5) 지표 알고리즘 버전업 시 구버전 쿼터 일괄 재분석 (ADR-0012).
+                    //      import 이후에 돌아야 신규 쿼터가 이중 분석되지 않는다.
+                    await WorkoutAnalyzer.reanalyzeOutdatedQuarters(
+                        in: modelContainer.mainContext
+                    )
+
                     // 3) 미동기화 Match 일괄 PUT (ADR-0003 D9 fire-and-forget)
                     await MatchSyncService.shared.syncPending(
                         in: modelContainer.mainContext

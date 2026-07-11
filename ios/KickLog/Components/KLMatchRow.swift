@@ -13,6 +13,8 @@ struct MatchRowData {
     let avgSpeedKmh: Double
     let sprintCount: Int
     let avgHeartRateBpm: Int
+    // ADR-0012 — 저밀도 데이터면 속도·스프린트를 "—" 로 숨긴다 (서버 목록 응답엔 정보 없음 → true 유지)
+    var speedMetricsAvailable: Bool = true
 }
 
 // MARK: - SampleMatch → MatchRowData
@@ -44,7 +46,8 @@ extension Match {
             distanceKm: Double(totalDistanceM) / 1000.0,
             avgSpeedKmh: maxSpeedKmh,           // 헤드라인은 max — 평균은 quarter 단위
             sprintCount: sprintCount,
-            avgHeartRateBpm: avgHeartRate
+            avgHeartRateBpm: avgHeartRate,
+            speedMetricsAvailable: speedMetricsAvailable
         )
     }
 
@@ -138,9 +141,10 @@ struct KLMatchRow: View {
             HStack(spacing: 0) {
                 StatPiece(text: "\(formatted(data.distanceKm))km")
                 StatDot()
-                StatPiece(text: "\(formatted(data.avgSpeedKmh))km/h")
+                // 저밀도 데이터는 속도·스프린트가 계산 불가 — 0 으로 속이지 않고 "—" (ADR-0012)
+                StatPiece(text: data.speedMetricsAvailable ? "\(formatted(data.avgSpeedKmh))km/h" : "—")
                 StatDot()
-                StatPiece(text: "\(data.sprintCount)회")
+                StatPiece(text: data.speedMetricsAvailable ? "\(data.sprintCount)회" : "—")
                 StatDot()
                 StatPiece(text: "\(data.avgHeartRateBpm)bpm")
             }

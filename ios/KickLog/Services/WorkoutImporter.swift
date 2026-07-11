@@ -111,7 +111,10 @@ final class WorkoutImporter {
             maxHeartRate: metrics.maxHeartRate,
             sprintCount: metrics.sprintCount,
             activeEnergyKcal: metrics.activeEnergyKcal,
-            trimmed: false
+            trimmed: false,
+            highIntensityRunCount: metrics.highIntensityRunCount,
+            speedMetricsAvailable: metrics.speedMetricsAvailable,
+            analysisVersion: WorkoutAnalyzer.currentAlgorithmVersion
         )
         modelContext.insert(quarter)
 

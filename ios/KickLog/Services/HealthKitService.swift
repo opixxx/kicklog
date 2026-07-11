@@ -14,19 +14,15 @@ final class HealthKitService {
     // ModelContainer 가 등록된 후 startObserver 호출 시 주입받는다.
     private var importer: WorkoutImporter?
 
-    // ADR-0004 D3 최소 6개 권한
-    static let readTypes: Set<HKObjectType> = {
-        var types: Set<HKObjectType> = [
-            HKObjectType.workoutType(),
-            HKQuantityType(.heartRate),
-            HKQuantityType(.distanceWalkingRunning),
-            HKQuantityType(.activeEnergyBurned),
-            HKSeriesType.workoutRoute(),
-        ]
-        // runningSpeed 는 iOS 17+ — 컴파일러는 이미 26.4 target 이라 무조건 사용 가능
-        types.insert(HKQuantityType(.runningSpeed))
-        return types
-    }()
+    // ADR-0004 D3 최소 권한 — runningSpeed read 는 ADR-0012 에서 분석 경로 제거와 함께 삭제
+    // (축구 워크아웃엔 해당 샘플이 아예 없음. DEBUG 시드용 write 권한은 별개로 유지)
+    static let readTypes: Set<HKObjectType> = [
+        HKObjectType.workoutType(),
+        HKQuantityType(.heartRate),
+        HKQuantityType(.distanceWalkingRunning),
+        HKQuantityType(.activeEnergyBurned),
+        HKSeriesType.workoutRoute(),
+    ]
 
     // DEBUG 빌드 전용 — E2E 테스트용 워크아웃 시드를 위한 share(write) 권한.
     // 릴리즈 빌드에서는 빈 set 으로 권한 다이얼로그에 노출되지 않는다.

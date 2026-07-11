@@ -206,10 +206,13 @@ struct MatchDetailScreen: View {
             ) {
                 KLStatCardMini(icon: "figure.run", label: "이동거리",
                                value: String(format: "%.1f", Double(match.totalDistanceM) / 1000.0), unit: "km")
+                // 저밀도(뭉텅이 샘플) 경기는 속도 파생 지표가 계산 불가 — "—" 표시 (ADR-0012)
                 KLStatCardMini(icon: "speedometer", label: "최고속도",
-                               value: String(format: "%.1f", match.maxSpeedKmh), unit: "km/h")
+                               value: match.speedMetricsAvailable ? String(format: "%.1f", match.maxSpeedKmh) : "—",
+                               unit: match.speedMetricsAvailable ? "km/h" : "")
                 KLStatCardMini(icon: "bolt.fill", iconColor: KLTokens.amber, label: "스프린트",
-                               value: "\(match.sprintCount)", unit: "회")
+                               value: match.speedMetricsAvailable ? "\(match.sprintCount)" : "—",
+                               unit: match.speedMetricsAvailable ? "회" : "")
                 KLStatCardMini(icon: "heart.fill", iconColor: KLTokens.red, label: "평균심박",
                                value: "\(match.avgHeartRate)", unit: "bpm")
             }
@@ -251,6 +254,15 @@ struct MatchDetailScreen: View {
                         formatValue: { String(Int($0)) }
                     )
                     .klCard()
+
+                    // 기존 14km/h 지표의 새 이름 — 스프린트(20km/h)와 분리 (ADR-0012)
+                    KLBarChart(
+                        title: "고강도 러닝", unit: "회",
+                        values: sortedQuarters.map { Double($0.highIntensityRunCount) },
+                        labels: quarterLabels,
+                        formatValue: { String(Int($0)) }
+                    )
+                    .klCard()
                 }
             } else {
                 Text("아직 쿼터 라벨링이 되지 않았습니다")
@@ -260,7 +272,7 @@ struct MatchDetailScreen: View {
                     .padding(.vertical, 24)
             }
 
-            // 쿼터별 상세 카드 — 출전 쿼터마다 6 metric (운동시간/이동거리/최고속도/평균심박/최고심박/kcal)
+            // 쿼터별 상세 카드 — 출전 쿼터마다 8 metric (운동시간/이동거리/최고속도/스프린트/고강도러닝/평균심박/최고심박/kcal)
             if !sortedQuarters.isEmpty {
                 Text("쿼터별 상세")
                     .font(KLFont.sectionTitle())
@@ -320,7 +332,7 @@ struct MatchDetailScreen: View {
         .offset(y: -28)
     }
 
-    // MARK: - Quarter detail card (출전 쿼터별 6 metric)
+    // MARK: - Quarter detail card (출전 쿼터별 8 metric)
 
     private func quarterDetailCard(_ quarter: QuarterWorkout) -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -339,7 +351,15 @@ struct MatchDetailScreen: View {
                 quarterMetric(label: "이동거리",
                               value: String(format: "%.1f", Double(quarter.distanceM) / 1000.0), unit: "km")
                 quarterMetric(label: "최고속도",
-                              value: String(format: "%.1f", quarter.maxSpeedKmh), unit: "km/h")
+                              value: quarter.speedMetricsAvailable
+                                  ? String(format: "%.1f", quarter.maxSpeedKmh) : "—",
+                              unit: quarter.speedMetricsAvailable ? "km/h" : "")
+                quarterMetric(label: "스프린트",
+                              value: quarter.speedMetricsAvailable ? "\(quarter.sprintCount)" : "—",
+                              unit: quarter.speedMetricsAvailable ? "회" : "")
+                quarterMetric(label: "고강도 러닝",
+                              value: quarter.speedMetricsAvailable ? "\(quarter.highIntensityRunCount)" : "—",
+                              unit: quarter.speedMetricsAvailable ? "회" : "")
                 quarterMetric(label: "평균심박",
                               value: "\(quarter.avgHeartRate)", unit: "bpm")
                 quarterMetric(label: "최고심박",

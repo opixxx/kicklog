@@ -81,6 +81,12 @@ final class Match {
     var sprintCount: Int
     var avgHeartRate: Int
 
+    // ADR-0012 — 고강도 러닝(기존 14km/h 지표 rename) + 속도 지표 신뢰 가능 여부.
+    // speedMetricsAvailable=false (전 쿼터 저밀도) 면 최고속도·스프린트·고강도 러닝을 UI 에서 숨긴다.
+    // 인라인 기본값 = SwiftData lightweight 마이그레이션의 기존 행 기본값.
+    var highIntensityRunCount: Int = 0
+    var speedMetricsAvailable: Bool = true
+
     // 동기화 상태
     var labeledAt: Date?
     var syncedAt: Date?
@@ -146,6 +152,13 @@ final class QuarterWorkout {
     var activeEnergyKcal: Int
     var trimmed: Bool
 
+    // ADR-0012 — 고강도 러닝 + 속도 지표 신뢰 가능 여부(저밀도 데이터면 false).
+    // analysisVersion: 지표 알고리즘 버전 (ADR-0004 D8 의 (C) Hybrid 진화).
+    // 기존 행 기본값 1 = 구버전 산출물 → 앱 구동 시 일괄 재분석 대상.
+    var highIntensityRunCount: Int = 0
+    var speedMetricsAvailable: Bool = true
+    var analysisVersion: Int = 1
+
     var match: Match?
 
     init(
@@ -162,6 +175,9 @@ final class QuarterWorkout {
         sprintCount: Int = 0,
         activeEnergyKcal: Int = 0,
         trimmed: Bool = false,
+        highIntensityRunCount: Int = 0,
+        speedMetricsAvailable: Bool = true,
+        analysisVersion: Int = 1,
         match: Match? = nil
     ) {
         self.sourceWorkoutUUID = sourceWorkoutUUID
@@ -177,6 +193,9 @@ final class QuarterWorkout {
         self.sprintCount = sprintCount
         self.activeEnergyKcal = activeEnergyKcal
         self.trimmed = trimmed
+        self.highIntensityRunCount = highIntensityRunCount
+        self.speedMetricsAvailable = speedMetricsAvailable
+        self.analysisVersion = analysisVersion
         self.match = match
     }
 }
@@ -400,9 +419,9 @@ enum MatchFormat {
 
 // MARK: - VersionedSchema (ADR-0004 — 스키마 진화 대비)
 
-// 현재 스키마 V1. @Model 클래스 정의를 바꾸지 않는 한 스키마 해시가 동일하므로
-// 기존 설치 사용자의 스토어가 그대로 열린다. 필드 추가/타입 변경 시 V2 를 새로 정의하고
-// KickLogMigrationPlan.stages 에 migration stage 를 추가한다.
+// 현재 스키마 V1. 기본값 있는 필드 "추가"는 lightweight 마이그레이션 대상이라 SwiftData 가
+// 자동 처리한다 (2026-07 ADR-0012 필드 추가가 이 경로). 필드 rename/타입 변경/삭제 같은
+// 구조 변경 시에만 V2 를 새로 정의하고 KickLogMigrationPlan.stages 에 stage 를 추가한다.
 enum KickLogSchemaV1: VersionedSchema {
     static let versionIdentifier = Schema.Version(1, 0, 0)
 
