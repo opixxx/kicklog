@@ -132,3 +132,20 @@
   - [x] docs/agent/learning.md (본 항목)
   - [ ] code-reviewer 체크리스트: "`@ExceptionHandler(Exception)` 광역 캐치 시 Spring 표준 예외 선분기 확인" — 후속 후보
 - Skip reason if not promoted: N/A
+
+---
+
+### 2026-07-11 — 스프린트 재설계: 비율 규칙의 분모 퇴화 + HealthKit read 권한 상태 조회 불가
+
+- Trigger: missing-test (RED 1건) + review-major (M1), fix/sprint-metric-redesign
+- Task/ADR: EXEC_PLAN `docs/agent/plans/2026-07-11-sprint-metric-redesign.md` / ADR-0012
+- Failures & Root cause:
+  1. **비율 기반 규칙의 분모 퇴화**: 심박 교차검증의 "세션 최고심박의 95% 도달이면 인정" 분기가 **심박이 완전히 평탄한 세션**에서 무의미 (세션 최고 == 평탄 수준 → 항상 통과 → 조깅 중 GPS 스파이크가 최고속도로 승격). 실측 픽스처(심박 변동 큼)만으론 절대 안 잡히고, 합성 unhappy 케이스가 적발.
+  2. **HealthKit read 권한 상태는 조회 불가**: `authorizationStatus(for:)` 는 write(share) 상태만 반환 — read 허용 여부는 프라이버시 설계상 숨겨진다. "권한 확인 후 분기" 류 제안(리뷰 M1 원안)은 read 경로에선 동작하지 않음. 부재 원인(삭제 vs 권한 vs 동기화 지연)을 구분할 수 없으면 **영구 스킵은 형식적으로 확정 가능한 케이스(UUID 형식 불일치)로 한정**하고 나머지는 재시도.
+- Prevention:
+  - 비율/상대값 규칙 도입 시 **분모가 퇴화하는 케이스(평탄·0·단일값 데이터)를 합성 테스트로 반드시 커버**. 실측 픽스처는 happy 재현엔 강하지만 퇴화 입력엔 무력.
+  - HealthKit 부재 판정 로직은 read 권한 조회가 불가함을 전제로 설계 (재시도 비용이 싸면 재시도가 기본값).
+- Updated:
+  - [x] EXEC_PLAN 학습 기록 섹션
+  - [x] docs/agent/learning.md (본 항목)
+  - [x] ADR-0012 D3/D5 본문
