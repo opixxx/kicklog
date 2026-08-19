@@ -5,6 +5,7 @@ import com.opixxx.kicklog.auth.service.AuthService
 import com.opixxx.kicklog.common.security.JwtTokenProvider
 import com.opixxx.kicklog.user.entity.User
 import com.opixxx.kicklog.user.repository.UserStore
+import org.hamcrest.Matchers
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -257,6 +258,22 @@ class UserProfileAcceptanceTest {
         }.andExpect {
             status { isBadRequest() }
             jsonPath("$.code") { value("VALIDATION_FAILED") }
+        }
+    }
+
+    @Test
+    fun `GET users me 응답의 createdAt 은 소수부 없는 초 단위 ISO-8601 UTC 다`() {
+        // EXEC_PLAN 2026-08-19 instant-seconds-serialization — 실제 HTTP 응답 경계에서 시간 포맷 계약 고정.
+        // User.create 는 createdAt 을 Instant.now() 로 채우므로 나노초가 실제로 실린다 (장애 재현 조건과 동일).
+        // 소수부가 붙으면 iOS 18 의 JSONDecoder.iso8601 이 응답 전체를 거부한다.
+        val user = createUser(displayName = "시간계약")
+        val accessToken = jwtTokenProvider.createAccessToken(user.id)
+
+        mockMvc.get("/users/me") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.createdAt") { value(Matchers.matchesPattern("""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z""")) }
         }
     }
 
