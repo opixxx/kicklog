@@ -265,7 +265,7 @@ GET /matches?cursor=eyJwbGF5ZWRBdCI6...&size=20
 
 | 타입 | JSON | 비고 |
 |---|---|---|
-| `Instant` | ISO-8601 UTC `"2026-05-21T10:00:00Z"` | 항상 UTC, 클라이언트가 변환 |
+| `Instant` | ISO-8601 UTC `"2026-05-21T10:00:00Z"` | 항상 UTC, 클라이언트가 변환. **소수부 금지** — 초 단위로 버림(`JacksonConfig`). iOS 18 `JSONDecoder.iso8601` 이 소수부를 거부한다 |
 | `LocalDate` | `"2026-05-21"` | 시즌 등 날짜만 |
 | `BigDecimal` / `NUMERIC` | 숫자 또는 문자열 — 정밀도 필요하면 문자열 권장 | `geo_lat`, `geo_lng` 등 |
 | `null` | `null` 명시 | 키 자체를 빼지 말 것 (iOS 디코딩 일관성) |
