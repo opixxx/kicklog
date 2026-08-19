@@ -7,7 +7,7 @@
 - **Base URL**: 운영 `https://api.kicklog.org/v1` · 로컬 `http://localhost:8080/v1` (도메인 확정: ADR-0007)
 - **인증 헤더**: `Authorization: Bearer <accessToken>` (보호 endpoint 전부)
 - **에러 응답**: 모든 에러는 `{ code, message, field?, traceId? }` (api-conventions.md)
-- **시간**: 모든 `Instant` 는 ISO-8601 UTC (`2026-05-21T10:00:00Z`)
+- **시간**: 모든 `Instant` 는 ISO-8601 UTC (`2026-05-21T10:00:00Z`) — **초 단위, 소수부(밀리/마이크로초) 없음**. iOS 18 의 `JSONDecoder.iso8601` 이 소수부를 거부하므로 계약이자 호환 요건이다 (`common/config/JacksonConfig.kt` 가 전역 강제)
 - **null**: 키를 빼지 않고 `null` 명시 (iOS 디코딩 일관성)
 - **🔒 = 인증 필요 / 🌐 = permitAll**
 

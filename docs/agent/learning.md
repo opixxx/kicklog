@@ -132,3 +132,32 @@
   - [x] docs/agent/learning.md (본 항목)
   - [ ] code-reviewer 체크리스트: "`@ExceptionHandler(Exception)` 광역 캐치 시 Spring 표준 예외 선분기 확인" — 후속 후보
 - Skip reason if not promoted: N/A
+
+---
+
+### 2026-08-19 — 응답 시간 포맷 계약 위반: 신규 사용자 로그인 전면 실패 (운영 장애)
+
+- Trigger: production-risk, fix/instant-seconds-serialization
+- Task/ADR: EXEC_PLAN `docs/agent/plans/2026-08-19-instant-seconds-serialization.md`
+- Failures & Root cause:
+  1. **Jackson 의 비결정적 시간 출력**: Jackson 3 는 `Instant` 의 나노초가 0 이면 소수부를 생략하고, 0 이 아니면 붙인다 (`2026-08-19T09:38:29.392099Z`). 같은 엔드포인트가 **값에 따라 다른 포맷**을 내보내는 상태였고, 이는 `docs/spec/api-spec.md` 가 규정한 계약(`2026-05-21T10:00:00Z`) 위반이었다.
+  2. **명세가 예시로만 존재**: 계약이 예시 문자열로만 적혀 있고 **테스트로 고정되지 않아**, 구현이 계약을 어겨도 아무도 못 잡았다.
+  3. **최신 OS 에서만 테스트**: iOS 18 의 `JSONDecoder.iso8601` 은 소수부를 거부하지만, iOS 26 의 새 swift-foundation 파서는 허용한다. 개발자 기기(iOS 26)에서는 증상이 아예 안 나타나 **신규 사용자 로그인이 전면 실패하는 동안에도 정상으로 보였다**. 이 맥에는 최소 지원 버전(iOS 18.0) 시뮬레이터 런타임 자체가 없었다.
+  4. **증상이 기존 사용자에게 안 보임**: 지뢰가 로그인 응답(`user.createdAt`)에만 있고 `/auth/refresh` 응답에는 날짜 필드가 없어, 이미 로그인한 사용자는 영원히 안 밟는다. 그래서 "나는 잘 되는데 그 사람만" 으로 보였다.
+- 진단에 결정적이었던 것:
+  - **nginx 액세스 로그의 User-Agent Darwin 버전** — `Darwin/24.6.0`(iOS 18.6) 기기만 signin 을 4회 연속 재시도하고 이후 `/auth/refresh` 가 한 건도 없었다(= 토큰 저장 실패). `Darwin/25.x`(iOS 26) 는 signin 1회 후 refresh 로 이어짐(= 정상). 서버는 전부 200 을 반환했으므로 **서버 정상 + 클라이언트 파싱 실패**가 로그만으로 확정됐다.
+  - 앱 에러 문구가 `decodingFailed` 계열인지(2xx 인데 파싱 실패) `server` 계열인지 구분한 것.
+- Prevention:
+  - **외부 계약(응답 포맷)은 예시가 아니라 테스트로 고정한다.** mapper 레벨 + **HTTP 응답 경계(MockMvc)** 양쪽에서. 경계 테스트는 "설정을 끄면 그 테스트만 실패하는가"로 실효를 검증한다.
+  - **직렬화는 엄격하게, 역직렬화는 관대하게.** 이미 배포된 클라이언트를 깨지 않으려면 입력은 넓게 받아야 한다.
+  - **`Instant.toString()` 으로 미리 문자열화하지 말 것** — 전역 시리얼라이저를 조용히 우회한다 (`HealthCheckController` 가 실제로 그랬다).
+  - **클라이언트 최소 지원 버전에서 최소 1회 검증한다.** 최신 OS 의 관대한 파서가 계약 위반을 가려준다.
+  - 서버 수정은 앱 배포 없이 즉시 반영되므로, **클라이언트 호환 장애는 서버에서 먼저 지혈**하고 클라이언트 근본 수정을 뒤따르게 한다.
+- Updated:
+  - [x] EXEC_PLAN 학습 기록 섹션
+  - [x] docs/agent/learning.md (본 항목)
+  - [x] docs/spec/api-spec.md · docs/architecture/api-conventions.md — "소수부 금지" 를 문장으로 명시
+  - [ ] iOS `APIClient` 디코더에 소수부 폴백 추가 — 후속 (2026-08-20 예정)
+  - [ ] iOS 18 시뮬레이터 런타임 설치 후 최소 지원 버전 스모크 — 후속 후보
+  - [ ] `*Response` 의 `java.time` 필드 타입을 검사하는 가드 테스트 — 후속 후보 (code-reviewer 제안)
+- Skip reason if not promoted: N/A
