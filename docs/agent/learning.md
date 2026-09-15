@@ -161,3 +161,38 @@
   - [ ] iOS 18 시뮬레이터 런타임 설치 후 최소 지원 버전 스모크 — 후속 후보
   - [ ] `*Response` 의 `java.time` 필드 타입을 검사하는 가드 테스트 — 후속 후보 (code-reviewer 제안)
 - Skip reason if not promoted: N/A
+
+---
+
+### 2026-09-15 — 컨테이너 JVM 메모리 제한 부재 → 호스트 스래싱으로 prod 9일 마비
+
+- Trigger: production-risk (운영 장애, 사용자 신고로 최초 발견)
+- Task/ADR: 장애 조사 (배포 PR #83 = `ae3da78`, 2026-08-19). 후속 ADR 예정
+- Failure: 2026-09-06 22:25 KST 부터 **9일간** prod 무응답. 백엔드·nginx·sshd·SSM agent 가 전부 "살아있으나 응답 불가". 컨테이너 재시작 없음, OOM killer 로그 없음, CloudWatch 알람 0건.
+- Root cause:
+  1. **`MaxRAMPercentage` 는 컨테이너 메모리 제한이 있을 때만 의도대로 동작한다.** `docker-compose.prod.yml` 에 `mem_limit` 이 없어(`hostconfig.json` 의 `"Memory": 0` 으로 실측 확인) `-XX:MaxRAMPercentage=70` 이 **호스트 전체 916MB 기준**으로 계산 → heap 상한 641MB. Dockerfile 주석의 의도("컨테이너 메모리의 70%")와 실제 동작이 어긋나 있었다.
+  2. **JVM 은 한 번 확장한 heap 을 OS 에 반납하지 않는다.** GC 는 heap *내부* 객체만 정리한다. 8/19 배포 53분 뒤 heap 확장 1회로 `%commit` 156%→179.6% 계단식 점프, 이후 page cache 가 193MB→22MB 로 잠식되며 18일에 걸쳐 임계 도달.
+  3. **스왑이 없어 OOM killer 가 발동하지 않았다.** 부팅 로그 `zram0: system has too much memory (916MB), limit is 800MB, ignoring` — zram 스왑 미생성. 커널은 "버릴 수 있는 page cache 가 남아 있다"고 판단해 OOM killer 대신 **무한 스래싱(라이브락)** 을 택했다. 그 결과 프로세스가 죽지 않아 `restart: unless-stopped` 도 작동하지 않았다.
+  - **트래픽과 무관하다.** 붕괴 직전 CPU 1.0%, RDS 커넥션 10개 고정. 부하가 아니라 설정이 원인이다.
+- Prevention:
+  - **컨테이너로 JVM 을 띄우면 `mem_limit` 은 필수다.** Java 10+ 는 cgroup 을 읽어 heap·GC 스레드 수·코드 캐시를 자동 결정하므로, 메모리 제한은 안전장치가 아니라 **JVM 튜닝의 입력값**이다.
+  - **heap 은 컨테이너 제한의 50~70%.** 비-heap(metaspace·스레드 스택·코드 캐시·GC 구조체)이 150~200MB 고정으로 들어간다. 작은 박스일수록 비율을 낮춘다 — 512MB 제한이면 50%(heap 256m), 4GB 이상이면 70~75%.
+  - **`-XX:+ExitOnOutOfMemoryError` 를 함께 건다.** 없으면 `OutOfMemoryError` 후 스레드만 죽고 프로세스는 좀비로 남아 재시작 경로가 막힌다.
+  - **제한을 걸면 실패 모드가 "컨테이너 OOM kill → 자동 재시작"** 으로 바뀐다. 제한이 없으면 "호스트 전체 마비"가 된다 — 깨끗하게 죽을 수 있게 하는 것이 제한의 본질적 가치다.
+  - **호스트에 스왑 1~2GB 를 둔다.** 스래싱 대신 OOM killer 가 정상 발동하도록 하는 완충 장치.
+- 감지 사각지대 (같이 고칠 것):
+  - **docker `healthcheck` 는 재시작을 트리거하지 않는다.** unhealthy 를 표시만 하고, `restart` 정책은 프로세스가 *종료될 때만* 작동한다. 실제 재시작이 필요하면 autoheal 컨테이너나 systemd watchdog 을 붙여야 한다.
+  - **`StatusCheckFailed` + `CPU >= 90%` 조합은 "OS 는 살았는데 앱만 죽은" 상태를 못 잡는다** (ADR-0009 D3). 실제 값은 StatusCheck 정상 / CPU 53%(vCPU 2개 중 1개 100% 점유 = 커널 메모리 회수 루프) 였다. 외부 uptime 감시(Route53 health check 등)와 메모리 알람이 필요하다.
+  - **`SENTRY_DSN` 이 prod 에 주입되지 않아 Sentry 가 꺼져 있었다** (기동 로그 `SENTRY_DSN 미설정 — Sentry 에러 트래킹 비활성화`). 관측 도구는 도입 후 **실제 이벤트 수신까지 확인**해야 도입이 끝난 것이다.
+- 진단 기법 (재사용):
+  - SSM·SSH 가 모두 응답하지 않을 때 → **EBS 스냅샷을 임시 인스턴스에 읽기 전용 마운트**. 원본의 마비 상태를 보존한 채 로그 확보 가능. 재부팅은 메모리 상태를 지우므로 증거 수집 뒤에 한다.
+  - **`/var/log/sa` (sysstat)** 로 과거 메모리·CPU 를 분 단위 복원 가능 — `sar -r -f sa<DD>`. 사후 분석의 핵심 자료다.
+  - **컨테이너 로그의 docker `time` 필드 vs 앱 타임스탬프 격차**가 스래싱의 직접 지표다. 이번엔 앱이 9/6 15:39 에 찍은 줄을 docker 가 9/11~9/14 에 기록했다.
+  - `%commit` **계단식 점프 = heap 확장 이벤트**, 완만한 증가 = 데이터 누적. 누수와 구분된다.
+- Updated:
+  - [x] docs/agent/learning.md (본 항목)
+  - [ ] `infra/docker-compose.prod.yml` — `mem_limit` 추가 (복구 작업에서)
+  - [ ] `backend/Dockerfile` — heap 상한 명시 + `ExitOnOutOfMemoryError` (복구 작업에서)
+  - [ ] ADR — free-tier 운영 메모리 예산 + 앱 레벨 헬스 감시 (ADR-0009 후속)
+  - [ ] code-reviewer 체크리스트: "컨테이너 배포 설정 변경 시 `mem_limit` ↔ JVM heap 상한 정합성" — 후속 후보
+- Skip reason if not promoted: N/A

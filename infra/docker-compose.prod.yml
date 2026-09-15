@@ -29,6 +29,18 @@ services:
     container_name: kicklog-backend
     restart: unless-stopped
 
+    # 메모리 제한 — 2026-09-06 장애의 근본 대책.
+    # 제한이 없으면 JVM 이 호스트 전체(916MB)를 기준으로 heap 상한을 잡아(642MB)
+    # page cache 를 고갈시키고, OOM killer 없이 호스트가 스래싱에 빠진다.
+    # 제한이 있어야 "컨테이너만 OOM kill → restart 로 자동 복구" 경로가 열린다.
+    #
+    #   실측(2026-09-15): JVM 비-heap 226MB · 비-JVM 프로세스 179MB
+    #   예산: 512(컨테이너) + 179(호스트 프로세스) = 691MB, page cache 225MB 확보
+    #   memswap_limit 을 mem_limit 과 같게 두면 컨테이너 스왑 사용이 0 이 된다.
+    #   (미지정 시 제한만큼 스왑을 더 써서 상한이 사실상 2배가 된다)
+    mem_limit: 512m
+    memswap_limit: 512m
+
     # localhost 만 bind — nginx 만 접근. 0.0.0.0 노출 X (SG 로 한 번 더 보호하지만 이중 안전).
     ports:
       - "127.0.0.1:8080:8080"
