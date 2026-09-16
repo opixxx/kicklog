@@ -8,12 +8,23 @@
 # SNS 는 첫 1,000 publication/m 까지 Free Tier 안에 들어옴 (실제 알람 폭증 시에만 과금 가능성).
 
 # ─── SNS Topic: 운영 알림 ────────────────────────────
-# SonarQube hotspot 해소 — AWS managed KMS key 로 SSE 활성화.
-# `alias/aws/sns` 는 AWS 가 계정·region 별로 자동 생성·관리하며 추가 비용 없음.
-# (고객 관리 CMK 는 월 $1 + API 호출 과금 — 본 토픽의 메시지(알람 메타데이터)는 PII/secret 없어 과잉)
+# ⚠️ SSE 를 켜지 않는다 — 켜면 CloudWatch 알람이 이 토픽에 발행하지 못한다. ADR-0013.
+#
+# 2026-09-16 실측으로 확인: `alias/aws/sns`(AWS 관리형 키)로 SSE 를 켠 상태에서
+#   - IAM 사용자의 직접 publish  → 성공 (Published 1 / Delivered 1 / Failed 0)
+#   - CloudWatch 알람의 publish → **발행 자체가 일어나지 않음**
+# CloudWatch 가 암호화된 토픽에 발행하려면 KMS 키 정책에 `cloudwatch.amazonaws.com` 의
+# kms:GenerateDataKey* / kms:Decrypt 가 필요한데, **AWS 관리형 키는 정책을 수정할 수 없다.**
+# 그 결과 2026-05 구축 이래 모든 알람이 조용히 실패하고 있었다 (알람은 ALARM 으로 바뀌지만
+# 통보가 나가지 않음 — 알람이 있는데 아무도 모르는 최악의 상태).
+#
+# 대안이었던 고객 관리형 CMK 는 월 $1 + 호출 과금이라 free-tier 원칙에 어긋난다.
+# 본 토픽의 메시지는 알람 이름·메트릭 값·시각뿐이고 PII/secret 이 없으며,
+# 최종 전달 경로인 이메일(SMTP) 자체가 평문이라 SSE 의 실질 보안 이득이 거의 없다.
+# → 통보 도달을 우선한다. 정적 분석(SonarQube)이 이 토픽의 미암호화를 지적하면
+#   ADR-0013 을 근거로 예외 처리한다.
 resource "aws_sns_topic" "alerts" {
-  name              = "kicklog-alerts"
-  kms_master_key_id = "alias/aws/sns"
+  name = "kicklog-alerts"
 
   tags = {
     Name = "kicklog-alerts"
