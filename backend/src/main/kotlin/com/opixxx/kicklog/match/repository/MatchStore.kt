@@ -16,6 +16,10 @@ interface MatchStore {
     fun findByUserIdAndClientMatchId(userId: Long, clientMatchId: UUID): Match?
     fun findAllByUserId(userId: Long, cursor: MatchCursorCondition?, limit: Int): List<Match>
     fun findAllWithQuartersByIdIn(ids: List<Long>): List<Match>
-    fun findAllByUserIdAndPlayedAtBetween(userId: Long, startInclusive: Instant, endExclusive: Instant): List<Match>
+    // 시즌 통계 집계 — 집계 단위별로 나뉘어 있다. matches 와 quarter_workouts 를 조인해
+    // 한 번에 집계하면 경기 1행이 쿼터 수만큼 복제되어 값이 중복 합산된다(fan-out).
+    fun aggregateSeasonMatches(userId: Long, startInclusive: Instant, endExclusive: Instant): SeasonMatchAggregate
+    fun aggregateSeasonQuarters(userId: Long, startInclusive: Instant, endExclusive: Instant): SeasonQuarterAggregate
+    fun aggregateMonthlyDistance(userId: Long, startInclusive: Instant, endExclusive: Instant): List<MonthlyDistance>
     fun clearVenueId(venueId: Long)
 }
