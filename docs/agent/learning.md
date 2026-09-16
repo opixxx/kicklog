@@ -222,3 +222,30 @@
   - [x] `infra/terraform/observability.tf` — 알람 2종
   - [ ] ADR — free-tier 앱 레벨 감시 정책 (ADR-0009 후속)
 - Skip reason if not promoted: N/A
+
+---
+
+### 2026-09-16 — SNS SSE 가 CloudWatch 알람 통보를 4개월간 막고 있었다
+
+- Trigger: production-risk (알람 통보 경로 테스트 중 발견)
+- Task/ADR: **ADR-0013**, EXEC_PLAN `docs/agent/plans/2026-09-16-sns-alarm-delivery.md`
+- Failure: 새로 만든 알람을 `set-alarm-state` 로 강제 ALARM 전환했는데 **이메일이 오지 않았다.** 설정은 전부 정상이었다 — `ActionsEnabled=true`, 알람 액션에 토픽 ARN 연결, SNS 구독 `PendingConfirmation=false`.
+- Root cause: **`alias/aws/sns`(AWS 관리형 키)로 SSE 를 켜면 CloudWatch 알람이 그 토픽에 발행할 수 없다.**
+  - CloudWatch 가 암호화된 토픽에 발행하려면 KMS 키 정책에 `cloudwatch.amazonaws.com` 의 `kms:GenerateDataKey*` / `kms:Decrypt` 가 필요하다.
+  - **AWS 관리형 키는 키 정책을 수정할 수 없다** → 구조적으로 불가능.
+  - 실패가 **에러 없이 침묵으로** 나타난다. 알람은 정상적으로 ALARM 상태가 되지만 통보만 안 나간다.
+  - 영향 범위는 그 토픽을 쓰는 **모든 알람**. ADR-0009 D3 로 2026-05 에 구축한 기존 4종도 포함 — **넉 달간 어떤 알람도 통보된 적이 없었다.**
+- 진단에 결정적이었던 것:
+  - **발행 주체를 갈라서 테스트한 것.** IAM 사용자의 직접 `sns publish` 는 성공(Delivered 1)했는데 CloudWatch 알람은 `NumberOfMessagesPublished` 자체가 무기록 → "SNS→이메일" 이 아니라 "알람→SNS" 구간의 문제로 좁혀졌다.
+  - SNS 3대 지표를 함께 본 것: `Published` 가 없으면 **발행 전 단계**(권한·암호화), `Published` 는 있는데 `Delivered` 가 없으면 수신처 문제, `Failed` 가 있으면 바운스.
+- Prevention:
+  - **알람은 "만들었다" 가 아니라 "통보가 도달했다" 가 완료 기준이다.** 생성 후 `aws cloudwatch set-alarm-state` 로 강제 전환해 실제 수신을 확인한다 (ADR-0013 D2).
+  - **보안 설정이 기능을 조용히 파괴할 수 있다.** SSE·암호화·권한 축소는 방향이 옳아도 상호작용을 검증해야 한다. 특히 **실패가 에러 없이 침묵으로 나타나는 경로**를 경계한다.
+  - **정적 분석 지적을 기계적으로 수용하지 않는다.** ADR-0009 D3 의 SSE 활성은 SonarQube hotspot 해소가 동기였는데, 이 토픽에서는 암호화가 기능을 파괴했다. 지적의 맥락 적합성을 따진다.
+- 같은 날 발견된 동형 문제: **Sentry 비활성** (IAM 누락 + `2>/dev/null` 로 에러 은폐 — 2026-09-16 앞 항목). 구조가 같다 — **설정은 완료됐으나 동작하지 않았고, 실패가 조용했다.** 관측·통보 계열은 엔드투엔드 수신 확인을 완료 기준으로 삼는다.
+- Updated:
+  - [x] docs/agent/learning.md (본 항목)
+  - [x] **docs/adr/0013-sns-alarm-delivery.md** — ADR-0009 D3 번복
+  - [x] `infra/terraform/observability.tf` — `kms_master_key_id` 제거
+  - [ ] apply 후 알람 재테스트로 실제 수신 확인 — 본 PR 의 완료 조건
+- Skip reason if not promoted: N/A
