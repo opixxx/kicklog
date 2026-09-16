@@ -83,12 +83,22 @@ resource "aws_iam_role_policy" "ec2_secrets_read" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret",
         ]
-        Resource = [
-          aws_secretsmanager_secret.db_password.arn,
-          aws_secretsmanager_secret.kakao_rest_api_key.arn,
-          aws_secretsmanager_secret.jwt_secret.arn,
-          aws_secretsmanager_secret.ghcr_pat.arn,
-        ]
+        # sentry_dsn 은 두 경로를 모두 커버한다:
+        #   - tfvars 로 관리하는 경우   → aws_secretsmanager_secret.sentry_dsn (count=1)
+        #   - 콘솔·CLI 로 수동 생성한 경우 → data.aws_secretsmanager_secret.sentry_dsn_existing
+        # 2026-09-16: 실제로는 수동 생성돼 있었고 이 정책에서 누락돼 있었다. 그 결과
+        # fetch-secrets.sh 의 GetSecretValue 가 AccessDenied 로 실패했지만 `2>/dev/null ||`
+        # 가 에러를 삼켜 SENTRY_DSN 이 빈 값으로 주입됐고, Sentry 가 조용히 꺼져 있었다.
+        Resource = concat(
+          [
+            aws_secretsmanager_secret.db_password.arn,
+            aws_secretsmanager_secret.kakao_rest_api_key.arn,
+            aws_secretsmanager_secret.jwt_secret.arn,
+            aws_secretsmanager_secret.ghcr_pat.arn,
+          ],
+          aws_secretsmanager_secret.sentry_dsn[*].arn,
+          data.aws_secretsmanager_secret.sentry_dsn_existing[*].arn,
+        )
       }
     ]
   })
