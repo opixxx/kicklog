@@ -5,9 +5,9 @@
 # 카운터 파일로 반복 횟수 제한 (무한 루프 + 비용 폭증 방지).
 #
 # 동작:
-#   1) worktree 내부 + 백엔드 변경 있을 때만 동작 (iOS 는 보호 대상 아님)
+#   1) worktree 내부 + 백엔드 또는 iOS 변경 있을 때만 동작 (ADR-0012: iOS 도 컴파일 센서 대상)
 #   2) 카운터 확인 — MAX_ATTEMPTS 초과 시 에스컬레이션
-#   3) compileKotlin 실행 (test는 PR/CI 단계로 위임)
+#   3) 백엔드 변경 → compileKotlin / iOS 변경 → xcodebuild (test는 PR/CI 단계로 위임)
 #   4) 실패 → decision:"block" + 에러 주입 (에이전트가 reasoning 재개)
 #   5) 성공 → 카운터 리셋
 
@@ -42,10 +42,11 @@ if [ -z "$top" ] || [ ! -f "$top/.git" ]; then
   exit 0
 fi
 
-# ─── 1-1) 백엔드 변경이 있는지 확인 ───────────────────────────────────────────
+# ─── 1-1) 백엔드/iOS 변경이 있는지 확인 ───────────────────────────────────────
 CHANGED_BACKEND=$(git -C "$top" diff HEAD --name-only 2>/dev/null | grep -E '^backend/.*\.(kt|kts|gradle)$' || true)
-if [ -z "$CHANGED_BACKEND" ]; then
-  # 백엔드 변경 없음 (문서만 또는 iOS만) → verify-and-block 대상 아님
+CHANGED_IOS=$(git -C "$top" diff HEAD --name-only 2>/dev/null | grep -E '^ios/.*\.swift$' || true)
+if [ -z "$CHANGED_BACKEND" ] && [ -z "$CHANGED_IOS" ]; then
+  # 소스 변경 없음 (문서만) → verify-and-block 대상 아님
   exit 0
 fi
 
@@ -69,13 +70,31 @@ if [ "$count" -ge "$MAX_ATTEMPTS" ]; then
   exit 0
 fi
 
-# ─── 3) 계산적 센서 — compileKotlin (test는 PR 단계) ─────────────────────────
+# ─── 3) 계산적 센서 — 백엔드 compileKotlin / iOS xcodebuild (test는 PR 단계) ──
 log_file="${top}/logs/verify-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "${top}/logs"
 
-if (cd "$top/backend" && ./gradlew compileKotlin --quiet) > "$log_file" 2>&1; then
+failed_check=""
+changed_files=""
+
+if [ -n "$CHANGED_BACKEND" ]; then
+  if ! (cd "$top/backend" && ./gradlew compileKotlin --quiet) > "$log_file" 2>&1; then
+    failed_check="backend.compileKotlin"
+    changed_files="$CHANGED_BACKEND"
+  fi
+fi
+
+if [ -z "$failed_check" ] && [ -n "$CHANGED_IOS" ]; then
+  if ! (cd "$top/ios" && xcodebuild build -project KickLog.xcodeproj -scheme KickLog \
+        -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO -quiet) > "$log_file" 2>&1; then
+    failed_check="ios.xcodebuild"
+    changed_files="$CHANGED_IOS"
+  fi
+fi
+
+if [ -z "$failed_check" ]; then
   if [ "$count" -gt 0 ]; then
-    append_trajectory "SELF_HEAL_RESOLVED check=backend.compileKotlin attempts=${count}" \
+    append_trajectory "SELF_HEAL_RESOLVED check=compile attempts=${count}" \
 "- resolved_by: subsequent code changes
 - prevention_required: decide whether this was one-off or should update docs/agent/learning.md, EXEC_PLAN template, code-reviewer, or backend-test-writer"
   fi
@@ -90,17 +109,17 @@ echo "$new_count" > "$counter_file"
 
 err_tail=$(tail -30 "$log_file" 2>/dev/null || echo "(로그 없음)")
 
-append_trajectory "SELF_HEAL_ATTEMPT check=backend.compileKotlin attempt=${new_count}/${MAX_ATTEMPTS}" \
+append_trajectory "SELF_HEAL_ATTEMPT check=${failed_check} attempt=${new_count}/${MAX_ATTEMPTS}" \
 "- failure_type: compile
-- failed_check: backend.compileKotlin
+- failed_check: ${failed_check}
 - log_file: ${log_file}
-- changed_backend:
-$(echo "$CHANGED_BACKEND" | sed 's/^/  - /')
+- changed_files:
+$(echo "$changed_files" | sed 's/^/  - /')
 - error_tail:
 $(echo "$err_tail" | sed 's/^/  /')
 - learning_action: after fixing, record root cause and prevention in docs/agent/learning.md if this can recur"
 
-reason="❌ 백엔드 컴파일 실패 (시도 ${new_count}/${MAX_ATTEMPTS})
+reason="❌ 컴파일 실패: ${failed_check} (시도 ${new_count}/${MAX_ATTEMPTS})
 
 아래 에러를 분석하고 수정하세요:
 
