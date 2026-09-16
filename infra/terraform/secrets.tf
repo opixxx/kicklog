@@ -95,3 +95,11 @@ resource "aws_secretsmanager_secret_version" "sentry_dsn" {
   secret_id     = aws_secretsmanager_secret.sentry_dsn[0].id
   secret_string = var.sentry_dsn
 }
+
+# tfvars 를 쓰지 않고 콘솔·CLI 로 직접 만든 sentry-dsn 을 참조한다 (ARN 만 쓰고 값은 읽지 않는다).
+# EC2 IAM 정책(ec2.tf)이 이 ARN 에 GetSecretValue 를 허용해야 fetch-secrets.sh 가 주입할 수 있다.
+# var.sentry_dsn 으로 terraform 이 직접 만든 경우에는 위 resource 가 잡으므로 이 data 는 count=0.
+data "aws_secretsmanager_secret" "sentry_dsn_existing" {
+  count = var.sentry_dsn == "" ? 1 : 0
+  name  = "kicklog/sentry-dsn"
+}
