@@ -51,9 +51,30 @@ JWT_SECRET=$(aws secretsmanager get-secret-value \
   --query SecretString --output text)
 
 # Sentry DSN — optional. 미발급이면 secret 이 없으므로 빈 값으로 두고 앱에서 Sentry 비활성 처리한다.
-SENTRY_DSN=$(aws secretsmanager get-secret-value \
+#
+# 단, "secret 이 없음(ResourceNotFound)" 과 "있는데 못 읽음(AccessDenied)" 은 구분해야 한다.
+# 2026-09-16 이전에는 둘 다 `2>/dev/null || echo ""` 로 뭉뚱그려져, IAM 정책에 sentry-dsn ARN 이
+# 누락된 사실이 드러나지 않은 채 Sentry 가 조용히 꺼져 있었다. 권한 문제는 설정 실수이므로
+# 반드시 경고를 남긴다 (배포 자체는 막지 않는다 — Sentry 는 optional 이다).
+SENTRY_ERR=$(mktemp)
+if SENTRY_DSN=$(aws secretsmanager get-secret-value \
   --region "$REGION" --secret-id kicklog/sentry-dsn \
-  --query SecretString --output text 2>/dev/null || echo "")
+  --query SecretString --output text 2>"$SENTRY_ERR"); then
+  echo "✅ Sentry DSN 조회 성공 — 에러 트래킹 활성화됨"
+else
+  if grep -qi "AccessDenied\|not authorized" "$SENTRY_ERR"; then
+    echo "⚠️  경고: sentry-dsn 시크릿은 존재하나 EC2 IAM role 에 읽기 권한이 없습니다." >&2
+    echo "    → infra/terraform/ec2.tf 의 kicklog-ec2-secrets-read 정책에 ARN 을 추가하고 apply 하세요." >&2
+    echo "    → Sentry 는 비활성 상태로 기동합니다 (에러가 수집되지 않습니다)." >&2
+  elif grep -qi "ResourceNotFound\|can't find the specified secret" "$SENTRY_ERR"; then
+    echo "ℹ️  sentry-dsn 시크릿 미발급 — Sentry 비활성으로 진행합니다."
+  else
+    echo "⚠️  경고: sentry-dsn 조회 실패 (원인 불명):" >&2
+    sed 's/^/    /' "$SENTRY_ERR" >&2
+  fi
+  SENTRY_DSN=""
+fi
+rm -f "$SENTRY_ERR"
 
 # /opt/kicklog/.env 작성 (atomic — 임시파일 + mv)
 TMP=$(mktemp)

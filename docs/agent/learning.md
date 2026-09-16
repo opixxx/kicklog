@@ -196,3 +196,29 @@
   - [ ] ADR — free-tier 운영 메모리 예산 + 앱 레벨 헬스 감시 (ADR-0009 후속)
   - [ ] code-reviewer 체크리스트: "컨테이너 배포 설정 변경 시 `mem_limit` ↔ JVM heap 상한 정합성" — 후속 후보
 - Skip reason if not promoted: N/A
+
+---
+
+### 2026-09-16 — terraform 밖에서 만든 시크릿 → IAM 누락 → 조용히 꺼져 있던 Sentry
+
+- Trigger: production-risk (2026-09-15 장애 조사 중 발견)
+- Task/PR: `chore/observability-sentry-alarms`, EXEC_PLAN `docs/agent/plans/2026-09-16-observability-sentry-alarms.md`
+- Failure: 2026-09-06 9일 장애 내내 Sentry 가 비활성이었다. 기동 로그에 `SENTRY_DSN 미설정 — Sentry 에러 트래킹 비활성화`. 에러 트래킹 도입은 PR #77 로 끝났다고 기록돼 있었으나 **실제로는 한 번도 동작한 적이 없었다.**
+- Root cause (2단 은폐):
+  1. **`kicklog/sentry-dsn` 시크릿이 terraform 밖(콘솔·CLI)에서 만들어졌다.** `var.sentry_dsn` 이 빈 값이라 `aws_secretsmanager_secret.sentry_dsn` 은 `count=0` — state 에 없다. terraform 으로 만들었다면 IAM 정책도 같은 apply 에서 갱신됐겠지만, 수동 생성이라 **`kicklog-ec2-secrets-read` 정책의 Resource 목록에서 누락**됐다 (db-password·kakao·jwt·ghcr-pat 4개만 등록).
+  2. **`fetch-secrets.sh` 가 그 실패를 삼켰다.** `aws secretsmanager get-secret-value ... 2>/dev/null || echo ""` — AccessDenied 가 `/dev/null` 로 사라지고 빈 문자열이 반환됐다. 주석은 "미발급이면 빈 값" 이라 적혀 있었지만 실제 상황은 **"발급됐는데 못 읽음"** 이었고, 둘이 구분되지 않아 설정 실수가 영원히 드러나지 않았다.
+- Prevention:
+  - **optional 의존이라도 "없음(ResourceNotFound)" 과 "권한 없음(AccessDenied)" 은 구분해 로그를 남긴다.** 전자는 정상 경로, 후자는 **설정 실수**다. 실패를 뭉뚱그려 삼키면 진단 불가능한 침묵이 된다.
+  - **시크릿·리소스를 콘솔에서 급히 만들었으면 terraform 쪽 참조(IAM 정책 등)를 같이 점검한다.** state 밖 리소스는 `data` source 로 참조해 정책에 포함시킨다 (`resource[*].arn` 과 `data[*].arn` 을 `concat`).
+  - **관측 도구는 "도입 완료" 가 아니라 "실제 이벤트 수신 확인" 이 완료 기준이다.** 배포했다고 켜진 게 아니다.
+- 함께 추가한 앱 레벨 알람 (기존 알람의 사각지대 — 2026-09-15 항목 참조):
+  - `kicklog-backend-db-disconnected` — RDS `DatabaseConnections < 1` 15분. 정상 10 고정, 장애 시 0. **9/6 23:00 에 즉시 감지됐을 값.**
+  - `kicklog-ec2-disk-read-surge` — EBS `VolumeReadBytes` 5분당 1GiB 초과 15분. 정상 36KB~1.4MB, 스래싱 시 4.5GB. **8/22 에 울렸을 값 — 붕괴 15일 전 조기 경보.**
+  - 둘 다 기존 메트릭이라 **추가 비용 0**. 외부 HTTPS 감시(Route53 health check)는 $0.50/월 이라 제외했다.
+- Updated:
+  - [x] docs/agent/learning.md (본 항목)
+  - [x] `infra/terraform/ec2.tf` · `secrets.tf` — IAM 정책 + data source
+  - [x] `infra/scripts/fetch-secrets.sh` — AccessDenied 경고
+  - [x] `infra/terraform/observability.tf` — 알람 2종
+  - [ ] ADR — free-tier 앱 레벨 감시 정책 (ADR-0009 후속)
+- Skip reason if not promoted: N/A
