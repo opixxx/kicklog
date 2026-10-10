@@ -159,7 +159,36 @@ variable "alert_email" {
 }
 
 variable "budget_monthly_usd" {
-  description = "AWS Budgets 월 한도 (USD). Free Tier 운영 가정 — 실수 감지용."
+  # 2026-10-02 경 Free plan 크레딧이 소진되어 EC2/RDS 가 실과금으로 전환됐다.
+  # 실측 forecast 가 $42.87 인데 한도가 $5 라서 80%/100%/forecast 알림 3건이
+  # 매달 전부 울렸다 — 정작 "NAT 를 실수로 만든" 류의 사고를 못 잡는 상태였다.
+  # 현 수준(약 $45)보다 약간 위로 올려 "사고 감지" 기능을 복원한다.
+  # 비용 다이어트(ARM 전환·단일 박스 통합) 후에는 그 목표치로 다시 낮춘다.
+  description = "AWS Budgets 월 한도 (USD). 실과금 전환 후 사고 감지용 임계."
   type        = number
-  default     = 5
+  default     = 50
+}
+
+# ─── 오리진 직접 접근 (break-glass) ───────────────────────
+# 평시 EC2 의 80/443 은 Cloudflare 엣지 IP 레인지에서만 받는다 (network.tf).
+# DNS 프록시를 끄고 디버깅해야 하는 등 비상 상황에서만 true 로 전환한다.
+# enable_ssh_inbound 와 동일한 토글 패턴 (ADR-0009 D4).
+variable "allow_direct_origin" {
+  description = "오리진(EC2) 80/443 을 direct_origin_cidr 에 직접 노출할지 여부. 평시 false."
+  type        = bool
+  default     = false
+}
+
+variable "direct_origin_cidr" {
+  description = "allow_direct_origin=true 일 때 오리진 직접 접근을 허용할 CIDR (본인 IP /32). curl ifconfig.me 로 확인."
+  type        = string
+  default     = "127.0.0.1/32" # placeholder — 토글이 false 면 미사용
+  sensitive   = true
+}
+
+# ─── 엣지 헬스 체크 (ADR-0015) ────────────────────────────
+variable "edge_health_url" {
+  description = "외부에서 감시할 엣지 URL. Lambda 가 5분마다 호출해 200 이 아니면 알람."
+  type        = string
+  default     = "https://kicklog.org/actuator/health"
 }

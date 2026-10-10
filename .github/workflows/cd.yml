@@ -21,7 +21,11 @@ on:
     paths:
       - "backend/**"
       - "infra/docker-compose.prod.yml"
-      - "infra/scripts/fetch-secrets.sh"
+      # ADR-0015: 호스트 설정(nginx conf · 스크립트 · systemd unit · AASA)도
+      # 배포 산출물이다. 박스에 직접 손대지 않기 위해 변경 시 CD 를 태운다.
+      - "infra/scripts/**"
+      - "infra/systemd/**"
+      - "infra/web/**"
       - ".github/workflows/cd.yml"
   workflow_dispatch:
 
@@ -146,6 +150,18 @@ jobs:
             "s3://${DEPLOY_STAGING_BUCKET}/fetch-secrets.sh" \
             --no-progress
 
+          # ADR-0015 — 호스트 설정 산출물을 host/ prefix 로 올린다.
+          # apply-host-config.sh 가 이 묶음을 받아 nginx conf · TLS 인증서 · AASA ·
+          # systemd timer 를 멱등하게 배치한다 (박스 직접 수정 금지).
+          aws s3 cp infra/scripts/ "s3://${DEPLOY_STAGING_BUCKET}/host/" \
+            --recursive --exclude "*" --include "*.sh" --no-progress
+          aws s3 cp infra/scripts/nginx-kicklog.conf \
+            "s3://${DEPLOY_STAGING_BUCKET}/host/nginx-kicklog.conf" --no-progress
+          aws s3 cp infra/systemd/ "s3://${DEPLOY_STAGING_BUCKET}/host/" \
+            --recursive --no-progress
+          aws s3 cp infra/web/.well-known/apple-app-site-association \
+            "s3://${DEPLOY_STAGING_BUCKET}/host/apple-app-site-association" --no-progress
+
       # ADR-0009: SSM 스크립트가 SHA tag 를 .env.deploy 에 기록하고,
       # 헬스 체크 실패 시 직전 SHA 로 자동 롤백한다.
       - name: Send SSM Run Command — SHA pull + restart + auto-rollback
@@ -257,6 +273,15 @@ jobs:
 
           # ── 오래된 dangling 이미지 정리 (디스크 보호, 단 롤백 후보는 7일 보존) ──
           docker image prune -af --filter "until=168h" || true
+
+          # ── 호스트 설정 적용 (ADR-0015) ──
+          # 앱 헬스 체크를 통과한 뒤에 수행한다 — nginx conf 가 깨져도 롤백 로직이
+          # 이미 끝난 상태라 서로 간섭하지 않는다. apply-host-config.sh 자체가
+          # nginx -t 게이트 + 직전 conf 자동 롤백을 갖고 있다.
+          aws s3 cp s3://${DEPLOY_STAGING_BUCKET}/host/apply-host-config.sh \
+            ./apply-host-config.sh --no-progress
+          DEPLOY_STAGING_BUCKET=${DEPLOY_STAGING_BUCKET} AWS_REGION=${AWS_REGION} \
+            bash ./apply-host-config.sh
 
           echo "Deploy 성공: \$(date) tag=\${NEW_TAG:0:7}"
           EOF

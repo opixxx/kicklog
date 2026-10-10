@@ -249,3 +249,28 @@
   - [x] `infra/terraform/observability.tf` — `kms_master_key_id` 제거
   - [ ] apply 후 알람 재테스트로 실제 수신 확인 — 본 PR 의 완료 조건
 - Skip reason if not promoted: N/A
+
+## 2026-10-10 — 프록시 뒤 TLS 갱신과 "보이지 않는 결함" (ADR-0015)
+
+- **Trigger**: production-risk
+- **무슨 일**: 오리진 TLS 인증서가 **46일간 만료 상태**로 운영됐다. Cloudflare 엣지가
+  `Full(비 strict)` 로 가려주고 있어 사용자에게는 계속 200 이 내려갔고, `certbot-renew.timer` 는
+  `disabled`, 80 포트에는 ACME 경로가 없어 갱신이 시도조차 되지 않았다.
+- **Root cause (2겹)**:
+  1. **구조** — `certbot --nginx` 의 HTTP-01 갱신은 프록시(Cloudflare) 뒤에서 성립하지 않는다.
+  2. **감시** — 알람 6개가 전부 인프라 메트릭(StatusCheck·CPU·Storage·DatabaseConnections)이라
+     사용자 경로를 보는 눈이 없었다. ADR-0013 이 "통보가 안 가던" 문제를 고쳤다면, 이번엔
+     **애초에 그 현상을 보는 알람이 없었다**.
+- **Prevention (규칙으로 승격)**:
+  1. **프록시 뒤에서는 ACME(HTTP-01)를 쓰지 않는다** — Origin CA(15년) 또는 DNS-01 을 쓴다.
+  2. **"가려주는 계층" 이 있으면 반드시 strict 로 올린다.** 엣지가 오리진을 검증하지 않으면
+     오리진이 깨져도 200 이 내려가고, 그 상태는 아무도 모른다.
+  3. **인프라 메트릭만으로는 장애를 못 잡는다.** 외부에서 사용자 경로를 호출하는 감시를
+     최소 1개 둔다 (Lambda + EventBridge 면 Free Tier 안에서 $0).
+  4. **박스 설정은 배포 산출물로만 바꾼다.** 직접 수정하면 저장소와 운영이 갈라지고,
+     `terraform plan` 의 "No changes" 가 거짓 안심을 준다 (실제로 운영엔 rate limit 이 없었고,
+     저장소엔 AASA 설정이 없었으며, `user-data.sh` 에는 `jq` 가 빠져 있었다).
+  5. **백업은 검증까지가 백업이다** — 업로드 전에 `pg_restore --list` 로 덤프를 연다.
+- **곁다리 교훈**: `aws s3 cp --recursive` 는 `s3:ListBucket` 을 요구한다(GetObject 만으로는 실패).
+  IAM 변경은 **전파에 수십 초**가 걸리니 즉시 재시도해서 "정책이 틀렸나" 로 오판하지 말 것.
+  `postgresql16` 은 `postgresql15` 와 파일 충돌하므로 `dnf swap` 이 필요하다.

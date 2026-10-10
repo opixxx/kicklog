@@ -3,7 +3,11 @@
 이 문서는 **이미 만들어진 인프라가 의도치 않게 과금 한도를 넘는 시나리오** 와 **감지·대응** 방법을 모은 SoT 다.
 ADR-0006 (호스팅), ADR-0008 (CD via SSM), ADR-0009 (Free Tier 운영 격상) 와 함께 읽는다.
 
-> 본 인프라는 **`ap-northeast-2` (서울 region)**, **12개월 무료** 가정. 작성 시점 = 2026-05-27.
+> 본 인프라는 **`ap-northeast-2` (서울 region)** 기준. 작성 시점 = 2026-05-27.
+>
+> ⚠️ **2026-10-02 경 Free plan 크레딧이 소진되어 실과금으로 전환됐다** — 아래 "Free Tier 한도"
+> 표의 EC2/RDS 항목은 더 이상 무료가 아니다 (실측 월 약 $45). Budget 한도도 $5 → $50 으로
+> 올렸다 (ADR-0015). 비용 구조와 절감 선택지는 별도 검토 중.
 
 ---
 
@@ -24,7 +28,10 @@ ADR-0006 (호스팅), ADR-0008 (CD via SSM), ADR-0009 (Free Tier 운영 격상) 
 | CloudWatch Logs | 5 GB ingestion + 5 GB storage | `aws_cloudwatch_log_group.userdata` 미사용 | 컨테이너 로그 전체 push 시 즉시 초과 |
 | SNS publication | 1,000건/m | 알람 빈도 < 50/m | 알람 폭풍 시 초과 가능 |
 | Secrets Manager | 무료 X (30일 trial) | 4 secrets × $0.40 ≈ $1.6/m | 추가 secret 마다 +$0.40 |
-| AWS Budgets | 계정당 2개 무료 | 1개 (`kicklog-monthly-budget`) | 3개 이상 만들면 +$0.02/budget/day |
+| AWS Budgets | 계정당 2개 무료 | 1개 (`kicklog-monthly-budget`, 한도 **$50** — ADR-0015) | 3개 이상 만들면 +$0.02/budget/day |
+| Lambda (엣지 감시) | 월 100만 요청 / 400,000 GB-s | 5분 주기 = 월 8,640회 | 주기를 1분으로 줄여도 Free Tier 안 |
+| CloudWatch 커스텀 메트릭 | 10개 | 2개 (`KickLog/Edge`) | 11번째부터 $0.30/metric/m |
+| S3 백업 버킷 | Free Tier 5GB (12개월) | pg_dump 수십 KB × 30일 | lifecycle 30일 만료 걸려 있음 |
 | Cost Explorer API | 무료 GUI / API 호출당 $0.01 | GUI 만 사용 | 자동화 스크립트가 API 자주 호출 시 초과 |
 
 ---

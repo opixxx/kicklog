@@ -1,0 +1,11 @@
+# ADR-0015 — 오리진 인증서 만료 감시 (46일 만료 방치 재발 방지)
+[Unit]
+Description=KickLog origin certificate expiry check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=AWS_REGION=ap-northeast-2
+Environment=WARN_DAYS=21
+ExecStart=/opt/kicklog/bin/check-cert-expiry.sh

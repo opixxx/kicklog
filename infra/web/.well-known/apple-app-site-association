@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["89V5W5F62V.com.opixxx.KickLog"],
+        "components": [
+          {
+            "/": "/i/*",
+            "comment": "친구 초대 링크 (InvitationService 의 base-url = https://kicklog.org/i)"
+          }
+        ]
+      }
+    ]
+  }
+}
