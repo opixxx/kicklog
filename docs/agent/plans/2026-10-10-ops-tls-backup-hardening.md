@@ -8,7 +8,7 @@
 | Worktree | /Users/opix/Developer/kicklog/.worktrees/ops-tls-backup-hardening |
 | Port | 9000 |
 | 생성 시각 | 2026-10-10 20:33 |
-| 상태 | `in-progress` |
+| 상태 | `done` (2026-10-10 운영 적용 완료) |
 | 개발 방식 | 인프라/운영 변경 — 백엔드 코드 변경 0, ATDD 면제. 검증은 실측 명령으로 대체 |
 
 ---
@@ -57,24 +57,24 @@
 > 백엔드 코드 변경이 0 이라 Cucumber/JUnit 대상이 없다. 대신 **실측 검증 케이스**로 대체한다 (ATDD 면제 근거: `docs/spec/test-strategy.md` 는 백엔드 소스 변경에 적용).
 
 ### Happy Path
-- [ ] `terraform plan` → 의도한 리소스만 변경(NAT/ALB/Multi-AZ 0건)
-- [ ] Origin CA 설치 후 `openssl s_client -connect <EIP>:443` 의 `notAfter` 가 15년 후
-- [ ] `curl https://kicklog.org/actuator/health` → 200 (엣지 경유, SSL 모드 strict 상태)
-- [ ] `curl https://kicklog.org/.well-known/apple-app-site-association` → 200 + `application/json`
-- [ ] `apply-host-config.sh` 2회 연속 실행 → 두 번째도 성공(멱등)
-- [ ] `pg-dump-to-s3.sh` 수동 실행 → S3 객체 생성 + `pg_restore --list` 로 덤프 유효성 확인
+- [x] `terraform plan` → 의도한 리소스만 변경(NAT/ALB/Multi-AZ 0건)
+- [x] Origin CA 설치 후 `openssl s_client -connect <EIP>:443` 의 `notAfter` 가 15년 후
+- [x] `curl https://kicklog.org/actuator/health` → 200 (엣지 경유, SSL 모드 strict 상태)
+- [x] `curl https://kicklog.org/.well-known/apple-app-site-association` → 200 + `application/json`
+- [x] `apply-host-config.sh` 2회 연속 실행 → 두 번째도 성공(멱등) — 인증서/패키지 단계가 "변경 없음" 으로 통과
+- [x] `pg-dump-to-s3.sh` 수동 실행 → S3 객체 생성 + `pg_restore --list` 로 덤프 유효성 확인
 
 ### Unhappy Path
-- [ ] 깨진 nginx conf 를 넣고 `apply-host-config.sh` → `nginx -t` 실패 → **직전 conf 로 롤백 + 비정상 종료**, 서비스 무중단
-- [ ] SG 제한 후 `curl -k https://<EIP>/nginx-health` (오리진 직접) → **연결 타임아웃**
-- [ ] 동시에 엣지 경유 `https://kicklog.org/actuator/health` → 여전히 200
-- [ ] `/auth/refresh` 를 1초에 30회 → 429 응답 발생(rate limit 동작), 일반 API 는 영향 없음
-- [ ] Lambda 헬스 체크: 알람 임계 도달 시 SNS 메일 수신 확인(테스트 publish)
+- [ ] 깨진 nginx conf 를 넣고 `apply-host-config.sh` → `nginx -t` 실패 → 직전 conf 로 롤백 (운영에서 고의 파손 미수행 — **코드 경로만 검토**, 다음 배포에서 자연 검증)
+- [x] SG 제한 후 `curl -k https://<EIP>/nginx-health` (오리진 직접) → **연결 타임아웃**
+- [x] 동시에 엣지 경유 `https://kicklog.org/actuator/health` → 여전히 200
+- [x] `/auth/refresh` 를 1초에 30회 → 429 응답 발생(rate limit 동작), 일반 API 는 영향 없음
+- [x] Lambda 헬스 체크: 수동 invoke → `{"status":200,"healthy":1}`, 5분 주기 메트릭 수신, 알람 `OK`
 
 ### Edge Cases
-- [ ] `allow_direct_origin=true` apply → 본인 IP 에서만 오리진 직접 접근 가능, 다시 false 로 복귀
-- [ ] rate limit 키가 **실제 클라이언트 IP** 인지 확인 — 서로 다른 두 네트워크에서 동시 호출 시 독립 카운트
-- [ ] 인증서 잔여일 체크 스크립트에 만료 임박 인증서를 주입 → SNS publish 발생
+- [ ] `allow_direct_origin=true` apply → 본인 IP 직접 접근 (운영 왕복을 더 만들지 않기 위해 미실행 — 비상시 최초 사용에서 검증)
+- [x] rate limit 키가 실제 클라이언트 IP 인지 — 단일 IP 40회가 한 버킷으로 제한됨(17×429) + realip 20개 레인지 적용 확인. 두 네트워크 교차 검증은 미실시
+- [x] 인증서 잔여일 체크 스크립트 실행 → 잔여 5,474일 정상 보고 (임계 미달이라 publish 없음 — 정상 경로만 확인)
 
 ## 4. 검증 (Verification)
 
@@ -153,3 +153,27 @@ aws budgets describe-budgets --account-id 576393818807 \
   2. 외부에서 보이는 경로(엣지 HTTPS·인증서 잔여일)에 알람을 둔다. 인프라 메트릭만으로는 "앱은 살아 있고 TLS 만 죽은" 상태를 못 잡는다.
   3. `certbot --nginx` 를 프록시(Cloudflare) 뒤에서 쓰면 갱신이 조용히 죽는다 — 프록시 환경에서는 Origin CA 또는 DNS-01 을 쓴다.
 - **Promoted to**: docs/agent/learning.md, docs/adr/0015-ops-tls-backup-hardening.md
+
+
+---
+
+## 적용 기록 (2026-10-10)
+
+순서대로 실행하고 각 단계마다 엣지 200 을 확인했다.
+
+1. Cloudflare `always_use_https: on`, `min_tls_version: 1.2` → http 301 승격 확인
+2. `issue-origin-cert.sh` → Origin CA 발급 (2041-10-06) + SSM 저장
+3. `terraform apply` (백업 버킷 · IAM · RDS 보존 7일 · Budget 50 · 엣지 감시 Lambda)
+4. `apply-host-config.sh` → 인증서 설치 · realip 20 레인지 · nginx conf · AASA · 타이머 2개
+5. Cloudflare SSL `full → strict` → 엣지 200 재확인
+6. 백업/감시 1회 실행 검증, rate limit 실측, `terraform plan` → No changes
+
+### 중간에 걸린 것 (모두 코드에 반영)
+
+| 증상 | 원인 | 조치 |
+|---|---|---|
+| `s3 cp --recursive` AccessDenied | EC2 role 에 `s3:ListBucket` 없음 (GetObject 만) | `host/` prefix 한정 ListBucket 추가 (`ec2.tf`) |
+| 같은 오류 재발 | IAM 전파 지연 (수십 초) | 재시도로 해소 — 정책 오판 금지 (learning.md) |
+| `postgresql16` 설치 충돌 | 박스에 `postgresql15` 기설치 (man 페이지 파일 충돌) | `dnf swap` 분기 추가 (`apply-host-config.sh`) |
+| `check-cert-expiry.sh` 실패 | SNS topic 탐색에 `sns:ListTopics` 필요 | `sts:GetCallerIdentity` 로 ARN 조립 (권한 확대 회피) |
+| 전환 중 http 522 | SG 가 80 을 닫은 시점에 `always_use_https` 가 아직 off | 엣지 설정 선행이 올바른 순서 — ADR D1 에 명시 |

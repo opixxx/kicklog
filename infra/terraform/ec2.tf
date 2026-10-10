@@ -118,17 +118,34 @@ resource "aws_iam_role_policy_attachment" "ec2_ssm_managed" {
 }
 
 # 배포 스테이징 버킷에서 docker-compose.prod.yml 다운로드 권한 (ADR-0008).
+# ADR-0015: apply-host-config.sh 가 host/ prefix 를 통째로 받으려면 ListBucket 이 필요하다
+# (`aws s3 cp --recursive` 는 내부적으로 ListObjectsV2 를 호출한다).
+# 버킷 전체 열람을 주지 않고 host/ prefix 로만 제한한다.
 resource "aws_iam_role_policy" "ec2_deploy_bucket_read" {
   name = "kicklog-ec2-deploy-bucket-read"
   role = aws_iam_role.ec2.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = "s3:GetObject"
-      Resource = "${aws_s3_bucket.deploy_staging.arn}/*"
-    }]
+    Statement = [
+      {
+        Sid      = "GetDeployArtifacts"
+        Effect   = "Allow"
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.deploy_staging.arn}/*"
+      },
+      {
+        Sid      = "ListHostPrefixOnly"
+        Effect   = "Allow"
+        Action   = "s3:ListBucket"
+        Resource = aws_s3_bucket.deploy_staging.arn
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["host/", "host/*"]
+          }
+        }
+      },
+    ]
   })
 }
 

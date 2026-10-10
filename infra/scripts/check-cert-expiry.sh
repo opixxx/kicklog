@@ -17,9 +17,12 @@ CERT_PATH="${CERT_PATH:-/etc/ssl/cloudflare/origin.pem}"
 WARN_DAYS="${WARN_DAYS:-21}"
 TOPIC_ARN="${TOPIC_ARN:-}"
 
+# ARN 을 계정 ID 로 조립한다. sns:ListTopics 로 탐색하면 토픽 전체 열람 권한이 필요한데,
+# 그 권한을 주지 않기 위해서다 (sts:GetCallerIdentity 는 별도 권한이 필요 없다).
+TOPIC_NAME="${TOPIC_NAME:-kicklog-alerts}"
 if [ -z "$TOPIC_ARN" ]; then
-  TOPIC_ARN=$(aws sns list-topics --region "$REGION" \
-    --query "Topics[?contains(TopicArn, 'kicklog-alerts')].TopicArn | [0]" --output text)
+  ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+  TOPIC_ARN="arn:aws:sns:${REGION}:${ACCOUNT_ID}:${TOPIC_NAME}"
 fi
 
 notify() {

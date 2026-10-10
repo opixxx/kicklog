@@ -104,4 +104,4 @@ aws ssm put-parameter --region "$REGION" --name /kicklog/origin-key \
 echo "SSM 저장 완료: /kicklog/origin-cert, /kicklog/origin-key"
 
 echo "다음: 박스에서 install-origin-cert.sh → nginx conf 적용 후 SSL 모드를 strict 로 올린다."
-echo "      strict 전환 명령: bash $(basename "$0") --set-strict"
+echo "      strict 전환 명령: bash set-cloudflare-ssl-strict.sh"

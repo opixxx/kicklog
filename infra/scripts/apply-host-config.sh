@@ -36,12 +36,22 @@ aws s3 cp "s3://${BUCKET}/host/" "$STAGE/" --recursive --region "$REGION" --no-p
 # ─── 1) 필수 패키지 (멱등) ────────────────────────────
 # jq: fetch-secrets.sh 가 DB secret JSON 파싱에 사용 (없으면 배포가 실패한다)
 # postgresql16: pg-dump-to-s3.sh 용. 서버가 16 이라 15 클라이언트로는 덤프가 거부된다.
-for pkg in jq postgresql16; do
-  if ! rpm -q "$pkg" >/dev/null 2>&1; then
-    echo "패키지 설치: $pkg"
-    dnf install -y -q "$pkg"
+if ! rpm -q jq >/dev/null 2>&1; then
+  echo "패키지 설치: jq"
+  dnf install -y -q jq
+fi
+
+# postgresql16 은 postgresql15 와 파일이 충돌한다(man 페이지 등). 박스에 15 가 이미
+# 깔려 있으면 swap 으로 교체한다 — 15 클라이언트로는 16 서버를 덤프할 수 없다.
+if ! rpm -q postgresql16 >/dev/null 2>&1; then
+  if rpm -q postgresql15 >/dev/null 2>&1; then
+    echo "패키지 교체: postgresql15 → postgresql16"
+    dnf swap -y -q postgresql15 postgresql16
+  else
+    echo "패키지 설치: postgresql16"
+    dnf install -y -q postgresql16
   fi
-done
+fi
 
 # ─── 2) Cloudflare Origin CA 인증서 ───────────────────
 bash "$STAGE/install-origin-cert.sh"
