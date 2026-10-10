@@ -41,12 +41,48 @@ class JpaMatchStore(
         return matchRepository.findAllWithQuartersByIdIn(ids)
     }
 
-    override fun findAllByUserIdAndPlayedAtBetween(
+    // DB 집계는 bigint 로 오고 도메인은 Int 다. toInt() 는 초과 시 조용히 wrap 하므로
+    // toIntExact 로 즉시 예외를 낸다 — 통계가 음수로 뒤집히는 것보다 실패가 낫다.
+    override fun aggregateSeasonMatches(
         userId: Long,
         startInclusive: Instant,
         endExclusive: Instant,
-    ): List<Match> {
-        return matchRepository.findAllByUserIdAndPlayedAtBetween(userId, startInclusive, endExclusive)
+    ): SeasonMatchAggregate {
+        val row = matchRepository.aggregateSeasonMatches(userId, startInclusive, endExclusive)
+        return SeasonMatchAggregate(
+            totalDistanceM = Math.toIntExact(row.totalDistanceM),
+            totalGoals = Math.toIntExact(row.totalGoals),
+            totalAssists = Math.toIntExact(row.totalAssists),
+            matchCount = Math.toIntExact(row.matchCount),
+            winCount = Math.toIntExact(row.winCount),
+            drawCount = Math.toIntExact(row.drawCount),
+            lossCount = Math.toIntExact(row.lossCount),
+            maxSpeedKmh = row.maxSpeedKmh,
+            longestMatchDistanceM = Math.toIntExact(row.longestMatchDistanceM),
+            mostSprintCount = Math.toIntExact(row.mostSprintCount),
+        )
+    }
+
+    override fun aggregateSeasonQuarters(
+        userId: Long,
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): SeasonQuarterAggregate {
+        val row = matchRepository.aggregateSeasonQuarters(userId, startInclusive, endExclusive)
+        return SeasonQuarterAggregate(
+            quarterCount = Math.toIntExact(row.quarterCount),
+            weightedHeartRateSum = row.weightedHeartRateSum,
+            totalDurationSeconds = row.totalDurationSeconds,
+        )
+    }
+
+    override fun aggregateMonthlyDistance(
+        userId: Long,
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): List<MonthlyDistance> {
+        return matchRepository.aggregateMonthlyDistance(userId, startInclusive, endExclusive)
+            .map { MonthlyDistance(month = it.month, distanceM = Math.toIntExact(it.distanceM)) }
     }
 
     override fun clearVenueId(venueId: Long) {

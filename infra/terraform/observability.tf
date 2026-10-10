@@ -235,3 +235,156 @@ resource "aws_cloudwatch_log_group" "userdata" {
     Name = "kicklog-userdata-logs"
   }
 }
+
+# ═══════════════════════════════════════════════════════
+# 엣지 헬스 체크 (ADR-0015 — 2026-10-10 TLS 46일 만료 방치 후속)
+#
+# 위 알람들은 모두 "AWS 가 보는 인프라" 를 본다. 그래서 다음을 못 잡는다:
+#   - nginx 만 사망 (EC2 StatusCheck 정상 · DB 커넥션 정상)
+#   - Cloudflare 엣지 장애 / 설정 실수
+#   - TLS 인증서 만료 (실제로 46일간 무증상이었다)
+# Lambda 가 VPC 밖에서 사용자와 동일한 경로를 5분마다 호출해 메꾼다.
+# 비용: Lambda 월 8,640회(무료 한도 100만) + 커스텀 메트릭 2개(무료 10개) = $0
+# ═══════════════════════════════════════════════════════
+
+data "archive_file" "edge_health" {
+  type        = "zip"
+  source_file = "${path.module}/lambda/edge_health.py"
+  output_path = "${path.module}/lambda/edge_health.zip"
+}
+
+resource "aws_iam_role" "edge_health" {
+  name = "kicklog-edge-health-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRole"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+
+  tags = {
+    Name = "kicklog-edge-health-role"
+  }
+}
+
+# 최소 권한 — 로그 기록 + 커스텀 메트릭 발행만. VPC 접근도 주지 않는다.
+resource "aws_iam_role_policy" "edge_health" {
+  name = "kicklog-edge-health-policy"
+  role = aws_iam_role.edge_health.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Resource = "${aws_cloudwatch_log_group.edge_health.arn}:*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "cloudwatch:PutMetricData"
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "cloudwatch:namespace" = "KickLog/Edge"
+          }
+        }
+      },
+    ]
+  })
+}
+
+# 로그 그룹을 Lambda 보다 먼저 만들어 retention 을 강제한다
+# (Lambda 가 자동 생성하면 "Never expire" 가 되어 장기 비용이 샌다).
+resource "aws_cloudwatch_log_group" "edge_health" {
+  name              = "/aws/lambda/kicklog-edge-health"
+  retention_in_days = 14
+
+  tags = {
+    Name = "kicklog-edge-health-logs"
+  }
+}
+
+resource "aws_lambda_function" "edge_health" {
+  function_name = "kicklog-edge-health"
+  description   = "외부에서 kicklog.org 엣지 상태를 5분마다 확인 (ADR-0015)"
+  role          = aws_iam_role.edge_health.arn
+  handler       = "edge_health.handler"
+  runtime       = "python3.12"
+  architectures = ["arm64"] # Graviton — 동일 성능에 요금 20% 저렴
+
+  filename         = data.archive_file.edge_health.output_path
+  source_code_hash = data.archive_file.edge_health.output_base64sha256
+
+  timeout     = 15 # 프로브 타임아웃 10초 + 여유
+  memory_size = 128
+
+  environment {
+    variables = {
+      EDGE_HEALTH_URL = var.edge_health_url
+    }
+  }
+
+  depends_on = [
+    aws_iam_role_policy.edge_health,
+    aws_cloudwatch_log_group.edge_health,
+  ]
+
+  tags = {
+    Name = "kicklog-edge-health"
+  }
+}
+
+resource "aws_cloudwatch_event_rule" "edge_health" {
+  name                = "kicklog-edge-health-schedule"
+  description         = "엣지 헬스 체크 5분 주기"
+  schedule_expression = "rate(5 minutes)"
+
+  tags = {
+    Name = "kicklog-edge-health-schedule"
+  }
+}
+
+resource "aws_cloudwatch_event_target" "edge_health" {
+  rule      = aws_cloudwatch_event_rule.edge_health.name
+  target_id = "kicklog-edge-health"
+  arn       = aws_lambda_function.edge_health.arn
+}
+
+resource "aws_lambda_permission" "edge_health_events" {
+  statement_id  = "AllowExecutionFromEventBridge"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.edge_health.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.edge_health.arn
+}
+
+# 10분(5분 × 2) 연속 비정상이면 통보. 배포 중 순간 502 로 오탐하지 않을 만큼 길고,
+# "9일간 아무도 모름" 같은 사태는 확실히 막을 만큼 짧다.
+# treat_missing_data=breaching — Lambda 자체가 죽어 메트릭이 끊기는 것도 장애로 본다.
+resource "aws_cloudwatch_metric_alarm" "edge_unhealthy" {
+  alarm_name          = "kicklog-edge-unhealthy"
+  alarm_description   = "외부에서 본 https://kicklog.org 가 10분 이상 비정상 — nginx/TLS/Cloudflare 경로 점검"
+  namespace           = "KickLog/Edge"
+  metric_name         = "EdgeHealthy"
+  statistic           = "Minimum"
+  comparison_operator = "LessThanThreshold"
+  threshold           = 1
+  period              = 300
+  evaluation_periods  = 2
+  datapoints_to_alarm = 2
+  treat_missing_data  = "breaching"
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = {
+    Name = "kicklog-edge-unhealthy"
+  }
+}

@@ -171,3 +171,31 @@ aws rds describe-db-instances --db-instance-identifier "$RESTORE_DB" 2>&1 | head
 - ADR-0006 D8 (RDS 백업 정책)
 - ADR-0009 D7 (백업 리허설 결정)
 - AWS RDS 공식 — Restoring from a snapshot: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_RestoreFromSnapshot.html
+
+
+---
+
+## 부록 — pg_dump 논리 백업에서 복원 (ADR-0015)
+
+자동 스냅샷(보존 **7일**) 외에 매일 04:30 KST 논리 백업이 S3 에 쌓인다 (30일 보관).
+
+```bash
+# 1) 백업 목록
+aws s3 ls s3://kicklog-backup-576393818807/pg/ --region ap-northeast-2
+
+# 2) 받아서 내용 확인 (복원 전에 반드시)
+aws s3 cp s3://kicklog-backup-576393818807/pg/kicklog-<STAMP>.dump /tmp/ --region ap-northeast-2
+pg_restore --list /tmp/kicklog-<STAMP>.dump | head -40
+
+# 3) 로컬/임시 DB 로 복원해 검증 (운영에 바로 쏘지 않는다)
+createdb kicklog_restore_test
+pg_restore --no-owner --no-privileges -d kicklog_restore_test /tmp/kicklog-<STAMP>.dump
+psql kicklog_restore_test -c "select count(*) from matches;"
+
+# 4) 테이블 1개만 되살릴 때
+pg_restore --no-owner -t matches -d <target> /tmp/kicklog-<STAMP>.dump
+```
+
+- 스냅샷 복원과의 역할 분담: **시점 전체 복구 = 스냅샷**, **부분·교차계정·버전 사고 = 논리 백업**
+- 덤프는 업로드 전에 `pg_restore --list` 로 이미 1차 검증된다 (`pg-dump-to-s3.sh`)
+- 수동 실행: `sudo systemctl start kicklog-pg-dump.service` → `journalctl -u kicklog-pg-dump -n 20`

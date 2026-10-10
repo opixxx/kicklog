@@ -12,6 +12,18 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.40"
     }
+
+    # Cloudflare 공식 IP 목록 조회용 (network.tf) — 오리진 SG 를 엣지로만 좁힌다.
+    http = {
+      source  = "hashicorp/http"
+      version = "~> 3.4"
+    }
+
+    # 엣지 헬스 체크 Lambda 패키징용 (observability.tf)
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.4"
+    }
   }
 
   # MVP는 로컬 state (ADR-0006 D8)

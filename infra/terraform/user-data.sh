@@ -41,6 +41,13 @@ fi
 echo 'vm.swappiness=10' > /etc/sysctl.d/99-kicklog-swap.conf
 sysctl -w vm.swappiness=10
 
+# ─── 필수 CLI (ADR-0015) ────────────────────────────
+# jq: fetch-secrets.sh 가 DB secret JSON 을 파싱한다. 없으면 **첫 배포가 즉시 실패**한다.
+#     2026-10-10 점검에서 user-data 에 jq 가 빠져 있는 것이 확인됐다 — 현 박스는
+#     수동 설치로 메꿔져 있었고, 그래서 "코드만으로 박스를 재현할 수 없는" 상태였다.
+# postgresql16: pg-dump-to-s3.sh 용. 서버가 PostgreSQL 16 이라 15 클라이언트는 덤프를 거부한다.
+dnf install -y jq postgresql16
+
 # ─── Docker 설치 ────────────────────────────────────
 dnf install -y docker
 systemctl enable --now docker
@@ -56,14 +63,21 @@ chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 dnf install -y nginx
 systemctl enable --now nginx
 
-# Spring Boot 백엔드로 reverse proxy (8080 포트 가정)
+# ⚠️ 여기서 만드는 conf 는 **부팅 직후 임시 placeholder** 다 (HTTP only).
+# 운영 conf 의 SoT 는 infra/scripts/nginx-kicklog.conf 이고,
+# CD 의 apply-host-config.sh 가 S3 staging 에서 받아 이 파일을 덮어쓴다 (ADR-0015 D3).
+# 박스에서 직접 수정하지 말 것 — 다음 배포에 덮어써지고, 저장소와 운영이 갈라진다.
 cat > /etc/nginx/conf.d/kicklog.conf <<'EOF'
 server {
     listen 80 default_server;
     server_name _;
 
-    # 정식 출시 시 도메인 + HTTPS 활성화 → certbot --nginx
-    # 현재는 HTTP만 (TestFlight 단계)
+    # placeholder — apply-host-config.sh 가 TLS(Origin CA) 포함 운영 conf 로 교체한다.
+    location = /nginx-health {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "nginx bootstrap\n";
+    }
 
     location / {
         proxy_pass http://127.0.0.1:8080;
@@ -76,12 +90,16 @@ server {
 EOF
 nginx -t && systemctl reload nginx
 
-# ─── Certbot 설치 (도메인 등록 후 사용) ───────────────
+# ─── TLS: Cloudflare Origin CA (certbot 미사용) ───────
+# ADR-0015 D1 — Let's Encrypt + certbot --nginx 는 Cloudflare 프록시 뒤에서
+# HTTP-01 갱신이 조용히 실패한다 (실제로 인증서가 46일간 만료 상태로 방치됐다).
+# 대신 유효기간 15년의 Origin CA 인증서를 SSM 에서 받아 설치한다:
+#   infra/scripts/issue-origin-cert.sh (로컬 1회) → install-origin-cert.sh (박스)
+# break-glass 로 프록시를 끈 채 ACME 가 필요할 때를 위해 패키지만 남겨둔다.
 dnf install -y python3-certbot-nginx
 
-# 사용법 (도메인 등록 후 수동):
-#   sudo certbot --nginx -d kicklog.app
-#   자동 갱신은 systemd timer로 자동 처리됨
+# AASA(Universal Link) · 운영 스크립트 배치 경로 — apply-host-config.sh 가 채운다.
+mkdir -p /var/www/kicklog/.well-known /var/www/certbot /opt/kicklog/bin
 
 # ─── Java (선택 — Docker 안에서 실행하면 불필요) ────
 # dnf install -y java-17-amazon-corretto-headless

@@ -16,6 +16,8 @@
 - [Error response contract](project_error_response_contract.md) — 401/403 은 HttpStatusEntryPoint 라 body 없음 → traceId 안 실림, advice 미경유
 - [Instant 응답 포맷 계약](project_instant_response_format.md) — 응답 `Instant` 는 소수부 없는 초 단위(JacksonConfig 전역), `toString()` 미리 변환·비-Instant 시간 타입이 우회로
 - [Sentry error tracking](project_sentry_error_tracking.md) — 코어+수동init(starter 미지원), 5xx만 전송, ErrorReporter 경유, PII 비전송, traceId 키 3곳 중복
+- [Native query 프로젝션 타입](project_native_query_projection_types.md) — SUM(bigint)=numeric, MAX(int)=integer, 선언 타입과 어긋나도 암묵 변환으로 통과
+- [집계 SQL 전환 리뷰 체크리스트](feedback_aggregate_fanout_review.md) — fan-out·UTC 월 경계·COALESCE·나눗셈 위치·스냅샷 원자성·프로젝션 타입
 
 <!--
 ### YYYY-MM-DD — <pattern>

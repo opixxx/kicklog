@@ -48,10 +48,15 @@ resource "aws_db_instance" "main" {
 
   publicly_accessible = false # MVP는 EC2에서만 접근
 
-  # 백업 — RDS Free Tier 는 backup_retention_period <= 1 만 허용 (서버가 거부).
-  # ADR-0006: Free Tier 졸업 (12개월) 후 7일로 회복 검토.
-  # 짧은 보존 기간으로 인한 데이터 손실 위험은 MVP 단계에서 명시적으로 수용 (N=20 규모).
-  backup_retention_period = 1             # NOSONAR: Free Tier 제약, ADR-0006 참조
+  # 백업 — 2026-10 Free plan 크레딧 소진으로 이미 실과금 전환됐으므로
+  # "Free Tier 가 1일만 허용한다" 는 전제는 더 이상 유효하지 않다 (ADR-0015).
+  #
+  # 1일 보존의 실질 위험: 2026-09-06 장애는 인지까지 9일이 걸렸다. 그 시점에
+  # 복구 가능한 백업은 이미 존재하지 않았다. 7일이면 "주말에 터진 걸 월요일에
+  # 알아차려도" 복구 창이 남는다.
+  # 비용: DB 실사용 약 2.9GB 기준 증분 스냅샷 월 $0.3 수준.
+  # 논리 백업(pg_dump → S3)은 backup.tf + pg-dump-to-s3.sh 로 이중화한다.
+  backup_retention_period = 7
   backup_window           = "17:00-18:00" # UTC = KST 02:00~03:00
 
   # 유지보수

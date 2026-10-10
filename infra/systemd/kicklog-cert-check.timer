@@ -1,0 +1,11 @@
+# 매일 09:30 KST (00:30 UTC) — 아침에 메일을 확인하는 시간대에 맞춘다.
+[Unit]
+Description=KickLog daily origin certificate expiry check
+
+[Timer]
+OnCalendar=*-*-* 00:30:00 UTC
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target
