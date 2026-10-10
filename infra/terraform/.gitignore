@@ -23,3 +23,6 @@ override.tf.json
 # crash logs
 crash.log
 crash.*.log
+
+# 생성물 — archive_file 이 매 plan 마다 만든다 (observability.tf)
+lambda/*.zip

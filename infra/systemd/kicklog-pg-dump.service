@@ -1,0 +1,11 @@
+# ADR-0015 D2 — pg_dump 논리 백업 (RDS 자동 스냅샷 7일과 이중화)
+[Unit]
+Description=KickLog pg_dump logical backup to S3
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=AWS_REGION=ap-northeast-2
+ExecStart=/opt/kicklog/bin/pg-dump-to-s3.sh
+# 백업 실패는 다음 주기에 재시도된다 — 재시도 폭주를 막기 위해 자동 재시작은 두지 않는다.

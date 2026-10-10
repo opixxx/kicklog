@@ -131,3 +131,65 @@ resource "aws_iam_role_policy" "ec2_deploy_bucket_read" {
     }]
   })
 }
+
+# ─── 논리 백업 업로드 권한 (ADR-0015) ────────────────
+# pg-dump-to-s3.sh 가 매일 pg_dump 결과를 올린다. 읽기/삭제는 주지 않는다 —
+# 박스가 침해되어도 과거 백업을 지우지 못하게 쓰기 전용으로 둔다.
+resource "aws_iam_role_policy" "ec2_backup_write" {
+  name = "kicklog-ec2-backup-write"
+  role = aws_iam_role.ec2.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "s3:PutObject"
+      Resource = "${aws_s3_bucket.backup.arn}/pg/*"
+    }]
+  })
+}
+
+# ─── 오리진 인증서 조회 + 알림 발행 권한 (ADR-0015) ──
+# install-origin-cert.sh 가 Cloudflare Origin CA 인증서를 SSM SecureString 에서 받아
+# /etc/ssl/cloudflare 에 설치하고, check-cert-expiry.sh 가 잔여일이 임계 이하면
+# SNS 로 직접 통보한다 (CloudWatch 알람으로는 박스 로컬 인증서를 볼 수 없다).
+resource "aws_iam_role_policy" "ec2_origin_cert_and_alerts" {
+  name = "kicklog-ec2-origin-cert-and-alerts"
+  role = aws_iam_role.ec2.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ReadOriginCertParameters"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+        ]
+        Resource = [
+          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/kicklog/origin-cert",
+          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/kicklog/origin-key",
+        ]
+      },
+      {
+        # SecureString 복호화 — AWS 관리형 키(alias/aws/ssm) 를 SSM 경유로만 사용하도록 제한.
+        Sid      = "DecryptSecureStringViaSsm"
+        Effect   = "Allow"
+        Action   = "kms:Decrypt"
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "ssm.${var.aws_region}.amazonaws.com"
+          }
+        }
+      },
+      {
+        Sid      = "PublishOperationalAlerts"
+        Effect   = "Allow"
+        Action   = "sns:Publish"
+        Resource = aws_sns_topic.alerts.arn
+      },
+    ]
+  })
+}
