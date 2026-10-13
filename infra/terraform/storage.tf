@@ -29,7 +29,7 @@ resource "aws_ebs_volume" "pgdata" {
 resource "aws_volume_attachment" "pgdata" {
   device_name = "/dev/sdf" # AL2023(nitro) 에서는 /dev/nvme1n1 으로 보인다
   volume_id   = aws_ebs_volume.pgdata.id
-  instance_id = aws_instance.app_v2.id # MIGRATION-TEMP
+  instance_id = aws_instance.app.id
 
   # 인스턴스가 교체될 때 강제 detach 하지 않는다 — 파일시스템 손상 방지.
   # 교체가 필요하면 먼저 컨테이너를 내리고 수동 detach 한다.

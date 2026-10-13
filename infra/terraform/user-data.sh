@@ -62,19 +62,33 @@ curl -sL https://github.com/docker/compose/releases/latest/download/docker-compo
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 # ─── Postgres 데이터 볼륨 마운트 (ADR-0016) ──────────
+# 이 블록만 `set +e` 로 감싼다. 볼륨 준비 실패로 **스크립트 전체가 중단되어 nginx·docker
+# 설정까지 통째로 누락되는** 사고를 막기 위함이다(2026-10-13 실제 발생). 볼륨이 없으면
+# apply-host-config.sh 의 mountpoint 가드가 배포를 막으므로, 여기서 죽을 이유가 없다.
+set +e
 # 별도 EBS(storage.tf, /dev/sdf → Nitro 에서는 /dev/nvme1n1 로 보인다)를 /mnt/pgdata 에 둔다.
 # 루트와 분리하는 이유: 인스턴스를 교체해도 데이터가 살아남고, OS·도커 이미지가 디스크를
 # 채워도 DB 가 말려들지 않으며, EBS 스냅샷으로 DB 만 따로 백업할 수 있다.
 PGDATA_MOUNT=/mnt/pgdata
-PGDATA_LABEL=kicklog-pgdata
+# ⚠️ XFS 레이블은 **최대 12자**다. 길면 mkfs 가 usage 를 뱉고 실패하는데,
+# 이 스크립트는 `set -e` 라 거기서 전체가 중단된다 (2026-10-13 실제 발생:
+# "kicklog-pgdata"(14자) 때문에 nginx 설치까지 통째로 건너뛰었다).
+PGDATA_LABEL=kicklogpg
 
 # 루트가 아닌 디스크 중 첫 번째를 데이터 볼륨으로 본다.
+# terraform 은 인스턴스를 만든 **뒤** 볼륨을 붙이므로, user-data 가 먼저 돌 수 있다.
+# 최대 90초까지 장치가 나타나기를 기다린다.
 ROOT_DISK=$(lsblk -no pkname "$(findmnt -no SOURCE /)" 2>/dev/null || true)
 DATA_DISK=""
-for d in $(lsblk -dn -o NAME,TYPE | awk '$2=="disk" {print $1}'); do
-  [ "$d" = "$ROOT_DISK" ] && continue
-  DATA_DISK="/dev/$d"
-  break
+for _ in $(seq 1 18); do
+  for d in $(lsblk -dn -o NAME,TYPE | awk '$2=="disk" {print $1}'); do
+    [ "$d" = "$ROOT_DISK" ] && continue
+    DATA_DISK="/dev/$d"
+    break
+  done
+  [ -n "$DATA_DISK" ] && break
+  echo "데이터 볼륨 attach 대기 중..."
+  sleep 5
 done
 
 if [ -n "$DATA_DISK" ]; then
@@ -102,6 +116,7 @@ if [ -n "$DATA_DISK" ]; then
 else
   echo "⚠️ 데이터 볼륨을 찾지 못했습니다 — EBS attach 상태를 확인하세요."
 fi
+set -e
 
 # ─── nginx 설치 + 기본 설정 ───────────────────────────
 dnf install -y nginx

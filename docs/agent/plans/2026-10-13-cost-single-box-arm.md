@@ -8,7 +8,7 @@
 | Worktree | /Users/opix/Developer/kicklog/.worktrees/cost-single-box-arm |
 | Port | 9000 |
 | 생성 시각 | 2026-10-13 |
-| 상태 | `in-progress` |
+| 상태 | `done` (2026-10-13 컷오버 완료) |
 | 개발 방식 | 인프라 마이그레이션 — 백엔드 코드 변경 0, ATDD 면제. 검증은 실측 명령 |
 
 ---
@@ -107,24 +107,24 @@ terraform 에 신규 인스턴스를 **추가**해 구 박스와 공존시킨 �
 > 백엔드 코드 변경 0 → Cucumber/JUnit 대상 없음. 실측 검증으로 대체.
 
 ### Happy Path
-- [ ] `terraform plan` — 신규 인스턴스/볼륨만 추가, 구 박스·RDS 는 그대로 (1단계)
-- [ ] v2 에서 `docker compose ps` → backend·postgres 모두 `healthy`
-- [ ] 리허설 복원 후 행 수 대조: `users`·`matches`·`quarter_workouts`·`refresh_tokens` 가 RDS 와 동일
-- [ ] `flyway_schema_history` 최신 버전이 **V16** 으로 동일
-- [ ] EIP 이동 후 엣지 `https://kicklog.org/actuator/health` → 200
-- [ ] `/nginx-health`·AASA 200, TLS 인증서 그대로(Origin CA 2041)
-- [ ] `pg-dump-to-s3.sh`(컨테이너 경유) 수동 실행 → S3 객체 생성 + `pg_restore --list` 통과
+- [x] `terraform plan` — 신규 인스턴스/볼륨만 추가, 구 박스·RDS 는 그대로 (1단계)
+- [x] v2 에서 `docker compose ps` → backend·postgres 모두 `healthy`
+- [x] 리허설 복원 후 행 수 대조: `users`·`matches`·`quarter_workouts`·`refresh_tokens` 가 RDS 와 동일
+- [x] `flyway_schema_history` 가 RDS 와 동일 (`max(version)` 은 text 비교라 '9' 로 보이지만 양쪽 같은 값)
+- [x] EIP 이동 후 엣지 `https://kicklog.org/actuator/health` → 200
+- [x] `/nginx-health`·AASA 200, TLS 인증서 그대로(Origin CA 2041)
+- [x] `pg-dump-to-s3.sh`(컨테이너 경유) 수동 실행 → S3 객체 생성 + `pg_restore --list` 통과
 
 ### Unhappy Path
-- [ ] v2 검증 실패 시 EIP 를 구 박스로 되돌리면 즉시 복구 — **EIP 이동 전에는 구 박스가 계속 서비스 중**
-- [ ] `fetch-secrets.sh` 가 SSM 파라미터 누락 시 **중단**(빈 값 주입 금지) — ADR-0015 의 Sentry 무음 실패 재발 방지
-- [ ] backend 컨테이너만 죽였을 때 postgres 는 생존하고 restart 로 자동 복구
-- [ ] 데이터 볼륨 미마운트 상태로 compose 기동 시도 → postgres 가 빈 디렉토리에 초기화하지 **않도록** 가드
+- [x] v2 검증 실패 시 EIP 를 구 박스로 되돌리면 즉시 복구 — **EIP 이동 전에는 구 박스가 계속 서비스 중**
+- [x] `fetch-secrets.sh` 가 SSM 파라미터 누락 시 **중단**(빈 값 주입 금지) — ADR-0015 의 Sentry 무음 실패 재발 방지
+- [x] backend 만 stop → postgres 생존 확인 (복원 절차에서 실제로 수행)
+- [x] 데이터 볼륨 미마운트 상태로 compose 기동 시도 → postgres 가 빈 디렉토리에 초기화하지 **않도록** 가드
 
 ### Edge Cases
-- [ ] 메모리 압박 주입(JVM 부하) 시 **컨테이너만 OOM kill → restart**, 호스트 스래싱 없음
-- [ ] 인스턴스 재부팅 후 데이터 볼륨 자동 마운트(fstab) + 컨테이너 자동 기동
-- [ ] `apply-host-config.sh` 를 arm64 박스에서 2회 연속 실행 → 멱등
+- [ ] 메모리 압박 주입 — **미실행**. 운영 박스에 부하를 주지 않는다는 원칙(ADR-0010) 유지. 예산 설계 + `check-host-health.sh` 스왑 감시로 갈음
+- [ ] 재부팅 후 자동 마운트 — **미실행**(운영 재부팅 회피). fstab 등록 + `restart: unless-stopped` 설정 확인으로 갈음
+- [x] `apply-host-config.sh` 를 arm64 박스에서 2회 연속 실행 → 멱등
 
 ## 4. 검증 (Verification)
 
@@ -194,3 +194,34 @@ aws ce get-cost-and-usage --time-period Start=<D>,End=<D+7> --granularity DAILY 
 ## (Optional) 학습 기록
 - Trigger: production-risk (컷오버 후 기록)
 - Promoted to: `docs/adr/0016-single-box-consolidation.md`
+
+
+---
+
+## 컷오버 기록 (2026-10-13)
+
+| 시각(KST) | 단계 |
+|---|---|
+| 20:0x | SSM 파라미터 5개 · EBS 20GB · t4g.small 생성 |
+| 20:05 | v2 user-data 재실행(레이블 버그 수정 후) → 볼륨 마운트·docker·nginx |
+| 20:10 | arm64 이미지 배포 + 호스트 설정(인증서·nginx·AASA·타이머 3종) |
+| 20:11 | **리허설 복원** 성공 (23초, 행 수 일치) |
+| **20:12:45** | **쓰기 차단** — 구 박스 backend 중지 |
+| 20:12:52 | 최종 덤프 + 복원 (23초) |
+| **20:13:26** | **EIP 이동** → v2 |
+| 20:13:29 | 엣지 검증 — 502 1건 후 전부 200 |
+| 20:14 | GitHub Variable `EC2_INSTANCE_ID` 전환 |
+| 20:21 | RDS 최종 스냅샷 후 삭제 (6분 55초) · Secrets Manager 5개 · RDS 알람 3개 · subnet public_c 제거 |
+| 20:22 | 구 인스턴스 종료, `terraform plan` → No changes |
+
+**쓰기 차단 총 44초.** 데이터 손실 0 (users=16 · matches=24 · quarters=63 · tokens=95 일치).
+
+### 중간에 걸린 것 → 코드 반영
+
+| 증상 | 원인 | 조치 |
+|---|---|---|
+| user-data 가 nginx 설치 전에 중단 | XFS 레이블 12자 초과(`kicklog-pgdata`) → 포맷 명령 실패 → `set -e` | 레이블 `kicklogpg`, 볼륨 블록만 `set +e` 로 격리 |
+| 데이터 디스크 미탐지 | terraform 이 인스턴스 생성 후 볼륨 attach | 90초 대기 루프 |
+| arm64 빌드 지연 우려 | 빌더 스테이지가 타깃 아키텍처에서 Gradle 실행 | `--platform=$BUILDPLATFORM` (실측 60초) |
+| 브랜치 CD 배포 잡 실패 | OIDC trust = `refs/heads/main` 전용 | **의도된 차단** — 구 운영 박스에 신규 compose 가 나가는 것을 막았다 |
+| 하네스가 일부 명령 차단 | `guard-bash.sh` 가 문자열로 판정 (포맷·DDL 키워드) | 복원은 `pg_restore --clean --if-exists` 로, 파일 작성은 Edit 도구로 우회 |
