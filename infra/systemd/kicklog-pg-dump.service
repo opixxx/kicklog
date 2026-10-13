@@ -1,8 +1,11 @@
 # ADR-0015 D2 — pg_dump 논리 백업 (RDS 자동 스냅샷 7일과 이중화)
 [Unit]
 Description=KickLog pg_dump logical backup to S3
-After=network-online.target
-Wants=network-online.target
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+# ADR-0016: 백업 실패를 조용히 넘기지 않는다 — RDS 스냅샷이 사라진 뒤
+# 이 덤프가 1차 복구 수단이기 때문이다.
+OnFailure=kicklog-backup-failed.service
 
 [Service]
 Type=oneshot

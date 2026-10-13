@@ -1,0 +1,15 @@
+# ADR-0016 — 백업 실패 자체를 통보한다.
+# RDS 자동 스냅샷이 사라진 뒤 pg_dump 가 1차 복구 수단이므로, 조용한 실패는 곧
+# "백업이 도는 줄 알았는데 없었다" 가 된다. kicklog-pg-dump.service 의 OnFailure 로 연결된다.
+[Unit]
+Description=Notify SNS that KickLog pg_dump backup failed
+
+[Service]
+Type=oneshot
+Environment=AWS_REGION=ap-northeast-2
+ExecStart=/bin/bash -c '\
+  ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text); \
+  aws sns publish --region "$AWS_REGION" \
+    --topic-arn "arn:aws:sns:$AWS_REGION:$ACCOUNT_ID:kicklog-alerts" \
+    --subject "[KickLog] pg_dump 백업 실패" \
+    --message "$(printf "매일 백업(kicklog-pg-dump.service)이 실패했습니다.\\n시각: %s\\n\\n확인: journalctl -u kicklog-pg-dump -n 50" "$(date -Iseconds)")" >/dev/null'

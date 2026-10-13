@@ -1,59 +1,100 @@
 # =============================================
-# KickLog Backend — EC2 운영 컴포즈
+# KickLog — EC2 운영 컴포즈 (앱 + DB 단일 박스, ADR-0016)
 # =============================================
-# 사용처: /opt/kicklog/docker-compose.yml 로 복사 (또는 심볼릭 링크)
+# 사용처: /opt/kicklog/docker-compose.yml 로 복사 (CD 가 S3 staging 에서 배치)
 # 사전 조건:
-#   /opt/kicklog/.env           ← Secrets Manager → fetch-secrets.sh 가 생성
-#   /opt/kicklog/.env.deploy    ← KICKLOG_IMAGE_TAG=<git-sha> (배포 시 cd.yml 이 작성)
+#   /opt/kicklog/.env        ← SSM Parameter Store → fetch-secrets.sh 가 생성
+#   /opt/kicklog/.env.deploy ← KICKLOG_IMAGE_TAG=<git-sha> (cd.yml 이 작성)
+#   /mnt/pgdata              ← Postgres 데이터 전용 EBS 가 마운트된 상태여야 한다
 #
 # 실행 (CD 가 사용하는 정확한 명령):
 #   cd /opt/kicklog
 #   docker compose --env-file .env --env-file .env.deploy pull
 #   docker compose --env-file .env --env-file .env.deploy up -d
 #
-# 로그:
-#   docker compose logs -f backend
+# ⚠️ /mnt/pgdata 가 마운트되지 않은 상태로 기동하면 Postgres 가 **빈 디렉토리에
+#    새 클러스터를 초기화**해 "데이터가 사라진 것처럼" 보인다. apply-host-config.sh 가
+#    기동 전에 mountpoint 를 검사하고, check-host-health.sh 가 상시 감시한다.
 #
-# 헬스 체크:
-#   curl http://127.0.0.1:8080/actuator/health
-#
-# nginx (호스트 OS) 가 127.0.0.1:8080 → 80/443 으로 reverse proxy.
-# 즉 backend 컨테이너는 외부 노출 X (localhost bind).
-#
-# ADR-0009: image tag 는 git SHA 로 immutable. `latest` 의존 제거.
-#           KICKLOG_IMAGE_TAG 가 비어 있으면 compose 가 즉시 abort 한다.
+# 메모리 예산 (t4g.small = 2GB, ADR-0016):
+#   backend 768m + postgres 512m + 호스트 ~180m + page cache 여유 ~500m
+#   2026-09-06 장애(메모리 고갈 → 스래싱 → 9일 마비)의 재발을 막는 핵심 설계다.
+#   두 컨테이너 모두 memswap_limit = mem_limit → 스왑으로 연명하지 않고
+#   OOM kill → restart 경로로 간다 (호스트 스왑 2GB 는 OS 프로세스용 완충).
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kicklog-postgres
+    restart: unless-stopped
+
+    mem_limit: 512m
+    memswap_limit: 512m
+
+    # 포트를 노출하지 않는다 — 같은 compose 네트워크의 backend 만 접근한다.
+    # (RDS 시절의 "SG 로 5432 를 EC2 에서만" 과 동등한 격리)
+    environment:
+      POSTGRES_DB: "${DB_NAME:?DB_NAME 이 .env 에 없습니다}"
+      POSTGRES_USER: "${DB_USERNAME:?DB_USERNAME 이 .env 에 없습니다}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD 가 .env 에 없습니다}"
+      # 데이터 디렉토리를 마운트 지점의 하위로 둔다 — 파일시스템 루트에 바로 두면
+      # lost+found 같은 항목 때문에 initdb 가 거부된다.
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    # shared_buffers 128MB: 컨테이너 한도 512m 의 1/4 (Postgres 권장 비율).
+    # max_connections 30: HikariCP 풀 10 + 유지보수/덤프 여유.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - max_connections=30
+      - -c
+      - log_min_duration_statement=500
+      - -c
+      - log_statement=ddl
+
+    volumes:
+      - /mnt/pgdata:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   backend:
     image: "ghcr.io/opixxx/kicklog:${KICKLOG_IMAGE_TAG:?KICKLOG_IMAGE_TAG 환경변수가 비어 있습니다 — .env.deploy 누락}"
     container_name: kicklog-backend
     restart: unless-stopped
 
-    # 메모리 제한 — 2026-09-06 장애의 근본 대책.
-    # 제한이 없으면 JVM 이 호스트 전체(916MB)를 기준으로 heap 상한을 잡아(642MB)
-    # page cache 를 고갈시키고, OOM killer 없이 호스트가 스래싱에 빠진다.
-    # 제한이 있어야 "컨테이너만 OOM kill → restart 로 자동 복구" 경로가 열린다.
-    #
-    #   실측(2026-09-15): JVM 비-heap 226MB · 비-JVM 프로세스 179MB
-    #   예산: 512(컨테이너) + 179(호스트 프로세스) = 691MB, page cache 225MB 확보
-    #   memswap_limit 을 mem_limit 과 같게 두면 컨테이너 스왑 사용이 0 이 된다.
-    #   (미지정 시 제한만큼 스왑을 더 써서 상한이 사실상 2배가 된다)
-    mem_limit: 512m
-    memswap_limit: 512m
+    # ADR-0016: 2GB 박스로 올라가며 512m → 768m. 실측 JVM 비-heap 226MB 기준
+    # heap 여유를 확보하되 page cache 를 고갈시키지 않는 선.
+    mem_limit: 768m
+    memswap_limit: 768m
 
-    # localhost 만 bind — nginx 만 접근. 0.0.0.0 노출 X (SG 로 한 번 더 보호하지만 이중 안전).
+    # DB 가 준비된 뒤에 뜬다 — Flyway 마이그레이션이 첫 연결에서 실패하지 않도록.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    # localhost 만 bind — nginx 만 접근한다.
     ports:
       - "127.0.0.1:8080:8080"
 
-    # /opt/kicklog/.env 에서 환경변수 로드 (Secrets Manager → fetch-secrets.sh 가 생성)
     env_file:
       - .env
 
-    # Spring Boot prod profile + nginx 헤더 신뢰
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_FORWARDHEADERSSTRATEGY: NATIVE
-      # Sentry 환경 태그 — DSN(.env) 이 있을 때만 활성. 비밀 아님이라 compose 에 고정.
       SENTRY_ENVIRONMENT: prod
 
     healthcheck:
@@ -63,7 +104,6 @@ services:
       start_period: 90s
       retries: 3
 
-    # 로그 회전 — t3.micro 디스크 30GB 보호
     logging:
       driver: json-file
       options:

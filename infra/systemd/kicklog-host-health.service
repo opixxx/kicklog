@@ -1,0 +1,12 @@
+# ADR-0016 — RDS 알람 폐지로 생긴 감시 공백을 메운다 (디스크·컨테이너·스왑·볼륨 마운트)
+[Unit]
+Description=KickLog host and container health check
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+Environment=AWS_REGION=ap-northeast-2
+ExecStart=/opt/kicklog/bin/check-host-health.sh
+# 문제가 있으면 exit 1 이지만, 그 자체로 systemd 가 재시도하지는 않는다 (타이머가 다음 주기에 다시 본다).
+SuccessExitStatus=0 1

@@ -41,16 +41,18 @@ if ! rpm -q jq >/dev/null 2>&1; then
   dnf install -y -q jq
 fi
 
-# postgresql16 은 postgresql15 와 파일이 충돌한다(man 페이지 등). 박스에 15 가 이미
-# 깔려 있으면 swap 으로 교체한다 — 15 클라이언트로는 16 서버를 덤프할 수 없다.
-if ! rpm -q postgresql16 >/dev/null 2>&1; then
-  if rpm -q postgresql15 >/dev/null 2>&1; then
-    echo "패키지 교체: postgresql15 → postgresql16"
-    dnf swap -y -q postgresql15 postgresql16
-  else
-    echo "패키지 설치: postgresql16"
-    dnf install -y -q postgresql16
-  fi
+# ADR-0016: psql 클라이언트는 더 이상 설치하지 않는다 (DB 가 컨테이너 안에 있어
+# `docker exec kicklog-postgres psql` 로 충분하고, 호스트/서버 버전 불일치도 사라진다).
+
+# ─── 1-b) 데이터 볼륨 마운트 확인 (ADR-0016) ─────────
+# 마운트가 풀린 채 compose 를 올리면 Postgres 가 빈 디렉토리에 새 클러스터를 만든다.
+# 배포 경로에서 먼저 막는다 — 가장 위험한 실패 모드다.
+PGDATA_MOUNT="${PGDATA_MOUNT:-/mnt/pgdata}"
+if ! mountpoint -q "$PGDATA_MOUNT"; then
+  echo "❌ 데이터 볼륨이 마운트되지 않았습니다: $PGDATA_MOUNT" >&2
+  echo "   이 상태로 compose 를 올리면 빈 DB 가 생성됩니다. 적용을 중단합니다." >&2
+  echo "   확인: lsblk / findmnt $PGDATA_MOUNT / mount -a" >&2
+  exit 1
 fi
 
 # ─── 2) Cloudflare Origin CA 인증서 ───────────────────
@@ -125,7 +127,7 @@ fi
 
 # ─── 6) 운영 스크립트 + systemd timer ─────────────────
 mkdir -p "$BIN_DIR"
-for s in pg-dump-to-s3.sh check-cert-expiry.sh install-origin-cert.sh fetch-secrets.sh; do
+for s in pg-dump-to-s3.sh check-cert-expiry.sh check-host-health.sh install-origin-cert.sh fetch-secrets.sh; do
   [ -f "$STAGE/$s" ] && install -m 0750 "$STAGE/$s" "$BIN_DIR/$s"
 done
 
@@ -134,7 +136,7 @@ for unit in "$STAGE"/kicklog-*.service "$STAGE"/kicklog-*.timer; do
 done
 
 systemctl daemon-reload
-systemctl enable --now kicklog-pg-dump.timer kicklog-cert-check.timer
+systemctl enable --now kicklog-pg-dump.timer kicklog-cert-check.timer kicklog-host-health.timer
 
 echo "타이머 상태:"
 systemctl list-timers --no-pager 'kicklog-*' || true

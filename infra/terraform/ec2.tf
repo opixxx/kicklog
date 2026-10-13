@@ -70,36 +70,42 @@ resource "aws_iam_instance_profile" "ec2" {
   role = aws_iam_role.ec2.name
 }
 
-resource "aws_iam_role_policy" "ec2_secrets_read" {
-  name = "kicklog-ec2-secrets-read"
+resource "aws_iam_role_policy" "ec2_ssm_read" {
+  name = "kicklog-ec2-ssm-read"
   role = aws_iam_role.ec2.id
 
+  # ADR-0016: Secrets Manager → SSM Parameter Store 일원화.
+  # /kicklog/* 경로 전체를 허용한다 — terraform 이 만드는 비밀 5개와
+  # 스크립트가 만드는 origin-cert/origin-key/cloudflare-api-token(ADR-0015)을
+  # 한 정책으로 덮기 위함이다. 다른 경로는 읽을 수 없다.
+  #
+  # 2026-09-16 교훈(ADR-0015): ARN 을 개별 나열하다 sentry-dsn 이 빠져 Sentry 가
+  # 조용히 꺼져 있었다. 경로 기반 권한이 그 실수 유형 자체를 없앤다.
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "ReadKicklogParameters"
         Effect = "Allow"
         Action = [
-          "secretsmanager:GetSecretValue",
-          "secretsmanager:DescribeSecret",
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath",
         ]
-        # sentry_dsn 은 두 경로를 모두 커버한다:
-        #   - tfvars 로 관리하는 경우   → aws_secretsmanager_secret.sentry_dsn (count=1)
-        #   - 콘솔·CLI 로 수동 생성한 경우 → data.aws_secretsmanager_secret.sentry_dsn_existing
-        # 2026-09-16: 실제로는 수동 생성돼 있었고 이 정책에서 누락돼 있었다. 그 결과
-        # fetch-secrets.sh 의 GetSecretValue 가 AccessDenied 로 실패했지만 `2>/dev/null ||`
-        # 가 에러를 삼켜 SENTRY_DSN 이 빈 값으로 주입됐고, Sentry 가 조용히 꺼져 있었다.
-        Resource = concat(
-          [
-            aws_secretsmanager_secret.db_password.arn,
-            aws_secretsmanager_secret.kakao_rest_api_key.arn,
-            aws_secretsmanager_secret.jwt_secret.arn,
-            aws_secretsmanager_secret.ghcr_pat.arn,
-          ],
-          aws_secretsmanager_secret.sentry_dsn[*].arn,
-          data.aws_secretsmanager_secret.sentry_dsn_existing[*].arn,
-        )
-      }
+        Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/kicklog/*"
+      },
+      {
+        # SecureString 복호화 — AWS 관리형 키를 SSM 경유로만 쓰도록 제한.
+        Sid      = "DecryptSecureStringViaSsm"
+        Effect   = "Allow"
+        Action   = "kms:Decrypt"
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "ssm.${var.aws_region}.amazonaws.com"
+          }
+        }
+      },
     ]
   })
 }
@@ -166,47 +172,20 @@ resource "aws_iam_role_policy" "ec2_backup_write" {
   })
 }
 
-# ─── 오리진 인증서 조회 + 알림 발행 권한 (ADR-0015) ──
-# install-origin-cert.sh 가 Cloudflare Origin CA 인증서를 SSM SecureString 에서 받아
-# /etc/ssl/cloudflare 에 설치하고, check-cert-expiry.sh 가 잔여일이 임계 이하면
-# SNS 로 직접 통보한다 (CloudWatch 알람으로는 박스 로컬 인증서를 볼 수 없다).
-resource "aws_iam_role_policy" "ec2_origin_cert_and_alerts" {
-  name = "kicklog-ec2-origin-cert-and-alerts"
+# ─── 운영 알림 발행 권한 (ADR-0015 · 0016) ──────────
+# check-cert-expiry.sh / check-host-health.sh 가 임계 초과 시 직접 통보한다.
+# (박스 로컬 상태 — 디스크 사용률·컨테이너 health·인증서 잔여일 — 은 CloudWatch 가 볼 수 없다)
+resource "aws_iam_role_policy" "ec2_alerts" {
+  name = "kicklog-ec2-alerts"
   role = aws_iam_role.ec2.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "ReadOriginCertParameters"
-        Effect = "Allow"
-        Action = [
-          "ssm:GetParameter",
-          "ssm:GetParameters",
-        ]
-        Resource = [
-          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/kicklog/origin-cert",
-          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/kicklog/origin-key",
-        ]
-      },
-      {
-        # SecureString 복호화 — AWS 관리형 키(alias/aws/ssm) 를 SSM 경유로만 사용하도록 제한.
-        Sid      = "DecryptSecureStringViaSsm"
-        Effect   = "Allow"
-        Action   = "kms:Decrypt"
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "kms:ViaService" = "ssm.${var.aws_region}.amazonaws.com"
-          }
-        }
-      },
-      {
-        Sid      = "PublishOperationalAlerts"
-        Effect   = "Allow"
-        Action   = "sns:Publish"
-        Resource = aws_sns_topic.alerts.arn
-      },
-    ]
+    Statement = [{
+      Sid      = "PublishOperationalAlerts"
+      Effect   = "Allow"
+      Action   = "sns:Publish"
+      Resource = aws_sns_topic.alerts.arn
+    }]
   })
 }

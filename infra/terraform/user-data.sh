@@ -45,8 +45,9 @@ sysctl -w vm.swappiness=10
 # jq: fetch-secrets.sh 가 DB secret JSON 을 파싱한다. 없으면 **첫 배포가 즉시 실패**한다.
 #     2026-10-10 점검에서 user-data 에 jq 가 빠져 있는 것이 확인됐다 — 현 박스는
 #     수동 설치로 메꿔져 있었고, 그래서 "코드만으로 박스를 재현할 수 없는" 상태였다.
-# postgresql16: pg-dump-to-s3.sh 용. 서버가 PostgreSQL 16 이라 15 클라이언트는 덤프를 거부한다.
-dnf install -y jq postgresql16
+# psql 클라이언트는 설치하지 않는다 — ADR-0016 이후 DB 가 컨테이너 안에 있어
+# `docker exec kicklog-postgres psql` 로 충분하고, 호스트/서버 버전 불일치도 사라진다.
+dnf install -y jq
 
 # ─── Docker 설치 ────────────────────────────────────
 dnf install -y docker
@@ -55,9 +56,52 @@ usermod -aG docker ec2-user
 
 # docker compose plugin (v2)
 mkdir -p /usr/local/lib/docker/cli-plugins
-curl -sL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+# ADR-0016: arm64(Graviton) 전환 — aarch64 바이너리를 받는다.
+curl -sL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# ─── Postgres 데이터 볼륨 마운트 (ADR-0016) ──────────
+# 별도 EBS(storage.tf, /dev/sdf → Nitro 에서는 /dev/nvme1n1 로 보인다)를 /mnt/pgdata 에 둔다.
+# 루트와 분리하는 이유: 인스턴스를 교체해도 데이터가 살아남고, OS·도커 이미지가 디스크를
+# 채워도 DB 가 말려들지 않으며, EBS 스냅샷으로 DB 만 따로 백업할 수 있다.
+PGDATA_MOUNT=/mnt/pgdata
+PGDATA_LABEL=kicklog-pgdata
+
+# 루트가 아닌 디스크 중 첫 번째를 데이터 볼륨으로 본다.
+ROOT_DISK=$(lsblk -no pkname "$(findmnt -no SOURCE /)" 2>/dev/null || true)
+DATA_DISK=""
+for d in $(lsblk -dn -o NAME,TYPE | awk '$2=="disk" {print $1}'); do
+  [ "$d" = "$ROOT_DISK" ] && continue
+  DATA_DISK="/dev/$d"
+  break
+done
+
+if [ -n "$DATA_DISK" ]; then
+  # 파일시스템이 **없을 때만** 포맷한다 — 기존 데이터가 담긴 볼륨을 재부착한 경우를 보호한다.
+  if ! blkid "$DATA_DISK" >/dev/null 2>&1; then
+    echo "데이터 볼륨 초기화: $DATA_DISK"
+    mkfs.xfs -L "$PGDATA_LABEL" "$DATA_DISK"
+  fi
+
+  mkdir -p "$PGDATA_MOUNT"
+  # ⚠️ 마운트 전에 디렉토리를 immutable 로 만든다.
+  # 볼륨이 빠진 채 compose 가 뜨면 Postgres 가 **빈 디렉토리에 새 클러스터를 초기화**해
+  # 데이터가 사라진 것처럼 보인다. immutable 이면 그 쓰기가 실패해 컨테이너가 시끄럽게 죽는다
+  # (조용한 데이터 사고보다 요란한 기동 실패가 낫다). 마운트는 immutable 위에도 가능하다.
+  chattr +i "$PGDATA_MOUNT" 2>/dev/null || true
+
+  grep -q "$PGDATA_LABEL" /etc/fstab || \
+    echo "LABEL=$PGDATA_LABEL $PGDATA_MOUNT xfs defaults,noatime,nofail 0 2" >> /etc/fstab
+  mount -a
+  if mountpoint -q "$PGDATA_MOUNT"; then
+    echo "데이터 볼륨 마운트 완료: $PGDATA_MOUNT"
+  else
+    echo "⚠️ 데이터 볼륨 마운트 실패 — compose 를 올리기 전에 반드시 해결할 것"
+  fi
+else
+  echo "⚠️ 데이터 볼륨을 찾지 못했습니다 — EBS attach 상태를 확인하세요."
+fi
 
 # ─── nginx 설치 + 기본 설정 ───────────────────────────
 dnf install -y nginx

@@ -110,7 +110,10 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: ./backend
-          platforms: linux/amd64
+          # ADR-0016: EC2 가 Graviton(arm64) 이라 arm64 이미지를 빌드한다.
+          # JVM 이라 애플리케이션 코드는 그대로이고, Gradle 산출물이 아키텍처 중립이라
+          # buildx 가 에뮬레이션 없이 교차 빌드한다.
+          platforms: linux/arm64
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/kicklog:${{ github.sha }}

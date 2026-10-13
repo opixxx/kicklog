@@ -1,0 +1,11 @@
+# 10분 주기 — 장애 감지를 15분 이내로 유지한다 (엣지 Lambda 10분과 상호 보완).
+[Unit]
+Description=KickLog host health check every 10 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
