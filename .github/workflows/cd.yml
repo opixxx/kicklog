@@ -95,6 +95,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      # arm64 런타임 스테이지(addgroup·chown 등 소수 명령)를 amd64 러너에서 실행하기 위한
+      # binfmt 등록. Gradle 빌드는 Dockerfile 의 --platform=$BUILDPLATFORM 덕분에
+      # 네이티브로 돌아 에뮬레이션 비용이 거의 없다 (ADR-0016).
+      - name: Set up QEMU (arm64 binfmt)
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        with:
+          platforms: arm64
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
@@ -111,8 +119,8 @@ jobs:
         with:
           context: ./backend
           # ADR-0016: EC2 가 Graviton(arm64) 이라 arm64 이미지를 빌드한다.
-          # JVM 이라 애플리케이션 코드는 그대로이고, Gradle 산출물이 아키텍처 중립이라
-          # buildx 가 에뮬레이션 없이 교차 빌드한다.
+          # Dockerfile 의 빌더 스테이지가 --platform=$BUILDPLATFORM 이라 Gradle 은
+          # 러너 네이티브(amd64)로 돌고, 런타임 스테이지만 arm64 로 조립된다.
           platforms: linux/arm64
           push: true
           tags: |

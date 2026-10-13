@@ -2,11 +2,16 @@
 # KickLog Backend — Spring Boot 4 + Kotlin
 # =============================================
 # Multi-stage build:
-#   stage 1: Gradle build → fat jar
-#   stage 2: Amazon Corretto 17 runtime (slim) + jar
+#   stage 1: Gradle build → fat jar (빌드 머신 아키텍처에서 네이티브 실행)
+#   stage 2: Amazon Corretto 17 runtime (slim) + jar (타깃 아키텍처)
+#
+# ADR-0016: EC2 가 Graviton(arm64) 으로 바뀌면서 CD 가 arm64 이미지를 빌드한다.
+# 빌더 스테이지에 --platform=$BUILDPLATFORM 을 주는 것이 핵심이다 — 이게 없으면
+# amd64 러너에서 **Gradle 빌드 전체가 QEMU 에뮬레이션**으로 돌아 20~40분이 걸린다.
+# jar 는 아키텍처 중립이므로 네이티브로 만들고, 런타임 스테이지만 arm64 로 둔다.
 
-# ─── Stage 1: Build ───────────────────────────────────
-FROM amazoncorretto:17-alpine AS builder
+# ─── Stage 1: Build (네이티브) ────────────────────────
+FROM --platform=$BUILDPLATFORM amazoncorretto:17-alpine AS builder
 WORKDIR /workspace
 
 # Gradle wrapper + 의존성 정의만 먼저 복사 (캐시 활용)
@@ -21,7 +26,7 @@ RUN ./gradlew --no-daemon dependencies --quiet || true
 COPY src ./src
 RUN ./gradlew --no-daemon bootJar -x test
 
-# ─── Stage 2: Runtime ─────────────────────────────────
+# ─── Stage 2: Runtime (타깃 아키텍처) ─────────────────
 FROM amazoncorretto:17-alpine AS runtime
 
 # 보안: 비루트 사용자
@@ -36,7 +41,7 @@ USER kicklog
 # Spring Boot 헬스 체크용
 EXPOSE 8080
 
-# JVM 옵션 (t3.micro 1GB RAM · compose 의 mem_limit 512m 전제)
+# JVM 옵션 (t4g.small 2GB RAM · compose 의 mem_limit 512m 전제 — ADR-0016)
 #
 # heap 은 절대값으로 고정한다. MaxRAMPercentage 는 컨테이너 메모리 제한이 있을 때만
 # 의도대로 동작하는데(없으면 호스트 전체가 기준), 이 앱은 비-heap 이 226MB 로 커서

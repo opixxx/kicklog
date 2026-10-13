@@ -17,10 +17,16 @@
 #    기동 전에 mountpoint 를 검사하고, check-host-health.sh 가 상시 감시한다.
 #
 # 메모리 예산 (t4g.small = 2GB, ADR-0016):
-#   backend 768m + postgres 512m + 호스트 ~180m + page cache 여유 ~500m
-#   2026-09-06 장애(메모리 고갈 → 스래싱 → 9일 마비)의 재발을 막는 핵심 설계다.
+#   backend 512m + postgres 512m + 호스트 ~180m → page cache 여유 약 800m
+#
+#   backend 를 512m 그대로 둔 이유: 3주 이상 RestartCount=0 · OOMKilled=false 로
+#   안정 운영된 검증된 값이고, 실측 heap 사용량이 93MB(상한 224m)라 늘릴 이유가 없다.
+#   늘어난 1GB 는 **page cache 로 보내는 것이 Postgres 에 더 이롭다** — shared_buffers
+#   를 키우는 것보다 OS 캐시에 맡기는 편이 작은 DB(2.9GB)에서 효율적이다.
+#
 #   두 컨테이너 모두 memswap_limit = mem_limit → 스왑으로 연명하지 않고
 #   OOM kill → restart 경로로 간다 (호스트 스왑 2GB 는 OS 프로세스용 완충).
+#   2026-09-06 장애(메모리 고갈 → 스래싱 → 9일 마비)의 재발을 막는 핵심 설계다.
 
 services:
   postgres:
@@ -75,10 +81,9 @@ services:
     container_name: kicklog-backend
     restart: unless-stopped
 
-    # ADR-0016: 2GB 박스로 올라가며 512m → 768m. 실측 JVM 비-heap 226MB 기준
-    # heap 여유를 확보하되 page cache 를 고갈시키지 않는 선.
-    mem_limit: 768m
-    memswap_limit: 768m
+    # 검증된 값 유지 (위 메모리 예산 주석 참조). JVM heap 상한은 Dockerfile 의 -Xmx224m.
+    mem_limit: 512m
+    memswap_limit: 512m
 
     # DB 가 준비된 뒤에 뜬다 — Flyway 마이그레이션이 첫 연결에서 실패하지 않도록.
     depends_on:

@@ -33,7 +33,8 @@ resource "aws_instance" "app" {
 
   # user_data 변경 시 재생성 X (수동 SSH로 갱신)
   lifecycle {
-    ignore_changes = [user_data, ami]
+    # MIGRATION-TEMP: instance_type 은 컷오버 동안만 무시한다 (구 x86 박스 보호).
+    ignore_changes = [user_data, ami, instance_type]
   }
 }
 
