@@ -96,98 +96,15 @@ resource "aws_cloudwatch_metric_alarm" "ec2_high_cpu" {
   }
 }
 
-# ─── CloudWatch Alarms — RDS ─────────────────────────
-resource "aws_cloudwatch_metric_alarm" "rds_high_cpu" {
-  alarm_name          = "kicklog-rds-high-cpu"
-  alarm_description   = "RDS CPU >= 85%"
-  namespace           = "AWS/RDS"
-  metric_name         = "CPUUtilization"
-  statistic           = "Average"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  threshold           = 85
-  period              = 60
-  evaluation_periods  = 5
-  datapoints_to_alarm = 3
-  treat_missing_data  = "notBreaching"
-
-  dimensions = {
-    DBInstanceIdentifier = aws_db_instance.main.identifier
-  }
-
-  alarm_actions = [aws_sns_topic.alerts.arn]
-  ok_actions    = [aws_sns_topic.alerts.arn]
-
-  tags = {
-    Name = "kicklog-rds-high-cpu"
-  }
-}
-
-# FreeStorageSpace <= 4GiB (20GB Free Tier 의 20%).
-# Free Tier 스토리지가 작아 임계가 비교적 높지만, 사고 전 1주 정도 여유 보장.
-resource "aws_cloudwatch_metric_alarm" "rds_low_storage" {
-  alarm_name          = "kicklog-rds-low-storage"
-  alarm_description   = "RDS FreeStorageSpace <= 4 GiB — Free Tier 20GB 한도 접근"
-  namespace           = "AWS/RDS"
-  metric_name         = "FreeStorageSpace"
-  statistic           = "Minimum"
-  comparison_operator = "LessThanOrEqualToThreshold"
-  threshold           = 4 * 1024 * 1024 * 1024 # 4 GiB in bytes
-  period              = 300
-  evaluation_periods  = 2
-  datapoints_to_alarm = 2
-  treat_missing_data  = "notBreaching"
-
-  dimensions = {
-    DBInstanceIdentifier = aws_db_instance.main.identifier
-  }
-
-  alarm_actions = [aws_sns_topic.alerts.arn]
-  ok_actions    = [aws_sns_topic.alerts.arn]
-
-  tags = {
-    Name = "kicklog-rds-low-storage"
-  }
-}
-
-# ═══════════════════════════════════════════════════════
-# 앱 레벨 장애 감지 (2026-09-06 9일 마비 후속)
-#
-# 기존 알람(StatusCheckFailed · CPU>=90%)은 "OS 는 살았는데 앱만 죽은" 상태를 못 잡는다.
-# 실제 장애 당시 StatusCheck 는 정상이었고 CPU 는 53% 여서 알람이 한 건도 울리지 않았다.
-# 아래 두 알람은 그 사각지대를 메운다. 둘 다 기존 메트릭을 쓰므로 추가 비용이 없다.
-# ═══════════════════════════════════════════════════════
-
-# ─── 백엔드 DB 연결 끊김 — 앱 다운의 직접 신호 ────────
-# 정상 운영 시 HikariCP 가 커넥션을 상시 유지해 DatabaseConnections 는 10 근처로 고정된다.
-# 이 값이 0 이면 앱이 DB 에 붙지 못하는 상태 — 앱 사망·기동 실패·네트워크 단절 중 하나다.
-# 2026-09-06 장애에서는 23:00(KST)에 0 으로 떨어져 9일간 유지됐다. 이 알람이 있었다면
-# 15분 만에 통보됐다.
-#
-# 15분(5분 × 3)을 두는 이유: 배포 중 컨테이너 재시작으로 1~2분간 0 이 될 수 있어 오탐 방지.
-# treat_missing_data=breaching — 메트릭 자체가 사라지는 것도 비정상으로 본다.
-resource "aws_cloudwatch_metric_alarm" "backend_db_disconnected" {
-  alarm_name          = "kicklog-backend-db-disconnected"
-  alarm_description   = "백엔드가 15분 이상 RDS 에 연결되어 있지 않음 — 앱 다운 의심"
-  comparison_operator = "LessThanThreshold"
-  evaluation_periods  = 3
-  threshold           = 1
-  period              = 300
-  statistic           = "Maximum"
-  metric_name         = "DatabaseConnections"
-  namespace           = "AWS/RDS"
-  treat_missing_data  = "breaching"
-
-  dimensions = {
-    DBInstanceIdentifier = aws_db_instance.main.identifier
-  }
-
-  alarm_actions = [aws_sns_topic.alerts.arn]
-  ok_actions    = [aws_sns_topic.alerts.arn]
-
-  tags = {
-    Name = "kicklog-backend-db-disconnected"
-  }
-}
+# ─── RDS 알람은 ADR-0016 으로 제거됐다 ───────────────
+# rds-high-cpu / rds-low-storage / backend-db-disconnected 세 알람은 RDS 메트릭에
+# 의존했는데 RDS 자체가 사라졌다. 역할은 이렇게 넘겼다:
+#   - DB 과부하        → EC2 CPUUtilization 알람 (위)
+#   - 스토리지 고갈     → check-host-health.sh 가 디스크 사용률 85% 초과 시 SNS
+#   - 앱↔DB 단절(앱 사망) → check-host-health.sh 의 컨테이너 health 점검
+#                          + 엣지 헬스 체크 Lambda (아래, ADR-0015)
+# backend-db-disconnected 는 2026-09-06 형 장애를 잡는 핵심이었으므로
+# 대체 수단 없이 지우지 않았다.
 
 # ─── 디스크 읽기 폭증 — 메모리 스래싱 조기 경보 ───────
 # 메모리가 고갈되면 커널이 page cache 를 버렸다 디스크에서 다시 읽기를 반복한다(스래싱).

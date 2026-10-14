@@ -1,3 +1,7 @@
+> ⚠️ **2026-10-13 (ADR-0016) 이후 RDS 는 존재하지 않는다.** 아래 RDS 절차는 *과거 기록*이며,
+> 현재 유효한 복구 절차는 문서 맨 아래 **"컨테이너 Postgres 복구"** 절이다.
+> 구 RDS 최종 스냅샷(`kicklog-postgres-final-20260527-042626`)은 보관 중이다.
+
 # Runbook — RDS 백업 복원 리허설 (분기 1회)
 
 ADR-0009 D7 의 코드화된 절차. **백업이 있다 ≠ 백업으로 복구할 수 있다** — 한 번이라도 복구해 본 사람만 사고 대응 가능.
@@ -199,3 +203,68 @@ pg_restore --no-owner -t matches -d <target> /tmp/kicklog-<STAMP>.dump
 - 스냅샷 복원과의 역할 분담: **시점 전체 복구 = 스냅샷**, **부분·교차계정·버전 사고 = 논리 백업**
 - 덤프는 업로드 전에 `pg_restore --list` 로 이미 1차 검증된다 (`pg-dump-to-s3.sh`)
 - 수동 실행: `sudo systemctl start kicklog-pg-dump.service` → `journalctl -u kicklog-pg-dump -n 20`
+
+
+---
+
+## 현행 — 컨테이너 Postgres 복구 (ADR-0016)
+
+DB 는 `kicklog-postgres` 컨테이너이고 데이터는 **별도 EBS**(`/mnt/pgdata`, vol-0fec57d33306454b3)에 있다.
+복구 수단은 3중이다.
+
+| 수단 | 보관 | 복구 단위 | 최대 손실 |
+|---|---|---|---|
+| S3 논리 백업 (`pg_dump -Fc`) | 매일 04:30 KST, 30일 | 테이블 단위까지 | 24시간 |
+| EBS 데이터 볼륨 | 인스턴스와 독립 | 볼륨 통째 | 0 (인스턴스 장애 시) |
+| EBS 스냅샷 | 수동 | 볼륨 통째 | 스냅샷 시점 |
+
+### 1) 논리 백업에서 복원
+
+```bash
+# 목록
+aws s3 ls s3://kicklog-backup-576393818807/pg/ --region ap-northeast-2
+
+# 박스에서 (SSM Session Manager)
+cd /opt/kicklog
+aws s3 cp s3://kicklog-backup-576393818807/pg/kicklog-<STAMP>.dump /tmp/r.dump --region ap-northeast-2
+
+# 반드시 먼저 열어본다 — 못 여는 덤프는 백업이 아니다
+docker exec -i kicklog-postgres pg_restore --list < /tmp/r.dump | head -20
+
+# 복원 (backend 를 내려 커넥션을 끊고 진행)
+docker compose --env-file .env --env-file .env.deploy stop backend
+docker exec -i kicklog-postgres pg_restore -U kicklog -d kicklog \
+  --clean --if-exists --no-owner --no-privileges < /tmp/r.dump
+docker compose --env-file .env --env-file .env.deploy start backend
+
+# 검증
+docker exec kicklog-postgres psql -U kicklog -d kicklog -c "select count(*) from matches;"
+curl -fsS http://127.0.0.1:8080/actuator/health
+```
+
+2026-10-13 컷오버 실측: 덤프 + 복원 + 재기동 **23초** (DB 2.9GB · 덤프 42KB).
+
+### 2) 인스턴스를 잃었을 때 (데이터 볼륨은 살아 있음)
+
+1. `terraform apply` 로 새 인스턴스 생성 (user-data 가 볼륨을 **포맷하지 않고** 마운트한다 —
+   `blkid` 로 기존 파일시스템을 감지하면 건너뛴다)
+2. CD 재실행 또는 `apply-host-config.sh` → compose up
+3. `check-host-health.sh` 로 마운트·컨테이너 확인
+
+### 3) 데이터 볼륨까지 잃었을 때
+
+새 볼륨 생성 → 위 1) 논리 백업 복원. 최대 24시간 손실을 수용한다(ADR-0016 Consequences).
+
+### ⚠️ 가장 위험한 실패 모드
+
+볼륨이 **마운트되지 않은 채** compose 가 뜨면 Postgres 가 빈 디렉토리에 새 클러스터를 만들어
+"데이터가 사라진 것처럼" 보인다. 이때 **절대 그 상태로 덮어쓰지 말고** 먼저 확인한다:
+
+```bash
+findmnt /mnt/pgdata          # 비어 있으면 미마운트
+lsblk -o NAME,LABEL,MOUNTPOINT
+mount -a && findmnt /mnt/pgdata
+```
+
+방어는 3중이다: `fstab(nofail)` + 마운트 지점 **immutable**(`chattr +i`) + `apply-host-config.sh`/
+`check-host-health.sh` 의 mountpoint 검사.

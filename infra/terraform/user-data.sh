@@ -27,7 +27,7 @@ dnf update -y
 # 주의: 백엔드 컨테이너는 compose 의 memswap_limit=mem_limit 으로 **스왑 사용이 0** 이다.
 # 이 스왑은 호스트 프로세스(nginx·docker·containerd·SSM agent·OS) 전용 완충이며,
 # 컨테이너는 제한 초과 시 스왑으로 연명하지 않고 즉시 OOM kill → 재시작된다 (의도된 동작).
-if [ ! -f /swapfile ]; then
+if [[ ! -f /swapfile ]]; then
   fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
   chmod 600 /swapfile
   mkswap /swapfile
@@ -45,19 +45,102 @@ sysctl -w vm.swappiness=10
 # jq: fetch-secrets.sh 가 DB secret JSON 을 파싱한다. 없으면 **첫 배포가 즉시 실패**한다.
 #     2026-10-10 점검에서 user-data 에 jq 가 빠져 있는 것이 확인됐다 — 현 박스는
 #     수동 설치로 메꿔져 있었고, 그래서 "코드만으로 박스를 재현할 수 없는" 상태였다.
-# postgresql16: pg-dump-to-s3.sh 용. 서버가 PostgreSQL 16 이라 15 클라이언트는 덤프를 거부한다.
-dnf install -y jq postgresql16
+# psql 클라이언트는 설치하지 않는다 — ADR-0016 이후 DB 가 컨테이너 안에 있어
+# `docker exec kicklog-postgres psql` 로 충분하고, 호스트/서버 버전 불일치도 사라진다.
+dnf install -y jq
 
 # ─── Docker 설치 ────────────────────────────────────
 dnf install -y docker
 systemctl enable --now docker
 usermod -aG docker ec2-user
 
-# docker compose plugin (v2)
+# docker compose plugin
+# ADR-0016: arm64(Graviton) 전환 — aarch64 바이너리를 받는다.
+#
+# 버전을 고정하고 **체크섬을 검증한 뒤에만** 설치한다. 이전에는 `releases/latest` 를
+# 그대로 받아 실행했는데, 그러면 ① 박스를 다시 만들 때마다 다른 버전이 깔려 재현성이 깨지고
+# ② 받은 바이너리가 올바른지 확인할 방법이 없다 (SonarCloud 보안 지적).
+# 갱신 방법:
+#   TAG=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)
+#   curl --proto '=https' --proto-redir '=https' -sL ".../download/$TAG/docker-compose-linux-aarch64.sha256"
+DOCKER_COMPOSE_VERSION=v5.6.0
+DOCKER_COMPOSE_SHA256=733ec76717ceb59052a9609b9dadfb523b2df8eab57a54212872d10a58078ea2
+
 mkdir -p /usr/local/lib/docker/cli-plugins
-curl -sL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
-  -o /usr/local/lib/docker/cli-plugins/docker-compose
-chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+COMPOSE_TMP=$(mktemp)
+# --proto '=https' --proto-redir '=https': GitHub 릴리스는 release-assets 도메인으로
+# 리다이렉트되는데, -L 만 쓰면 그 과정에서 평문으로 떨어져도 그대로 따라간다.
+# 최초 요청과 리다이렉트 모두 HTTPS 만 허용한다 (SonarCloud S5332).
+curl --proto '=https' --proto-redir '=https' -fsSL \
+  "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-aarch64" \
+  -o "$COMPOSE_TMP"
+
+if echo "${DOCKER_COMPOSE_SHA256}  ${COMPOSE_TMP}" | sha256sum --check --status; then
+  install -m 0755 "$COMPOSE_TMP" /usr/local/lib/docker/cli-plugins/docker-compose
+  echo "docker compose ${DOCKER_COMPOSE_VERSION} 설치 완료 (체크섬 검증됨)"
+else
+  echo "❌ docker compose 체크섬 불일치 — 설치하지 않습니다 (공급망 위험)" >&2
+  rm -f "$COMPOSE_TMP"
+  exit 1
+fi
+rm -f "$COMPOSE_TMP"
+
+# ─── Postgres 데이터 볼륨 마운트 (ADR-0016) ──────────
+# 이 블록만 `set +e` 로 감싼다. 볼륨 준비 실패로 **스크립트 전체가 중단되어 nginx·docker
+# 설정까지 통째로 누락되는** 사고를 막기 위함이다(2026-10-13 실제 발생). 볼륨이 없으면
+# apply-host-config.sh 의 mountpoint 가드가 배포를 막으므로, 여기서 죽을 이유가 없다.
+set +e
+# 별도 EBS(storage.tf, /dev/sdf → Nitro 에서는 /dev/nvme1n1 로 보인다)를 /mnt/pgdata 에 둔다.
+# 루트와 분리하는 이유: 인스턴스를 교체해도 데이터가 살아남고, OS·도커 이미지가 디스크를
+# 채워도 DB 가 말려들지 않으며, EBS 스냅샷으로 DB 만 따로 백업할 수 있다.
+PGDATA_MOUNT=/mnt/pgdata
+# ⚠️ XFS 레이블은 **최대 12자**다. 길면 mkfs 가 usage 를 뱉고 실패하는데,
+# 이 스크립트는 `set -e` 라 거기서 전체가 중단된다 (2026-10-13 실제 발생:
+# "kicklog-pgdata"(14자) 때문에 nginx 설치까지 통째로 건너뛰었다).
+PGDATA_LABEL=kicklogpg
+
+# 루트가 아닌 디스크 중 첫 번째를 데이터 볼륨으로 본다.
+# terraform 은 인스턴스를 만든 **뒤** 볼륨을 붙이므로, user-data 가 먼저 돌 수 있다.
+# 최대 90초까지 장치가 나타나기를 기다린다.
+ROOT_DISK=$(lsblk -no pkname "$(findmnt -no SOURCE /)" 2>/dev/null || true)
+DATA_DISK=""
+for _ in $(seq 1 18); do
+  for d in $(lsblk -dn -o NAME,TYPE | awk '$2=="disk" {print $1}'); do
+    [[ "$d" == "$ROOT_DISK" ]] && continue
+    DATA_DISK="/dev/$d"
+    break
+  done
+  [[ -n "$DATA_DISK" ]] && break
+  echo "데이터 볼륨 attach 대기 중..."
+  sleep 5
+done
+
+if [[ -n "$DATA_DISK" ]]; then
+  # 파일시스템이 **없을 때만** 포맷한다 — 기존 데이터가 담긴 볼륨을 재부착한 경우를 보호한다.
+  if ! blkid "$DATA_DISK" >/dev/null 2>&1; then
+    echo "데이터 볼륨 초기화: $DATA_DISK"
+    mkfs.xfs -L "$PGDATA_LABEL" "$DATA_DISK"
+  fi
+
+  mkdir -p "$PGDATA_MOUNT"
+  # ⚠️ 마운트 전에 디렉토리를 immutable 로 만든다.
+  # 볼륨이 빠진 채 compose 가 뜨면 Postgres 가 **빈 디렉토리에 새 클러스터를 초기화**해
+  # 데이터가 사라진 것처럼 보인다. immutable 이면 그 쓰기가 실패해 컨테이너가 시끄럽게 죽는다
+  # (조용한 데이터 사고보다 요란한 기동 실패가 낫다). 마운트는 immutable 위에도 가능하다.
+  chattr +i "$PGDATA_MOUNT" 2>/dev/null || true
+
+  grep -q "$PGDATA_LABEL" /etc/fstab || \
+    echo "LABEL=$PGDATA_LABEL $PGDATA_MOUNT xfs defaults,noatime,nofail 0 2" >> /etc/fstab
+  mount -a
+  if mountpoint -q "$PGDATA_MOUNT"; then
+    echo "데이터 볼륨 마운트 완료: $PGDATA_MOUNT"
+  else
+    echo "⚠️ 데이터 볼륨 마운트 실패 — compose 를 올리기 전에 반드시 해결할 것"
+  fi
+else
+  echo "⚠️ 데이터 볼륨을 찾지 못했습니다 — EBS attach 상태를 확인하세요."
+fi
+set -e
 
 # ─── nginx 설치 + 기본 설정 ───────────────────────────
 dnf install -y nginx

@@ -1,73 +1,69 @@
 #!/bin/bash
 # =============================================
-# KickLog — Secrets Manager → /opt/kicklog/.env
+# KickLog — SSM Parameter Store → /opt/kicklog/.env
 # =============================================
-# EC2 안에서 실행. IAM Role (kicklog-ec2-role) 이 secretsmanager:GetSecretValue 권한 보유.
+# EC2 안에서 실행. IAM Role(kicklog-ec2-role)이 /kicklog/* 에 ssm:GetParameter 보유.
+#
+# ADR-0016: Secrets Manager → SSM Parameter Store 로 이전했다 (월 $2 절감 + 저장소 일원화).
+# ADR-0016: DB 가 RDS → 같은 박스의 postgres 컨테이너로 바뀌었다. 따라서 host/port 는
+#           compose 네트워크에서 고정(postgres:5432)이고, 비밀은 비밀번호 하나면 된다.
 #
 # 사용:
 #   sudo bash fetch-secrets.sh
 #
 # 결과:
-#   /opt/kicklog/.env (chmod 600, chown ec2-user:ec2-user)
-#   docker compose 가 env_file 로 읽음
+#   /opt/kicklog/.env (chmod 600, chown ec2-user:ec2-user) — compose 가 env_file 로 읽는다
 #
 # 갱신:
-#   Secrets Manager 에서 secret 값 변경 후 이 스크립트 재실행 → docker compose restart backend
-#
-# 참고:
-#   ADR-0006 D6 — Secrets Manager 사용
-#   RDS endpoint, kakao 키, JWT secret 은 Terraform 생성 시 자동 저장됨.
+#   SSM 파라미터 값 변경 → 이 스크립트 재실행 → docker compose up -d
 
 set -euo pipefail
 
 REGION="${AWS_REGION:-ap-northeast-2}"
 ENV_FILE="/opt/kicklog/.env"
 
-echo "===== Secrets 가져오기 시작 $(date) ====="
+DB_NAME="${DB_NAME:-kicklog}"
+DB_USERNAME="${DB_USERNAME:-kicklog}"
 
-# 의존성 확인
-command -v aws >/dev/null || { echo "aws CLI 가 없습니다. dnf install -y aws-cli"; exit 1; }
-command -v jq >/dev/null || { echo "jq 가 없습니다. dnf install -y jq"; exit 1; }
+echo "===== Secrets 가져오기 시작 $(date -Iseconds) ====="
 
-# Secrets Manager 에서 값 조회 (실패 시 즉시 중단)
-# db-password 는 JSON: {"username","password","host","port","dbname"} — terraform secrets.tf 참조
-DB_SECRET_JSON=$(aws secretsmanager get-secret-value \
-  --region "$REGION" --secret-id kicklog/db-password \
-  --query SecretString --output text)
+command -v aws >/dev/null || { echo "aws CLI 가 없습니다. dnf install -y awscli" >&2; exit 1; }
+command -v jq >/dev/null || { echo "jq 가 없습니다. dnf install -y jq" >&2; exit 1; }
 
-DB_USERNAME=$(echo "$DB_SECRET_JSON" | jq -r .username)
-DB_PASSWORD=$(echo "$DB_SECRET_JSON" | jq -r .password)
-DB_HOST=$(echo "$DB_SECRET_JSON" | jq -r .host)
-DB_PORT=$(echo "$DB_SECRET_JSON" | jq -r .port)
-DB_NAME=$(echo "$DB_SECRET_JSON" | jq -r .dbname)
-DB_URL="jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}"
+# 필수 파라미터는 한 번에 받는다. 하나라도 없으면 InvalidParameters 로 돌아오고,
+# 아래에서 즉시 중단한다 — **빈 값으로 기동해서 조용히 망가지는 것이 최악**이기 때문이다
+# (2026-09-16 Sentry 무음 실패의 교훈, ADR-0015).
+RESP=$(aws ssm get-parameters --region "$REGION" --with-decryption \
+  --names /kicklog/db-password /kicklog/kakao-rest-api-key /kicklog/jwt-secret \
+  --output json)
 
-KAKAO_REST_API_KEY=$(aws secretsmanager get-secret-value \
-  --region "$REGION" --secret-id kicklog/kakao-rest-api-key \
-  --query SecretString --output text)
+MISSING=$(echo "$RESP" | jq -r '.InvalidParameters[]?')
+if [[ -n "$MISSING" ]]; then
+  echo "❌ 필수 SSM 파라미터 누락:" >&2
+  echo "$MISSING" | sed 's/^/    /' >&2
+  exit 1
+fi
 
-JWT_SECRET=$(aws secretsmanager get-secret-value \
-  --region "$REGION" --secret-id kicklog/jwt-secret \
-  --query SecretString --output text)
+param() {
+  local name="$1"
+  echo "$RESP" | jq -r --arg n "$name" '.Parameters[] | select(.Name == $n) | .Value'
+}
 
-# Sentry DSN — optional. 미발급이면 secret 이 없으므로 빈 값으로 두고 앱에서 Sentry 비활성 처리한다.
-#
-# 단, "secret 이 없음(ResourceNotFound)" 과 "있는데 못 읽음(AccessDenied)" 은 구분해야 한다.
-# 2026-09-16 이전에는 둘 다 `2>/dev/null || echo ""` 로 뭉뚱그려져, IAM 정책에 sentry-dsn ARN 이
-# 누락된 사실이 드러나지 않은 채 Sentry 가 조용히 꺼져 있었다. 권한 문제는 설정 실수이므로
-# 반드시 경고를 남긴다 (배포 자체는 막지 않는다 — Sentry 는 optional 이다).
+DB_PASSWORD=$(param /kicklog/db-password)
+KAKAO_REST_API_KEY=$(param /kicklog/kakao-rest-api-key)
+JWT_SECRET=$(param /kicklog/jwt-secret)
+
+# Sentry DSN 은 optional — "없음(정상)" 과 "있는데 못 읽음(권한 오류)" 을 구분한다.
 SENTRY_ERR=$(mktemp)
-if SENTRY_DSN=$(aws secretsmanager get-secret-value \
-  --region "$REGION" --secret-id kicklog/sentry-dsn \
-  --query SecretString --output text 2>"$SENTRY_ERR"); then
+if SENTRY_DSN=$(aws ssm get-parameter --region "$REGION" --with-decryption \
+  --name /kicklog/sentry-dsn --query Parameter.Value --output text 2>"$SENTRY_ERR"); then
   echo "✅ Sentry DSN 조회 성공 — 에러 트래킹 활성화됨"
 else
   if grep -qi "AccessDenied\|not authorized" "$SENTRY_ERR"; then
-    echo "⚠️  경고: sentry-dsn 시크릿은 존재하나 EC2 IAM role 에 읽기 권한이 없습니다." >&2
-    echo "    → infra/terraform/ec2.tf 의 kicklog-ec2-secrets-read 정책에 ARN 을 추가하고 apply 하세요." >&2
-    echo "    → Sentry 는 비활성 상태로 기동합니다 (에러가 수집되지 않습니다)." >&2
-  elif grep -qi "ResourceNotFound\|can't find the specified secret" "$SENTRY_ERR"; then
-    echo "ℹ️  sentry-dsn 시크릿 미발급 — Sentry 비활성으로 진행합니다."
+    echo "⚠️  경고: sentry-dsn 파라미터는 있으나 EC2 IAM role 에 읽기 권한이 없습니다." >&2
+    echo "    → infra/terraform/ec2.tf 의 kicklog-ec2-ssm-read 정책을 확인하세요." >&2
+  elif grep -qi "ParameterNotFound" "$SENTRY_ERR"; then
+    echo "ℹ️  sentry-dsn 미발급 — Sentry 비활성으로 진행합니다."
   else
     echo "⚠️  경고: sentry-dsn 조회 실패 (원인 불명):" >&2
     sed 's/^/    /' "$SENTRY_ERR" >&2
@@ -76,7 +72,6 @@ else
 fi
 rm -f "$SENTRY_ERR"
 
-# /opt/kicklog/.env 작성 (atomic — 임시파일 + mv)
 TMP=$(mktemp)
 trap 'rm -f "$TMP"' EXIT
 
@@ -84,10 +79,11 @@ cat > "$TMP" <<EOF
 # Auto-generated by fetch-secrets.sh at $(date -Iseconds)
 # DO NOT EDIT MANUALLY. 재생성 시 모든 변경 손실.
 
-# Database (host/port/dbname 은 db-password JSON 에서 파싱)
-DB_URL=${DB_URL}
+# Database — 같은 compose 네트워크의 postgres 컨테이너 (ADR-0016)
+DB_NAME=${DB_NAME}
 DB_USERNAME=${DB_USERNAME}
 DB_PASSWORD=${DB_PASSWORD}
+DB_URL=jdbc:postgresql://postgres:5432/${DB_NAME}
 
 # JWT
 JWT_SECRET=${JWT_SECRET}
@@ -99,7 +95,7 @@ JWT_REFRESH_TOKEN_DAYS=90
 # Kakao
 KAKAO_REST_API_KEY=${KAKAO_REST_API_KEY}
 
-# Sentry (에러 트래킹 — DSN 빈 값이면 자동 비활성. SENTRY_ENVIRONMENT 는 compose 에서 prod 주입)
+# Sentry (DSN 빈 값이면 자동 비활성. SENTRY_ENVIRONMENT 는 compose 에서 주입)
 SENTRY_DSN=${SENTRY_DSN}
 
 # Apple
@@ -114,7 +110,4 @@ chmod 600 "$ENV_FILE"
 chown ec2-user:ec2-user "$ENV_FILE"
 
 echo ".env 생성 완료: $ENV_FILE (chmod 600)"
-echo "===== Secrets 가져오기 완료 $(date) ====="
-echo ""
-echo "다음 명령으로 backend 재시작:"
-echo "  cd /opt/kicklog && docker compose up -d"
+echo "===== Secrets 가져오기 완료 $(date -Iseconds) ====="
