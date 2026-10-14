@@ -221,10 +221,11 @@ jobs:
           echo "\$NEW_TAG" > "\$DEPLOY_DIR/current-tag"
 
           # ── GHCR 인증 ──
-          GHCR_PAT=\$(aws secretsmanager get-secret-value \
+          # ADR-0016: Secrets Manager 폐지 → SSM Parameter Store.
+          GHCR_PAT=\$(aws ssm get-parameter \
             --region ${AWS_REGION} \
-            --secret-id kicklog/ghcr-pat \
-            --query SecretString --output text)
+            --name /kicklog/ghcr-pat --with-decryption \
+            --query Parameter.Value --output text)
           echo "\$GHCR_PAT" | docker login ghcr.io -u ${REPO_OWNER} --password-stdin
           unset GHCR_PAT
 
