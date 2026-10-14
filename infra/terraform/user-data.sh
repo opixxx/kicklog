@@ -68,7 +68,11 @@ DOCKER_COMPOSE_SHA256=733ec76717ceb59052a9609b9dadfb523b2df8eab57a54212872d10a58
 
 mkdir -p /usr/local/lib/docker/cli-plugins
 COMPOSE_TMP=$(mktemp)
-curl -fsSL "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-aarch64" \
+# --proto '=https' --proto-redir '=https': GitHub 릴리스는 release-assets 도메인으로
+# 리다이렉트되는데, -L 만 쓰면 그 과정에서 평문으로 떨어져도 그대로 따라간다.
+# 최초 요청과 리다이렉트 모두 HTTPS 만 허용한다 (SonarCloud S5332).
+curl --proto '=https' --proto-redir '=https' -fsSL \
+  "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-aarch64" \
   -o "$COMPOSE_TMP"
 
 if echo "${DOCKER_COMPOSE_SHA256}  ${COMPOSE_TMP}" | sha256sum --check --status; then
