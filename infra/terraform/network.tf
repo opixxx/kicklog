@@ -37,20 +37,6 @@ resource "aws_subnet" "public_a" {
   }
 }
 
-# ─── RDS subnet group용 2번째 subnet ─────────────────
-# AWS DB Subnet Group은 최소 2 AZ 요구. MVP에 multi-AZ는 안 쓰지만 정책 충족 필요.
-resource "aws_subnet" "public_c" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.rds_subnet_cidr_b
-  availability_zone       = var.rds_subnet_az_b
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name = "kicklog-public-c"
-    Tier = "public"
-  }
-}
-
 # ─── Route Table ──────────────────────────────────────
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
@@ -67,11 +53,6 @@ resource "aws_route_table" "public" {
 
 resource "aws_route_table_association" "public_a" {
   subnet_id      = aws_subnet.public_a.id
-  route_table_id = aws_route_table.public.id
-}
-
-resource "aws_route_table_association" "public_c" {
-  subnet_id      = aws_subnet.public_c.id
   route_table_id = aws_route_table.public.id
 }
 
@@ -165,30 +146,4 @@ resource "aws_security_group_rule" "ec2_ssh_break_glass" {
   to_port     = 22
   protocol    = "tcp"
   cidr_blocks = [var.allowed_ssh_cidr]
-}
-
-# ─── Security Group: RDS ──────────────────────────────
-# ADR-0009 검증: ingress 는 EC2 SG 5432 단일 출처만, egress 는 명시 안 해
-# 기본 deny (terraform 은 SG egress 미지정 시 빈 set 적용) — 외부 통신 없음.
-# publicly_accessible=false 와 함께 이중 방어.
-# description 필드는 immutable + RDS-attached ENI 라 변경 불가 — ADR-0006 원본 그대로 유지.
-resource "aws_security_group" "rds" {
-  name        = "kicklog-rds-sg"
-  description = "RDS: 5432 from EC2 SG only"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description     = "PostgreSQL from EC2"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.ec2.id]
-  }
-
-  # RDS는 outbound 불필요 (백업 등은 AWS 내부)
-  # 보안상 명시적으로 제거
-
-  tags = {
-    Name = "kicklog-rds-sg"
-  }
 }

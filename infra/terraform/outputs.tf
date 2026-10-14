@@ -8,33 +8,13 @@ output "ec2_public_ip" {
 }
 
 output "ssh_command" {
-  description = "SSH 접속 명령"
+  description = "SSH 접속 명령 (평시 SG 에서 22 가 닫혀 있다 — SSM Session Manager 를 쓴다)"
   value       = "ssh -i ~/.ssh/${var.ssh_key_name}.pem ec2-user@${aws_eip.app.public_ip}"
 }
 
-output "rds_endpoint" {
-  description = "RDS PostgreSQL endpoint (EC2에서만 접근)"
-  value       = aws_db_instance.main.endpoint
-}
-
-output "rds_database_name" {
-  description = "초기 데이터베이스 이름"
-  value       = aws_db_instance.main.db_name
-}
-
-output "secrets_db_password_arn" {
-  description = "Secrets Manager ARN — DB 비밀번호"
-  value       = aws_secretsmanager_secret.db_password.arn
-}
-
-output "secrets_kakao_arn" {
-  description = "Secrets Manager ARN — Kakao API 키"
-  value       = aws_secretsmanager_secret.kakao_rest_api_key.arn
-}
-
-output "secrets_jwt_arn" {
-  description = "Secrets Manager ARN — JWT secret"
-  value       = aws_secretsmanager_secret.jwt_secret.arn
+output "pgdata_volume_id" {
+  description = "Postgres 데이터 EBS 볼륨 ID (스냅샷·복구 시 사용)"
+  value       = aws_ebs_volume.pgdata.id
 }
 
 output "aws_account_id" {
@@ -57,11 +37,6 @@ output "deploy_staging_bucket_name" {
 output "ec2_instance_id" {
   description = "SSM 타겟 EC2 instance ID (Variable: EC2_INSTANCE_ID)"
   value       = aws_instance.app.id
-}
-
-output "secrets_ghcr_pat_arn" {
-  description = "Secrets Manager ARN — GHCR PAT"
-  value       = aws_secretsmanager_secret.ghcr_pat.arn
 }
 
 # ─── Observability / Budget (ADR-0009) ───────────────

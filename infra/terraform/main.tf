@@ -52,14 +52,14 @@ provider "aws" {
 # 현재 AWS 계정 ID 조회 (정보용)
 data "aws_caller_identity" "current" {}
 
-# Amazon Linux 2023 최신 AMI 자동 조회
+# Amazon Linux 2023 최신 AMI 자동 조회 (arm64 — ADR-0016 Graviton 전환)
 data "aws_ami" "amazon_linux_2023" {
   most_recent = true
   owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["al2023-ami-2023.*-x86_64"]
+    values = ["al2023-ami-2023.*-arm64"]
   }
 
   filter {

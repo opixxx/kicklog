@@ -33,24 +33,21 @@ variable "public_subnet_az" {
   default     = "ap-northeast-2a"
 }
 
-# RDS는 multi-AZ 안 쓰지만 subnet group은 최소 2 AZ 필요
-variable "rds_subnet_cidr_b" {
-  description = "RDS subnet group용 2번째 AZ subnet (실제 사용 안 함, AWS 정책)"
-  type        = string
-  default     = "10.0.2.0/24"
-}
-
-variable "rds_subnet_az_b" {
-  description = "RDS subnet group용 2번째 AZ"
-  type        = string
-  default     = "ap-northeast-2c"
-}
-
 # ─── EC2 ──────────────────────────────────────────────
 variable "ec2_instance_type" {
-  description = "EC2 인스턴스 타입 (Free Tier: t3.micro)"
+  # ADR-0016: t3.micro(x86, 1GB) → t4g.small(arm64, 2GB).
+  # 앱과 Postgres 를 한 박스에 올리므로 메모리가 2GB 필요하고, Graviton 이 같은
+  # 사양에서 약 20% 싸다. 실측 CPU 사용률이 평균 0.67% 라 vCPU 는 문제가 아니다.
+  description = "EC2 인스턴스 타입 (arm64 — Graviton)"
   type        = string
-  default     = "t3.micro"
+  default     = "t4g.small"
+}
+
+variable "pgdata_volume_size_gb" {
+  # 현재 DB 실사용 약 2.9GB. 20GB 면 수년치 여유이고 기존 RDS 스토리지와 같은 크기다.
+  description = "Postgres 데이터 전용 EBS 볼륨 크기 (GB)"
+  type        = number
+  default     = 20
 }
 
 variable "ec2_volume_size_gb" {
@@ -80,34 +77,24 @@ variable "enable_ssh_inbound" {
   default     = false
 }
 
-# ─── RDS ──────────────────────────────────────────────
-variable "rds_instance_class" {
-  description = "RDS 인스턴스 클래스 (Free Tier: db.t3.micro)"
-  type        = string
-  default     = "db.t3.micro"
-}
-
-variable "rds_storage_size_gb" {
-  description = "RDS 할당 스토리지 (Free Tier: 20GB)"
-  type        = number
-  default     = 20
-}
-
-variable "rds_db_name" {
-  description = "초기 데이터베이스 이름"
+# ─── Database (컨테이너 Postgres, ADR-0016) ───────────
+# RDS 를 폐지하고 docker compose 의 postgres 서비스로 옮겼다.
+# host/port 는 compose 네트워크에서 고정(postgres:5432)이라 변수가 아니다.
+variable "db_name" {
+  description = "데이터베이스 이름"
   type        = string
   default     = "kicklog"
 }
 
-variable "rds_username" {
-  description = "RDS 마스터 사용자명"
+variable "db_username" {
+  description = "DB 사용자명"
   type        = string
   default     = "kicklog"
   sensitive   = true
 }
 
-variable "rds_password" {
-  description = "RDS 마스터 비밀번호 (terraform.tfvars에 sensitive로 저장, Secrets Manager에 동기화됨)"
+variable "db_password" {
+  description = "DB 비밀번호 (SSM Parameter Store 에 동기화됨)"
   type        = string
   sensitive   = true
 }
