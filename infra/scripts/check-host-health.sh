@@ -32,8 +32,8 @@ fi
 
 # ─── 2) 디스크 사용률 ─────────────────────────────────
 while read -r target pct; do
-  [ -z "$target" ] && continue
-  if [ "$pct" -ge "$DISK_WARN_PCT" ]; then
+  [[ -z "$target" ]] && continue
+  if [[ "$pct" -ge "$DISK_WARN_PCT" ]]; then
     problems+=("디스크 사용률 ${pct}% (임계 ${DISK_WARN_PCT}%): $target")
   fi
 done < <(df --output=target,pcent / "$PGDATA_MOUNT" 2>/dev/null | tail -n +2 | tr -d '%' | awk '{print $1, $2}')
@@ -46,7 +46,7 @@ for c in kicklog-postgres kicklog-backend; do
   fi
   health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null)
   restarts=$(docker inspect --format '{{.RestartCount}}' "$c" 2>/dev/null)
-  if [ "$health" != "healthy" ] && [ "$health" != "none" ]; then
+  if [[ "$health" != "healthy" && "$health" != "none" ]]; then
     problems+=("컨테이너 비정상: $c (health=$health, restarts=$restarts)")
   fi
 done
@@ -54,35 +54,37 @@ done
 # ─── 4) 스왑 사용률 ───────────────────────────────────
 # 스왑을 쓰기 시작했다는 것은 2GB 예산이 빡빡해졌다는 신호다 (2026-09-06 재발 조짐).
 read -r swap_total swap_used < <(free -m | awk '/^Swap:/ {print $2, $3}')
-if [ "${swap_total:-0}" -gt 0 ]; then
+if [[ "${swap_total:-0}" -gt 0 ]]; then
   swap_pct=$(( swap_used * 100 / swap_total ))
-  if [ "$swap_pct" -ge "$SWAP_WARN_PCT" ]; then
+  if [[ "$swap_pct" -ge "$SWAP_WARN_PCT" ]]; then
     problems+=("스왑 사용률 ${swap_pct}% (${swap_used}/${swap_total}MB) — 메모리 예산 재검토 필요")
   fi
 fi
 
 # ─── 통보 ─────────────────────────────────────────────
-if [ ${#problems[@]} -eq 0 ]; then
+if [[ ${#problems[@]} -eq 0 ]]; then
   echo "정상 — 문제 없음 $(date -Iseconds)"
   rm -f "$STATE_FILE"
   exit 0
 fi
 
 message=$(printf '%s\n' "${problems[@]}")
-hash=$(printf '%s' "$message" | md5sum | cut -d' ' -f1)
+# 해시는 "같은 문제가 계속되는가" 판별용이지 보안 용도가 아니지만,
+# 약한 해시를 쓸 이유도 없어 sha256 을 쓴다 (SonarCloud S4790).
+hash=$(printf '%s' "$message" | sha256sum | cut -d' ' -f1)
 now=$(date +%s)
 
 should_notify=true
-if [ -f "$STATE_FILE" ]; then
+if [[ -f "$STATE_FILE" ]]; then
   read -r prev_hash prev_time < "$STATE_FILE"
-  if [ "$prev_hash" = "$hash" ] && [ $((now - prev_time)) -lt "$COOLDOWN_SECONDS" ]; then
+  if [[ "$prev_hash" == "$hash" && $((now - prev_time)) -lt "$COOLDOWN_SECONDS" ]]; then
     should_notify=false
   fi
 fi
 
 echo "$message"
 
-if [ "$should_notify" = true ]; then
+if [[ "$should_notify" == true ]]; then
   ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
   TOPIC_ARN="arn:aws:sns:${REGION}:${ACCOUNT_ID}:${TOPIC_NAME}"
   aws sns publish --region "$REGION" --topic-arn "$TOPIC_ARN" \
