@@ -27,7 +27,7 @@ dnf update -y
 # 주의: 백엔드 컨테이너는 compose 의 memswap_limit=mem_limit 으로 **스왑 사용이 0** 이다.
 # 이 스왑은 호스트 프로세스(nginx·docker·containerd·SSM agent·OS) 전용 완충이며,
 # 컨테이너는 제한 초과 시 스왑으로 연명하지 않고 즉시 OOM kill → 재시작된다 (의도된 동작).
-if [ ! -f /swapfile ]; then
+if [[ ! -f /swapfile ]]; then
   fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
   chmod 600 /swapfile
   mkswap /swapfile
@@ -54,12 +54,32 @@ dnf install -y docker
 systemctl enable --now docker
 usermod -aG docker ec2-user
 
-# docker compose plugin (v2)
-mkdir -p /usr/local/lib/docker/cli-plugins
+# docker compose plugin
 # ADR-0016: arm64(Graviton) 전환 — aarch64 바이너리를 받는다.
-curl -sL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 \
-  -o /usr/local/lib/docker/cli-plugins/docker-compose
-chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+#
+# 버전을 고정하고 **체크섬을 검증한 뒤에만** 설치한다. 이전에는 `releases/latest` 를
+# 그대로 받아 실행했는데, 그러면 ① 박스를 다시 만들 때마다 다른 버전이 깔려 재현성이 깨지고
+# ② 받은 바이너리가 올바른지 확인할 방법이 없다 (SonarCloud 보안 지적).
+# 갱신 방법:
+#   TAG=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)
+#   curl -sL ".../download/$TAG/docker-compose-linux-aarch64.sha256"
+DOCKER_COMPOSE_VERSION=v5.6.0
+DOCKER_COMPOSE_SHA256=733ec76717ceb59052a9609b9dadfb523b2df8eab57a54212872d10a58078ea2
+
+mkdir -p /usr/local/lib/docker/cli-plugins
+COMPOSE_TMP=$(mktemp)
+curl -fsSL "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-aarch64" \
+  -o "$COMPOSE_TMP"
+
+if echo "${DOCKER_COMPOSE_SHA256}  ${COMPOSE_TMP}" | sha256sum --check --status; then
+  install -m 0755 "$COMPOSE_TMP" /usr/local/lib/docker/cli-plugins/docker-compose
+  echo "docker compose ${DOCKER_COMPOSE_VERSION} 설치 완료 (체크섬 검증됨)"
+else
+  echo "❌ docker compose 체크섬 불일치 — 설치하지 않습니다 (공급망 위험)" >&2
+  rm -f "$COMPOSE_TMP"
+  exit 1
+fi
+rm -f "$COMPOSE_TMP"
 
 # ─── Postgres 데이터 볼륨 마운트 (ADR-0016) ──────────
 # 이 블록만 `set +e` 로 감싼다. 볼륨 준비 실패로 **스크립트 전체가 중단되어 nginx·docker
@@ -82,16 +102,16 @@ ROOT_DISK=$(lsblk -no pkname "$(findmnt -no SOURCE /)" 2>/dev/null || true)
 DATA_DISK=""
 for _ in $(seq 1 18); do
   for d in $(lsblk -dn -o NAME,TYPE | awk '$2=="disk" {print $1}'); do
-    [ "$d" = "$ROOT_DISK" ] && continue
+    [[ "$d" == "$ROOT_DISK" ]] && continue
     DATA_DISK="/dev/$d"
     break
   done
-  [ -n "$DATA_DISK" ] && break
+  [[ -n "$DATA_DISK" ]] && break
   echo "데이터 볼륨 attach 대기 중..."
   sleep 5
 done
 
-if [ -n "$DATA_DISK" ]; then
+if [[ -n "$DATA_DISK" ]]; then
   # 파일시스템이 **없을 때만** 포맷한다 — 기존 데이터가 담긴 볼륨을 재부착한 경우를 보호한다.
   if ! blkid "$DATA_DISK" >/dev/null 2>&1; then
     echo "데이터 볼륨 초기화: $DATA_DISK"

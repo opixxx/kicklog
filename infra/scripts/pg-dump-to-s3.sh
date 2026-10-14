@@ -18,7 +18,7 @@ REGION="${AWS_REGION:-ap-northeast-2}"
 CONTAINER="${PG_CONTAINER:-kicklog-postgres}"
 BUCKET="${BACKUP_BUCKET:-}"
 
-if [ -z "$BUCKET" ]; then
+if [[ -z "$BUCKET" ]]; then
   ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
   BUCKET="kicklog-backup-${ACCOUNT_ID}"
 fi
@@ -41,7 +41,7 @@ docker exec "$CONTAINER" sh -c \
   'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc --no-owner --no-privileges' > "$DUMP_FILE"
 
 SIZE=$(stat -c %s "$DUMP_FILE")
-if [ "$SIZE" -lt 1024 ]; then
+if [[ "$SIZE" -lt 1024 ]]; then
   echo "❌ 덤프가 ${SIZE}바이트로 비정상적으로 작습니다 — 업로드하지 않습니다." >&2
   exit 1
 fi

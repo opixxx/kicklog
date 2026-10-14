@@ -38,13 +38,16 @@ RESP=$(aws ssm get-parameters --region "$REGION" --with-decryption \
   --output json)
 
 MISSING=$(echo "$RESP" | jq -r '.InvalidParameters[]?')
-if [ -n "$MISSING" ]; then
+if [[ -n "$MISSING" ]]; then
   echo "❌ 필수 SSM 파라미터 누락:" >&2
   echo "$MISSING" | sed 's/^/    /' >&2
   exit 1
 fi
 
-param() { echo "$RESP" | jq -r --arg n "$1" '.Parameters[] | select(.Name == $n) | .Value'; }
+param() {
+  local name="$1"
+  echo "$RESP" | jq -r --arg n "$name" '.Parameters[] | select(.Name == $n) | .Value'
+}
 
 DB_PASSWORD=$(param /kicklog/db-password)
 KAKAO_REST_API_KEY=$(param /kicklog/kakao-rest-api-key)
