@@ -62,7 +62,7 @@ usermod -aG docker ec2-user
 # ② 받은 바이너리가 올바른지 확인할 방법이 없다 (SonarCloud 보안 지적).
 # 갱신 방법:
 #   TAG=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)
-#   curl -sL ".../download/$TAG/docker-compose-linux-aarch64.sha256"
+#   curl --proto '=https' --proto-redir '=https' -sL ".../download/$TAG/docker-compose-linux-aarch64.sha256"
 DOCKER_COMPOSE_VERSION=v5.6.0
 DOCKER_COMPOSE_SHA256=733ec76717ceb59052a9609b9dadfb523b2df8eab57a54212872d10a58078ea2
 
