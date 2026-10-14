@@ -4,6 +4,12 @@
 # ADR-0006 D3: Amazon Linux 2023 + JDK 17 (일반 JVM)
 # ADR-0006 D4: Docker + docker-compose로 Spring Boot 실행
 
+# SecureString 복호화에 쓰이는 AWS 관리형 키 (alias/aws/ssm).
+# 계정·리전마다 ID 가 달라 하드코딩하지 않고 조회한다.
+data "aws_kms_key" "ssm" {
+  key_id = "alias/aws/ssm"
+}
+
 # ─── EC2 Instance ─────────────────────────────────────
 resource "aws_instance" "app" {
   ami           = data.aws_ami.amazon_linux_2023.id
@@ -95,11 +101,13 @@ resource "aws_iam_role_policy" "ec2_ssm_read" {
         Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/kicklog/*"
       },
       {
-        # SecureString 복호화 — AWS 관리형 키를 SSM 경유로만 쓰도록 제한.
-        Sid      = "DecryptSecureStringViaSsm"
+        # SecureString 복호화 — **키 ARN 으로 범위를 좁히고** SSM 경유 조건까지 건다.
+        # `Resource = "*"` 로 두면 계정의 모든 KMS 키에 대한 복호화를 허용하는 셈이라,
+        # ViaService 조건이 있어도 과도하다 (SonarCloud S6317).
+        Sid      = "DecryptSsmSecureStringKeyOnly"
         Effect   = "Allow"
         Action   = "kms:Decrypt"
-        Resource = "*"
+        Resource = data.aws_kms_key.ssm.arn
         Condition = {
           StringEquals = {
             "kms:ViaService" = "ssm.${var.aws_region}.amazonaws.com"
