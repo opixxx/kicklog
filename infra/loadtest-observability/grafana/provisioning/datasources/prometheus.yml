@@ -1,0 +1,13 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: kicklog-prom
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      # scrape_interval 과 맞춘다. 어긋나면 Grafana 가 rate() 창을 잘못 잡아
+      # 계단 모양 그래프가 나온다.
+      timeInterval: 2s
