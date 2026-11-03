@@ -1,5 +1,13 @@
-# 부하 테스트 전용 profile — 경로 B(nginx ↔ backend keep-alive lifecycle) 재현.
+# 부하 테스트 전용 profile — 운영에는 존재하지 않는 설정이다.
 #
+# 두 가지 측정을 담는다:
+#   (A) ADR-0010 경로 B — nginx ↔ backend keep-alive lifecycle 재현
+#   (B) 시나리오 1    — 외부 의존 지연 하의 동시성 처리 모델 선택
+#
+# **모든 노브는 env 로 교체 가능해야 한다.** 측정 전제가 "같은 바이너리에서 설정만 바꿔 비교"이기
+# 때문이다. 바이너리가 다르면 처리량 차이를 설정에 귀속할 수 없다.
+
+# ─── (A) keep-alive lifecycle (ADR-0010) ─────────────────────────────────────
 # server.tomcat.keep-alive-timeout 을 env 로 토글해 3막 상태를 만든다:
 #   S1 (비대칭, race 유발): TOMCAT_KEEPALIVE_TIMEOUT=1s   (< nginx 60s)
 #   S2 (예방):             TOMCAT_KEEPALIVE_TIMEOUT=80s   (> nginx 60s)
@@ -11,6 +19,84 @@ server:
   tomcat:
     keep-alive-timeout: ${TOMCAT_KEEPALIVE_TIMEOUT:20s}
     max-keep-alive-requests: ${TOMCAT_MAX_KEEPALIVE_REQUESTS:100}
+
+    # ─── (B) 동시성 천장 노브 ───────────────────────────────────────────────
+    # threads.max 가 **동시에 처리 가능한 요청 수**의 상한이다 (플랫폼 스레드 모델에서).
+    # 동시성 = 주입률 × 응답시간 이므로, 지연 200ms 기준 천장은 threads.max ÷ 0.2s 가 된다.
+    # 200 → 1,000 RPS. 이 계산값과 실측이 일치하는지가 H1 의 검증 조건이다.
+    threads:
+      max: ${TOMCAT_MAX_THREADS:200}
+      min-spare: ${TOMCAT_MIN_SPARE_THREADS:10}
+
+    # max-connections 는 "수락해 들고 있는 커넥션 수", accept-count 는 그 뒤의 OS 백로그다.
+    # 스레드(200)보다 크게 두는 것이 중요하다 — 이게 더 작으면 천장이 커넥션 수락 단계로
+    # 옮겨가, 측정하려던 "스레드 포화"가 아니라 "커넥션 거절"을 재게 된다.
+    max-connections: ${TOMCAT_MAX_CONNECTIONS:8192}
+    accept-count: ${TOMCAT_ACCEPT_COUNT:1000}
+
+    # tomcat.threads.busy 메트릭은 MBean 레지스트리가 켜져 있어야 노출된다.
+    # 이 메트릭이 없으면 "스레드가 꽉 찼다"를 직접 관측할 수 없고 추론만 남는다.
+    mbeanregistry:
+      enabled: true
+
+  # 과부하 중단 시 in-flight 요청을 흘려보내고 종료한다. 측정 반복에서 종료가 지저분하면
+  # 다음 회차의 기준선이 오염된다 (TIME_WAIT·미완료 커넥션 잔류).
+  shutdown: graceful
+
+spring:
+  # 가상 스레드 — **런타임 JDK 21+ 에서만 활성된다**(런타임 체크이므로 빌드 toolchain 17 유지 가능).
+  # JDK 17 런타임에서 true 로 둬도 무시되고 플랫폼 스레드로 동작한다.
+  # 측정 시에는 `bootJar` 산출물을 JDK 21 로 실행해 토글이 실제로 먹는지 먼저 확인할 것.
+  threads:
+    virtual:
+      enabled: ${VIRTUAL_THREADS:false}
+
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+# ─── 측정 대상 하네스 (시나리오 1) ───────────────────────────────────────────
+kicklog:
+  loadtest:
+    upstream-base-url: ${LOADTEST_UPSTREAM_URL:http://localhost:9100}
+    # 기본값 simple = 운영 인증 경로와 같은 형상(커넥션 풀 없음). 기준선이 운영을 대변해야 한다.
+    http-client: ${LOADTEST_HTTP_CLIENT:simple}
+    default-delay-ms: ${LOADTEST_DEFAULT_DELAY_MS:200}
+    max-delay-ms: ${LOADTEST_MAX_DELAY_MS:10000}
+    connect-timeout-millis: ${LOADTEST_CONNECT_TIMEOUT_MS:2000}
+    # read timeout 은 민감하다 — 과부하 구간에서 이 값이 작으면 "스레드 포화"가 아니라
+    # "타임아웃"을 측정하게 되어 원인이 바뀐다. 주입 지연의 수십 배로 두고, 바꿀 때는 기록할 것.
+    read-timeout-millis: ${LOADTEST_READ_TIMEOUT_MS:10000}
+
+# ─── 관측 ────────────────────────────────────────────────────────────────────
+# 천장이 "하드웨어"인지 "설정"인지 귀속하려면 포화 시점의 CPU 와 각 자원의 사용률이 동시에 필요하다
+# (판정 기준 G6). metrics 엔드포인트 없이는 이 귀속이 불가능하다.
+management:
+  server:
+    # **관측 경로를 측정 대상과 분리한다.**
+    # 같은 8080 에 두면 actuator 요청이 부하 요청과 같은 Tomcat 스레드 풀에서 대기한다.
+    # 스레드가 포화한 순간 — 정확히 우리가 CPU·스레드 수를 알고 싶은 그 순간 — 스크레이프가
+    # 타임아웃되어 그래프에 구멍이 뚫린다 (2026-10-30 실측으로 확인).
+    # 별도 포트는 자체 커넥터·자체 스레드 풀을 가지므로 부하와 무관하게 응답한다.
+    port: ${MANAGEMENT_PORT:8081}
+
+  endpoints:
+    web:
+      exposure:
+        # prometheus 는 Grafana 실시간 관찰용이다. 운영 profile 은 base application.yml 의
+        # health,info 만 유지하므로 이 노출은 부하테스트에만 존재한다.
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      # 회차를 구분할 수 있게 구성 이름을 지표에 붙인다. 이게 없으면 Grafana 에서
+      # "어느 설정의 그래프인지"를 시간대로만 추측해야 한다.
+      config: ${LOADTEST_CONFIG_LABEL:unlabeled}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoint:
+    health:
+      show-details: when-authorized
 
 logging:
   level:

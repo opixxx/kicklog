@@ -17,6 +17,11 @@
 
 - [transactionTemplate RED 충돌](pattern_transaction_template_red_conflict.md) — 침묵 fallback 을 명시 실패로 바꾸면 그 fallback 의존 기존 단위 테스트가 GREEN 에서 깨짐
 
+## Feedback
+
+- [하네스 테스트 인프라](feedback_loadtest_test_infra.md) — DB 미접촉 loadtest 경로는 Testcontainers 금지, H2 프로파일 겹침 + 실제 HttpServer stub
+- [Kotlin 주석 중첩](feedback_kotlin_kdoc_nested_comment.md) — KDoc 안에 `/**` 가 들어가면 컴파일이 깨진다 (실제 발생)
+
 <!--
 ### YYYY-MM-DD — <pattern>
 - Missing case:

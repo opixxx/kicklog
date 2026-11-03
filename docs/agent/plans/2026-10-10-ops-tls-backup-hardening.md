@@ -20,7 +20,7 @@
 1. **오리진 TLS 가 46일째 만료 상태**(`notAfter=Aug 25 2026`)이고 `certbot-renew.timer` 가 `disabled` + `acme-challenge` 경로 부재로 **자동 갱신 구조 자체가 깨져 있다.** Cloudflare 엣지 + `Full(비 strict)` 가 가려서 46일간 무증상이었다.
 2. **예산 알람이 무의미화**됐다 — 한도 $5 / forecast $42.87 로 매달 3건이 전부 울려 alert fatigue 상태. **DB 백업은 1일분뿐이고 수동 스냅샷 0개** (2026-09-06 장애는 인지까지 9일 걸렸다 — 1일 보존으로는 복구 불가였다).
 3. **IaC 공백** — `terraform plan` 은 "No changes" 지만 nginx conf·certbot·AASA·jq 가 Terraform 밖이라 거짓 안심이다. 저장소 conf 와 운영 conf 가 서로 다르고, `user-data.sh` 에 `jq` 가 없어 **새 박스는 첫 배포가 반드시 실패**한다.
-4. **오리진이 직접 노출**돼 있다 — `https://3.37.14.253/nginx-health` 가 200 응답(SG 80/443 = 0.0.0.0/0). 저장소에만 있던 rate limit 이 운영에 적용된 적 없어 **인증 엔드포인트 brute force 완화가 0** 이다.
+4. **오리진이 직접 노출**돼 있다 — `https://<ORIGIN_EIP>/nginx-health` 가 200 응답(SG 80/443 = 0.0.0.0/0). 저장소에만 있던 rate limit 이 운영에 적용된 적 없어 **인증 엔드포인트 brute force 완화가 0** 이다.
 
 ## 2. 접근 (Approach)
 
@@ -90,27 +90,27 @@ cd infra/terraform && terraform fmt -check && terraform validate && terraform pl
 ### 시나리오 검증 (실측)
 ```bash
 # TLS — 오리진 인증서 교체 확인
-echo | openssl s_client -connect 3.37.14.253:443 -servername kicklog.org 2>/dev/null \
+echo | openssl s_client -connect <ORIGIN_EIP>:443 -servername kicklog.org 2>/dev/null \
   | openssl x509 -noout -subject -enddate -issuer
 
 # 엣지 정상 + strict 모드
 curl -s -o /dev/null -w "%{http_code}\n" https://kicklog.org/actuator/health
 
 # 오리진 직접 접근 차단
-curl -k --max-time 8 https://3.37.14.253/nginx-health ; echo "exit=$?"   # 타임아웃 기대
+curl -k --max-time 8 https://<ORIGIN_EIP>/nginx-health ; echo "exit=$?"   # 타임아웃 기대
 
 # AASA
 curl -sI https://kicklog.org/.well-known/apple-app-site-association | head -3
 
 # 백업
-aws s3 ls s3://kicklog-backup-576393818807/pg/ --region ap-northeast-2
+aws s3 ls s3://kicklog-backup-<AWS_ACCOUNT_ID>/pg/ --region ap-northeast-2
 
 # RDS 보존 기간
 aws rds describe-db-instances --region ap-northeast-2 \
   --query "DBInstances[].BackupRetentionPeriod" --output text   # 7 기대
 
 # 예산
-aws budgets describe-budgets --account-id 576393818807 \
+aws budgets describe-budgets --account-id <AWS_ACCOUNT_ID> \
   --query "Budgets[].[BudgetLimit.Amount,CalculatedSpend.ForecastedSpend.Amount]" --output text
 ```
 

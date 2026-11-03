@@ -35,6 +35,7 @@ enum class ErrorCode(
     FRIEND_UNAUTHORIZED(HttpStatus.FORBIDDEN, "친구 관계가 아닙니다"),
     EXTERNAL_APPLE_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "Apple 서비스가 일시적으로 응답하지 않습니다"),
     EXTERNAL_KAKAO_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "카카오 서비스가 일시적으로 응답하지 않습니다"),
+    EXTERNAL_UPSTREAM_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "외부 의존 서비스가 일시적으로 응답하지 않습니다"),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다"),
 }

@@ -16,6 +16,33 @@ data class LoadTestTokenResponse(
     val accessToken: String,
 )
 
+// ── 외부 의존 지연 (W-EXT) ───────────────────────────────────────────────────
+
+/**
+ * 외부 호출 1회의 결과. `elapsedMs` 는 **백엔드가 블로킹된 실제 시간**이다.
+ *
+ * 주입 지연(`upstreamDelayMs`)과 `elapsedMs` 의 차이가 큰 구간은 upstream 이 아니라
+ * 백엔드 쪽에서 대기가 생긴 구간이다 — 스레드 포화의 1차 신호로 쓴다.
+ */
+data class LoadTestExternalResponse(
+    val upstreamDelayMs: Int,
+    val upstreamPid: Int,
+    val elapsedMs: Long,
+)
+
+// ── DB 커넥션 점유 (W-DB-POOL) ───────────────────────────────────────────────
+
+/**
+ * DB 커넥션을 붙잡은 결과.
+ *
+ * `elapsedMs` 가 `requestedDelayMs` 보다 크게 벌어지면 그 차이가 **풀 대기 시간**이다 —
+ * 커넥션이 없어 기다린 시간이므로, 풀이 구속 자원이 됐다는 직접 증거다.
+ */
+data class LoadTestDbResponse(
+    val requestedDelayMs: Int,
+    val elapsedMs: Long,
+)
+
 // ── 대량 시드 ────────────────────────────────────────────────────────────────
 
 /**

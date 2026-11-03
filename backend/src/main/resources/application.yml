@@ -32,8 +32,15 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+  lifecycle:
+    # graceful shutdown 의 유예 시간. 이 시간이 지나면 남은 요청도 끊고 종료한다.
+    timeout-per-shutdown-phase: ${SHUTDOWN_GRACE_PERIOD:20s}
+
 server:
   port: ${SERVER_PORT:8080}
+  # 종료 신호를 받으면 새 요청은 거절하되 처리 중인 요청은 끝까지 흘려보낸다.
+  # 없으면 배포(CD)마다 in-flight 요청이 그대로 끊긴다.
+  shutdown: graceful
 
 management:
   endpoints:
@@ -71,10 +78,18 @@ kicklog:
   apple:
     client-id: ${APPLE_CLIENT_ID:com.opixxx.KickLog}
     jwks-url: ${APPLE_JWKS_URL:https://appleid.apple.com/auth/keys}
+    # 서명 키는 로테이션 주기가 길어 매 로그인마다 받아올 이유가 없다.
+    # kid 가 캐시에 없으면 TTL 과 무관하게 즉시 재조회하므로 로테이션에 뒤처지지 않는다.
+    jwks-cache-ttl-minutes: ${APPLE_JWKS_CACHE_TTL_MINUTES:360}
   kakao:
     user-info-url: ${KAKAO_USER_INFO_URL:https://kapi.kakao.com/v2/user/me}
     rest-api-key: ${KAKAO_REST_API_KEY:}
     local-search-url: ${KAKAO_LOCAL_SEARCH_URL:https://dapi.kakao.com/v2/local/search/keyword.json}
-    connect-timeout-millis: ${KAKAO_LOCAL_CONNECT_TIMEOUT_MILLIS:2000}
-    read-timeout-millis: ${KAKAO_LOCAL_READ_TIMEOUT_MILLIS:3000}
+
+  # 모든 외부 HTTP 클라이언트가 공유하는 타임아웃 (config/RestClientConfig).
+  # 원래 kicklog.kakao 아래 있었으나 Apple 인증도 같은 빌더를 쓰게 되어 이름을 일반화했다.
+  # **타임아웃이 없으면 외부가 응답하지 않을 때 스레드가 영구 점유되어 전역 장애가 된다** (ADR-0017 D11).
+  external-http:
+    connect-timeout-millis: ${EXTERNAL_HTTP_CONNECT_TIMEOUT_MILLIS:2000}
+    read-timeout-millis: ${EXTERNAL_HTTP_READ_TIMEOUT_MILLIS:3000}
   # 초대 링크 도메인은 P1 V13 에서 폐기 — kicklog.invitation prefix 와 INVITATION_BASE_URL 환경변수 모두 제거.
