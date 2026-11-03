@@ -15,13 +15,22 @@ import java.security.KeyFactory
 import java.security.Signature
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.RSAPublicKeySpec
+import java.time.Clock
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.Base64
+import java.util.concurrent.atomic.AtomicReference
 
 @ConfigurationProperties(prefix = "kicklog.apple")
 data class AppleProperties(
     val clientId: String,
     val jwksUrl: String,
+    /**
+     * JWKS 캐시 수명. Apple 의 서명 키는 로테이션 주기가 길어 매 로그인마다 받아올 이유가 없다.
+     * 짧게 잡으면 캐시의 의미가 없고, 길게 잡아도 **kid 미스 시 즉시 재조회**하므로
+     * 로테이션에 뒤처지지 않는다 (fetchPublicKey 참조).
+     */
+    val jwksCacheTtlMinutes: Long = 360,
 )
 
 data class AppleJwksResponse(
@@ -53,10 +62,27 @@ private data class AppleJwtPayload(
 @EnableConfigurationProperties(AppleProperties::class)
 class AppleIdentityVerifier(
     private val properties: AppleProperties,
+    // 공유 빌더를 쓴다 — RestClient.create() 는 타임아웃이 없어 무한 대기한다 (RestClientConfig 참조).
+    restClientBuilder: RestClient.Builder,
+    private val clock: Clock,
 ) {
-    private val restClient = RestClient.create()
+    private val restClient = restClientBuilder.build()
     private val decoder = Base64.getUrlDecoder()
     private val objectMapper = ObjectMapper()
+
+    /**
+     * JWKS 캐시. 매 로그인마다 Apple 을 호출하던 것을 없앤다 — 외부 호출이 줄면
+     * 외부 장애에 대한 노출도 함께 줄어든다.
+     *
+     * 단일 인스턴스 운영(ADR-0016)이라 프로세스 내 캐시로 충분하다. 경쟁 조건이 생겨도
+     * 중복 조회 한 번이 전부고 결과는 같으므로 락을 걸지 않는다.
+     */
+    private val cachedJwks = AtomicReference<CachedJwks?>(null)
+
+    private data class CachedJwks(
+        val keysByKid: Map<String, RSAPublicKey>,
+        val fetchedAt: Instant,
+    )
 
     fun verify(identityToken: String): OAuthUserInfo {
         val parts = identityToken.split(".")
@@ -83,7 +109,24 @@ class AppleIdentityVerifier(
         )
     }
 
+    /**
+     * kid 에 해당하는 공개키를 돌려준다. 캐시를 먼저 보고, 없으면 한 번만 재조회한다.
+     *
+     * **캐시가 신선해도 kid 가 없으면 재조회하는 것이 핵심이다.** Apple 이 키를 로테이션한 직후
+     * 새 kid 로 서명된 토큰이 들어오는데 TTL 만 믿고 캐시를 쓰면, 남은 TTL 동안 **모든 로그인이 실패**한다.
+     * 반대로 재조회는 **한 번만** 한다 — 없는 kid 를 들고 온 토큰(위조·오설정)이 매번 Apple 을
+     * 때리게 두면 그 자체가 증폭 경로가 된다.
+     */
     private fun fetchPublicKey(kid: String): RSAPublicKey {
+        cachedJwks.get()
+            ?.takeIf { Instant.now(clock).isBefore(it.fetchedAt.plus(properties.jwksCacheTtlMinutes, ChronoUnit.MINUTES)) }
+            ?.keysByKid?.get(kid)
+            ?.let { return it }
+
+        return refreshJwks()[kid] ?: throw KickLogException(ErrorCode.AUTH_INVALID_APPLE_TOKEN)
+    }
+
+    private fun refreshJwks(): Map<String, RSAPublicKey> {
         val jwks = try {
             restClient.get()
                 .uri(properties.jwksUrl)
@@ -93,10 +136,17 @@ class AppleIdentityVerifier(
             throw KickLogException(ErrorCode.EXTERNAL_APPLE_UNAVAILABLE, cause = exception)
         } ?: throw KickLogException(ErrorCode.EXTERNAL_APPLE_UNAVAILABLE)
 
-        val key = jwks.keys.firstOrNull { it.kid == kid && it.kty == "RSA" }
-            ?: throw KickLogException(ErrorCode.AUTH_INVALID_APPLE_TOKEN)
-        val modulus = BigInteger(1, decoder.decode(key.n))
-        val exponent = BigInteger(1, decoder.decode(key.e))
+        val keysByKid = jwks.keys
+            .filter { it.kty == "RSA" }
+            .associate { it.kid to it.toPublicKey() }
+
+        cachedJwks.set(CachedJwks(keysByKid = keysByKid, fetchedAt = Instant.now(clock)))
+        return keysByKid
+    }
+
+    private fun AppleJwk.toPublicKey(): RSAPublicKey {
+        val modulus = BigInteger(1, decoder.decode(n))
+        val exponent = BigInteger(1, decoder.decode(e))
         return KeyFactory.getInstance("RSA")
             .generatePublic(RSAPublicKeySpec(modulus, exponent)) as RSAPublicKey
     }

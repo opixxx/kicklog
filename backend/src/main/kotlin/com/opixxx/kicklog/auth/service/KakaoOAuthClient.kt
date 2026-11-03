@@ -35,8 +35,10 @@ data class KakaoProfile(
 @EnableConfigurationProperties(KakaoProperties::class)
 class KakaoOAuthClient(
     private val properties: KakaoProperties,
+    // 공유 빌더를 쓴다 — RestClient.create() 는 타임아웃이 없어 무한 대기한다 (RestClientConfig 참조).
+    restClientBuilder: RestClient.Builder,
 ) {
-    private val restClient = RestClient.create()
+    private val restClient = restClientBuilder.build()
 
     fun fetchUserInfo(kakaoAccessToken: String): OAuthUserInfo {
         val response = try {
