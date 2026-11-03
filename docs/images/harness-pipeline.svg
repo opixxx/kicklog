@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="270" viewBox="0 0 960 270" font-family="-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif">
+  <defs>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker>
+    <marker id="gr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#15803d"/></marker>
+    <style>
+      .b { fill: #eef2ff; stroke: #1e3a8a; stroke-width: 1.6; }
+      .w { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.4; }
+      .ok { fill: #ecfdf5; stroke: #15803d; stroke-width: 1.6; }
+      .t { font-size: 14px; font-weight: 700; fill: #0f172a; }
+      .s { font-size: 11.5px; fill: #475569; }
+      .tag { font-size: 11px; fill: #64748b; }
+      .red { font-size: 11.5px; font-weight: 600; fill: #dc2626; }
+      .grn { font-size: 11.5px; font-weight: 600; fill: #15803d; }
+    </style>
+  </defs>
+  <rect width="960" height="270" fill="#ffffff"/>
+
+  <text class="tag" x="40" y="36">② 테스트 먼저</text>
+  <text class="tag" x="420" y="36">① 구조 · ③ 동작 보존 · ⑤ 우회 차단</text>
+  <text class="tag" x="606" y="36">④ 품질 · 설계 의도</text>
+
+  <rect class="b" x="30" y="48" width="160" height="62" rx="8"/>
+  <text class="t" x="110" y="74" text-anchor="middle">계획 (EXEC_PLAN)</text>
+  <text class="s" x="110" y="95" text-anchor="middle">테스트 케이스 선작성 강제</text>
+
+  <rect class="w" x="216" y="48" width="160" height="62" rx="8"/>
+  <text class="t" x="296" y="74" text-anchor="middle">구현 (AI)</text>
+  <text class="s" x="296" y="95" text-anchor="middle">worktree · RED → GREEN</text>
+
+  <rect class="b" x="402" y="48" width="160" height="62" rx="8"/>
+  <text class="t" x="482" y="74" text-anchor="middle">Stop 훅 · 결정론</text>
+  <text class="s" x="482" y="95" text-anchor="middle">컴파일 · 테스트 · 아키텍처</text>
+
+  <rect class="b" x="588" y="48" width="160" height="62" rx="8"/>
+  <text class="t" x="668" y="74" text-anchor="middle">리뷰 에이전트 · 추론</text>
+  <text class="s" x="668" y="95" text-anchor="middle">컨벤션 · ADR 기준 판정</text>
+
+  <rect class="ok" x="774" y="48" width="156" height="62" rx="8"/>
+  <text class="t" x="852" y="74" text-anchor="middle">PR · CI 게이트</text>
+  <text class="s" x="852" y="95" text-anchor="middle">위험도별 머지 정책</text>
+
+  <g stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#g)">
+    <path d="M190,79 L212,79"/><path d="M376,79 L398,79"/><path d="M562,79 L584,79"/><path d="M748,79 L770,79"/>
+  </g>
+
+  <!-- Stop 훅 실패 → 구현 -->
+  <path d="M482,110 L482,142 L310,142 L310,114" stroke="#dc2626" stroke-width="1.6" fill="none" marker-end="url(#r)"/>
+  <text class="red" x="396" y="160" text-anchor="middle">실패 → 에러 주입 후 자가수정 (최대 3회, 초과 시 사람에게)</text>
+
+  <!-- 리뷰 Critical → 구현 -->
+  <path d="M690,110 L690,186 L282,186 L282,114" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="6 4" fill="none" marker-end="url(#r)"/>
+  <text class="red" x="486" y="204" text-anchor="middle">Critical → 구현 단계로 복귀</text>
+
+  <!-- 승격 → 리뷰어 -->
+  <path d="M852,110 L852,240 L668,240 L668,114" stroke="#15803d" stroke-width="1.5" stroke-dasharray="6 4" fill="none" marker-end="url(#gr)"/>
+  <text class="grn" x="760" y="258" text-anchor="middle">Critical · 반복 Major → 리뷰어 메모리로 승격, 다음 PR 에서 먼저 대조</text>
+</svg>
