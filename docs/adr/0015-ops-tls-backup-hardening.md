@@ -13,7 +13,7 @@ uptime 25일, `RestartCount=0`, `OOMKilled=false`, 30일 커널 OOM 로그 0건,
 ### 1. 오리진 TLS 가 46일째 만료 상태였다
 
 ```
-오리진(3.37.14.253) CN=kicklog.org  notAfter=Aug 25 2026   ← 만료
+오리진(<ORIGIN_EIP>) CN=kicklog.org  notAfter=Aug 25 2026   ← 만료
 엣지(Cloudflare)    CN=kicklog.org  notAfter=Dec 21 2026   ← 정상
 certbot.timer        존재하지 않음
 certbot-renew.timer  disabled
@@ -54,7 +54,7 @@ DNS 는 Cloudflare 프록시(A 레코드 = `104.21.33.107`/`172.67.189.210`)이�
 
 ### 4. 오리진이 인터넷에 직접 노출돼 있었다
 
-`curl -k https://3.37.14.253/nginx-health` → **200**. SG 가 80/443 을 `0.0.0.0/0` 으로 열어둬서
+`curl -k https://<ORIGIN_EIP>/nginx-health` → **200**. SG 가 80/443 을 `0.0.0.0/0` 으로 열어둬서
 Cloudflare 의 WAF·rate limit·캐시를 우회해 백엔드를 직접 때릴 수 있었다. nginx access log 에
 실제로 스캐너(Palo Alto Xpanse, internet-measurement.com, GenomeCrawler)와 정체불명 IP 의
 직접 요청이 남아 있고, 이들은 Spring Security 까지 도달해 401 을 받고 있었다.

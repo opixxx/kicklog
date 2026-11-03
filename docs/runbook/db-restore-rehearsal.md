@@ -185,10 +185,10 @@ aws rds describe-db-instances --db-instance-identifier "$RESTORE_DB" 2>&1 | head
 
 ```bash
 # 1) 백업 목록
-aws s3 ls s3://kicklog-backup-576393818807/pg/ --region ap-northeast-2
+aws s3 ls s3://kicklog-backup-<AWS_ACCOUNT_ID>/pg/ --region ap-northeast-2
 
 # 2) 받아서 내용 확인 (복원 전에 반드시)
-aws s3 cp s3://kicklog-backup-576393818807/pg/kicklog-<STAMP>.dump /tmp/ --region ap-northeast-2
+aws s3 cp s3://kicklog-backup-<AWS_ACCOUNT_ID>/pg/kicklog-<STAMP>.dump /tmp/ --region ap-northeast-2
 pg_restore --list /tmp/kicklog-<STAMP>.dump | head -40
 
 # 3) 로컬/임시 DB 로 복원해 검증 (운영에 바로 쏘지 않는다)
@@ -222,11 +222,11 @@ DB 는 `kicklog-postgres` 컨테이너이고 데이터는 **별도 EBS**(`/mnt/p
 
 ```bash
 # 목록
-aws s3 ls s3://kicklog-backup-576393818807/pg/ --region ap-northeast-2
+aws s3 ls s3://kicklog-backup-<AWS_ACCOUNT_ID>/pg/ --region ap-northeast-2
 
 # 박스에서 (SSM Session Manager)
 cd /opt/kicklog
-aws s3 cp s3://kicklog-backup-576393818807/pg/kicklog-<STAMP>.dump /tmp/r.dump --region ap-northeast-2
+aws s3 cp s3://kicklog-backup-<AWS_ACCOUNT_ID>/pg/kicklog-<STAMP>.dump /tmp/r.dump --region ap-northeast-2
 
 # 반드시 먼저 열어본다 — 못 여는 덤프는 백업이 아니다
 docker exec -i kicklog-postgres pg_restore --list < /tmp/r.dump | head -20
