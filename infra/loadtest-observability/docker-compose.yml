@@ -1,0 +1,57 @@
+# 부하테스트 관측 스택 — **로컬 전용**. 운영 배포 대상이 아니다.
+#
+# 인증을 끄고 익명 Admin 으로 띄운다. 부하를 걸면서 그래프를 봐야 하는데 로그인 화면이
+# 먼저 나오면 관찰 흐름이 끊긴다. 포트도 127.0.0.1 에만 바인딩해 외부에 열리지 않게 한다.
+#
+# 기동:  docker compose -f infra/loadtest-observability/docker-compose.yml up -d
+# 보기:  http://localhost:3000  (대시보드: KickLog 부하테스트)
+
+name: kicklog-loadtest-obs
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: kicklog-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      # k6 가 보내는 지표를 받는 입구. 이 플래그 없이는 remote write 가 404 로 떨어진다.
+      - --web.enable-remote-write-receiver
+      # 짧은 측정을 되돌아보기 좋게 보존은 짧게, 조회 간격은 촘촘하게.
+      - --storage.tsdb.retention.time=24h
+      - --query.lookback-delta=15s
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: kicklog-grafana
+    restart: unless-stopped
+    depends_on: [prometheus, renderer]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_DEFAULT_THEME: dark
+      # 패널을 PNG 로 뽑는 경로 (/render/...). 사람이 보는 화면과 같은 대시보드에서 나온다.
+      GF_RENDERING_SERVER_URL: http://renderer:8081/render
+      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
+      GF_LOG_LEVEL: warn
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  renderer:
+    image: grafana/grafana-image-renderer:3.12.1
+    container_name: kicklog-grafana-renderer
+    restart: unless-stopped
+    environment:
+      RENDERING_MODE: default
+      # 그래프를 두 개 나란히 놓고 읽을 수 있는 폭.
+      RENDERING_VIEWPORT_DEVICE_SCALE_FACTOR: "2"
